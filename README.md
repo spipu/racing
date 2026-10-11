@@ -18,10 +18,10 @@ website/           l'application, servie telle quelle
 ## Tester en local
 
 ```bash
-python3 -m http.server 8080 --directory website
+python3 -m http.server 8082 --directory website
 ```
 
-Puis `http://localhost:8080/`.
+Puis `http://localhost:8082/`.
 
 ## Traces de référence
 
