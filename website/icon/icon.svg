@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <!-- Source of the icon set, flat polygons only (rasterised by tools/icon/buildIcons.js) -->
+    <rect x="0" y="0" width="512" height="512" fill="#1B2F9E"/>
+    <polygon points="0,0 512,0 512,150 0,230" fill="#2440C0"/>
+    <!-- checkered track -->
+    <polygon points="0,392 512,392 512,512 0,512" fill="#F2F2EC"/>
+    <polygon points="0,392 85,392 64,432 0,432" fill="#141414"/>
+    <polygon points="171,392 256,392 256,432 149,432" fill="#141414"/>
+    <polygon points="341,392 427,392 448,432 363,432" fill="#141414"/>
+    <polygon points="85,392 171,392 149,432 64,432" fill="#F2F2EC"/>
+    <polygon points="64,432 149,432 128,472 32,472" fill="#F2F2EC"/>
+    <polygon points="0,432 64,432 32,472 0,472" fill="#141414"/>
+    <polygon points="149,432 256,432 256,472 128,472" fill="#141414"/>
+    <polygon points="363,432 448,432 480,472 384,472" fill="#141414"/>
+    <polygon points="32,472 128,472 107,512 0,512" fill="#141414"/>
+    <polygon points="256,472 384,472 405,512 256,512" fill="#141414"/>
+    <polygon points="480,472 512,472 512,512 512,512" fill="#141414"/>
+    <polygon points="128,472 256,472 256,512 107,512" fill="#F2F2EC"/>
+    <polygon points="256,392 341,392 363,432 256,432" fill="#F2F2EC"/>
+    <polygon points="448,432 512,432 512,472 480,472" fill="#F2F2EC"/>
+    <polygon points="427,392 512,392 512,432 448,432" fill="#141414"/>
+    <!-- shadow -->
+    <polygon points="96,384 416,384 440,408 72,408" fill="#0A0A20"/>
+    <!-- rear wing -->
+    <polygon points="132,138 380,138 388,176 124,176" fill="#C41818"/>
+    <polygon points="124,176 388,176 380,190 132,190" fill="#7A0C0C"/>
+    <polygon points="226,190 238,190 238,232 226,232" fill="#2A2A30"/>
+    <polygon points="274,190 286,190 286,232 274,232" fill="#2A2A30"/>
+    <!-- rear wheels -->
+    <polygon points="84,214 158,206 168,312 92,320" fill="#26262C"/>
+    <polygon points="92,320 168,312 160,330 100,336" fill="#101014"/>
+    <polygon points="354,206 428,214 420,320 344,312" fill="#3A3A42"/>
+    <polygon points="344,312 420,320 412,336 352,330" fill="#101014"/>
+    <!-- body -->
+    <polygon points="196,218 316,218 330,300 182,300" fill="#E02828"/>
+    <polygon points="256,218 316,218 330,300 256,300" fill="#B41C1C"/>
+    <polygon points="160,262 196,250 182,320 150,322" fill="#F4F4F0"/>
+    <polygon points="352,262 316,250 330,320 362,322" fill="#C8C8C4"/>
+    <!-- cockpit and driver -->
+    <polygon points="226,222 286,222 292,262 220,262" fill="#14141C"/>
+    <polygon points="242,206 270,206 282,222 276,246 236,246 230,222" fill="#F0C800"/>
+    <polygon points="256,206 270,206 282,222 276,246 256,246" fill="#C89E00"/>
+    <polygon points="234,222 278,222 274,232 238,232" fill="#1B2F9E"/>
+    <!-- nose -->
+    <polygon points="210,300 302,300 284,350 228,350" fill="#F4F4F0"/>
+    <polygon points="256,300 302,300 284,350 256,350" fill="#C8C8C4"/>
+    <!-- front wheels -->
+    <polygon points="118,300 176,296 180,372 120,378" fill="#26262C"/>
+    <polygon points="336,296 394,300 392,378 332,372" fill="#3A3A42"/>
+    <!-- front wing -->
+    <polygon points="150,350 362,350 372,370 140,370" fill="#F4F4F0"/>
+    <polygon points="140,370 372,370 364,380 148,380" fill="#A8A8A4"/>
+    <polygon points="132,342 156,342 156,382 132,382" fill="#2050D0"/>
+    <polygon points="356,342 380,342 380,382 356,382" fill="#1838A0"/>
+</svg>

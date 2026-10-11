@@ -1,0 +1,5 @@
+# Grid start on acropolis
+setup formula automatic acropolis
+30 -
+240 B
+30 -

@@ -1,0 +1,25 @@
+# Manual gearbox: up-shifts at each step, then down-shifts while braking
+setup formula manual big_forest
+30 -
+90 B
+5 B+DOWN
+70 B
+5 B+DOWN
+70 B
+5 B+DOWN
+70 B
+5 B+DOWN
+70 B
+5 B+DOWN
+70 B
+5 B+DOWN
+70 B
+5 A+UP
+30 A
+5 A+UP
+30 A
+5 A+UP
+30 A
+5 A+UP
+30 A
+60 -

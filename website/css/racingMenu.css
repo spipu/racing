@@ -1,0 +1,273 @@
+/*
+ * Spipu-Racing theme of the menus, after the screens of Virtua Racing Deluxe:
+ * colours, fonts, borders and backgrounds of the app-menu-* structure
+ * (css/webapp/appMenu.css, loaded first), plus the racing screens. Every size
+ * is in em, like the structure.
+ */
+
+.app-menu-display {
+    background:
+        repeating-conic-gradient(#86A1A3 0 25%, #97B2B4 0 50%) 0 0 / 3.2em 3.2em,
+        #8EA9AB;
+}
+
+.app-menu-display-transparent {
+    background: none;
+}
+
+.app-menu-screen {
+    /* Own stacking context: the title tab rises over the panel, never over a modal. */
+    z-index: 0;
+}
+
+/* --- Title: the white tab framed in yellow of the original screens --- */
+.app-menu-screen-title {
+    background: #F7F7F2;
+    border: 0.1em solid #E8C400;
+    color: #1B2F9E;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 2em;
+    font-style: italic;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.1em 1em;
+    margin-bottom: -0.55em;
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Central panel: dashed white over black, like the original frames --- */
+.app-menu-panel {
+    background: rgba(255, 255, 255, 0.12);
+    border: 0.12em dashed #F7F7F2;
+    outline: 0.12em solid #111;
+    border-radius: 0;
+    padding: 1.4em 1.2em 1em;
+}
+
+.app-menu-subtitle {
+    color: #1B2F9E;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 1.05em;
+    font-style: italic;
+    font-weight: bold;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-bottom: 0.06em solid rgba(27, 47, 158, 0.35);
+}
+
+.app-menu-list,
+.app-menu-modal-list-body {
+    scrollbar-color: rgba(27, 47, 158, 0.5) transparent;
+}
+
+.app-menu-list::-webkit-scrollbar-thumb,
+.app-menu-modal-list-body::-webkit-scrollbar-thumb {
+    background: rgba(27, 47, 158, 0.5);
+    border-radius: 0.1em;
+}
+
+.app-menu-item {
+    background: rgba(236, 243, 243, 0.62);
+    border: max(0.08em, 1px) solid rgba(27, 47, 158, 0.25);
+    border-radius: 0;
+    color: #1B2F9E;
+}
+
+/* Hovering only moves the shared selection (mouse, keyboard and gamepad all
+   drive the same highlighted entry). Pre-brightened colors, no filter: a
+   filter here makes iOS re-run its text autosizing on the selected label. */
+.app-menu-item-selected {
+    background: #FFFFFF;
+    border-color: #E8C400;
+}
+
+/* Press feedback: a beat brighter than the selection, before the action. */
+.app-menu-item-pressed {
+    background: #FFF6C8;
+    border-color: #F5D000;
+}
+
+.app-menu-item-label {
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 1.05em;
+    font-style: italic;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+}
+
+.app-menu-item-infos {
+    color: rgba(27, 47, 158, 0.6);
+    font-size: 0.75em;
+    letter-spacing: 0.1em;
+}
+
+.app-menu-color-swatch {
+    border-radius: 0;
+}
+
+/* Setting row value (right side of the item, the label pushes it there). */
+.app-menu-item-value {
+    color: #C41818;
+    font-size: 0.9em;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+}
+
+.app-menu-button.app-menu-item-delete {
+    font-size: 0.85em;
+    /* Single glyph: the button letter-spacing would trail it off-centre. */
+    letter-spacing: 0;
+    line-height: 1;
+}
+
+/* Buttons: white on the original navy at rest, navy on yellow once focused
+   (hover or keyboard / gamepad), a lighter yellow while pressed (the press
+   feedback of AppMenuDom.addButton). No dimming filter: it would eat the contrast. */
+.app-menu-button {
+    background: #1B2F9E;
+    border: 0.08em solid #E8C400;
+    border-radius: 0;
+    color: #FFFFFF;
+    font-family: "Helvetica", "Arial", sans-serif;
+    font-weight: bold;
+    font-size: 0.8em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.app-menu-button:hover,
+.app-menu-button-focus {
+    background: #F5D000;
+    color: #1B2F9E;
+}
+
+.app-menu-button:disabled {
+    background: #6F7896;
+    color: #D8DBE6;
+    border-color: #9AA0B4;
+}
+
+.app-menu-button-pressed,
+.app-menu-button-pressed:hover {
+    background: #FFF6C8;
+    color: #1B2F9E;
+}
+
+.app-menu-button-secondary {
+    background: rgba(255, 255, 255, 0.5);
+    color: #1B2F9E;
+}
+
+/* --- Status, empty list --- */
+.app-menu-status {
+    color: #1B2F9E;
+    font-size: 0.8em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.app-menu-status-error {
+    color: #C41818;
+}
+
+.app-menu-empty {
+    color: rgba(27, 47, 158, 0.6);
+    font-size: 0.85em;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+/* --- Footer (version + webapp stats) --- */
+.app-menu-footer {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.65em;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-shadow: 0 0 0.3em rgba(0, 0, 0, 0.6);
+}
+
+.app-menu-overlay {
+    background: rgba(10, 20, 60, 0.55);
+}
+
+.app-menu-modal {
+    background: #EEF3F3;
+    border: 0.12em dashed #1B2F9E;
+    outline: 0.12em solid #F7F7F2;
+    border-radius: 0;
+    box-shadow: 0 0 2em rgba(0, 0, 0, 0.35);
+}
+
+.app-menu-modal-message {
+    color: #1B2F9E;
+    font-size: 0.95em;
+    letter-spacing: 0.08em;
+}
+
+.app-menu-modal-loading {
+    animation: racingMenuPulse 1.2s ease-in-out infinite;
+}
+
+.app-menu-modal-error {
+    color: #C41818;
+}
+
+.app-menu-modal-detail {
+    font-family: monospace;
+    font-size: 0.7em;
+    line-height: 1.4;
+    color: #1B2F9E;
+    background: rgba(27, 47, 158, 0.08);
+    border-radius: 0;
+}
+
+@keyframes racingMenuPulse {
+    0%, 100% {
+        opacity: 0.45;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.app-menu-modal-heading {
+    color: #1B2F9E;
+    font-family: "Georgia", "Times New Roman", serif;
+    font-size: 1.1em;
+    font-style: italic;
+    font-weight: bold;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.app-menu-modal-link {
+    color: #C41818;
+    font-size: 1em;
+    letter-spacing: 0.08em;
+}
+
+.app-menu-modal-link:hover {
+    color: #E02828;
+}
+
+.app-menu-modal-line {
+    color: #24306E;
+    font-size: 1em;
+    letter-spacing: 0.06em;
+    line-height: 1.55;
+}
+
+.app-menu-text-field {
+    background: #FFFFFF;
+    border: 0.08em solid #1B2F9E;
+    border-radius: 0;
+    color: #1B2F9E;
+    font-size: 1.4em;
+    letter-spacing: 0.2em;
+}
+
+.app-menu-text-caret {
+    color: #C41818;
+}

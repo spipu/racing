@@ -1,0 +1,57 @@
+# Spipu-Racing
+
+Jeu de course PWA reprenant Virtua Racing Deluxe (Sega 32X). Projet personnel, non diffusé : les données du jeu d'origine (© SEGA 1994) ne doivent pas être redistribuées.
+
+## Arborescence
+
+```
+bench/             traces de référence du jeu d'origine, enregistrement et comparaison de la physique
+├── recorder/      enregistreur de traces (frontal libretro en C pour PicoDrive)
+├── scenarios/     scénarios de commandes rejoués dans le jeu d'origine
+└── traces/        traces enregistrées (une ligne JSON par image, gzip)
+tools/
+├── export/        exporteur des données de la ROM vers website/assets/virtual_racing/
+└── icon/          génération du jeu d'icônes depuis website/icon/icon.svg
+website/           l'application, servie telle quelle
+```
+
+## Tester en local
+
+```bash
+python3 -m http.server 8080 --directory website
+```
+
+Puis `http://localhost:8080/`.
+
+## Traces de référence
+
+Prérequis, hors dépôt : dans `.source/`, la ROM `Virtua Racing Deluxe (USA).32x` (MD5 `72b1ad0f949f68da7d0a6339ecd51a3f`) et le cœur libretro de PicoDrive compilé (`.source/picodrive/picodrive_libretro.so`, `make -f Makefile.libretro`).
+
+```bash
+node bench/recordTraces.js              # tous les scénarios
+node bench/recordTraces.js wall         # un scénario
+```
+
+Chaque scénario rejoue la navigation Time Attack (voiture, boîte, circuit), puis ses commandes ; la trace garde, image par image depuis le départ, l'état de la voiture du joueur et les variables globales du jeu.
+
+## Comparaison de la physique
+
+```bash
+node bench/comparePhysics.js                         # tous les scénarios, tick par tick
+node bench/comparePhysics.js wall --ticks 50         # un scénario, ses 50 premiers ticks
+node bench/comparePhysics.js --continuous --rate 3   # physique à pas variable, 3 pas par tick
+```
+
+Le mode par défaut enchaîne `RacingCarPhysics` tick par tick depuis le premier état de la trace : chaque champ qui diffère du jeu d'origine est signalé, puis recalé sur la trace. Tous les scénarios doivent sortir `identical`. Le mode `--continuous` fait rouler librement `RacingCarContinuousPhysics` et mesure l'écart de trajectoire (mètres) et de vitesse (%) ; il échoue au-delà de 1,5 m ou 2 %. Les scénarios `views` et `views_3button` servent aux transitions de caméra : ils ne sont comparés que si on les nomme.
+
+## Données du jeu d'origine
+
+```bash
+node tools/export/exportVirtualRacing.js     # ROM USA dans .source/, voir website/assets/virtual_racing/README.md
+```
+
+## Icônes
+
+```bash
+node tools/icon/buildIcons.js                # régénère les PNG et favicon.ico depuis website/icon/icon.svg
+```

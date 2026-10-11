@@ -1,0 +1,8 @@
+# Full throttle from the grid, coast, throttle again, then brake to a stop
+setup formula automatic big_forest
+30 -
+360 B
+120 -
+240 B
+150 A
+60 -

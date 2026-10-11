@@ -1,0 +1,5 @@
+# Grid start on highland
+setup formula automatic highland
+30 -
+240 B
+30 -

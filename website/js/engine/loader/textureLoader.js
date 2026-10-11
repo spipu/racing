@@ -1,0 +1,30 @@
+class TextureLoader extends AbstractLoader {
+    constructor(loadedCallback) {
+        super('texture', loadedCallback);
+    }
+
+
+    _create(id, url, callback) {
+        return new Texture(id, url, callback);
+    }
+
+    _initialiseEntityFromUrl(entity) {
+        const img = new Image();
+        img.onload = () => {
+            const canvas  = document.createElement('canvas');
+            const ctx     = canvas.getContext('2d');
+            canvas.width  = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            entity.setImageData(ctx.getImageData(0, 0, img.width, img.height));
+            entity.setLoaded();
+        };
+
+        img.src = appBootstrap.buildUrl(entity.getUrl());
+    }
+
+    _populateFromData(entity, imageData) {
+        entity.setImageData(imageData);
+    }
+}

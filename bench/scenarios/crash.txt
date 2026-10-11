@@ -1,0 +1,3 @@
+# Full throttle on Bay Bridge into the first bend: a frontal crash at speed, then the recovery
+setup formula automatic bay_bridge
+1000 B

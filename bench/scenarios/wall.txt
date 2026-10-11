@@ -1,0 +1,6 @@
+# Steers into the right-hand side barrier at speed
+setup formula automatic big_forest
+30 -
+200 B
+240 B+RIGHT
+180 B

@@ -1,0 +1,340 @@
+class Object3dRendererBase {
+    constructor() {
+        this._litColor          = [0, 0, 0];
+        this._lightContribution = [0, 0, 0];
+        this._uvOffsetOut       = [0, 0];
+        this._spriteCanvases    = new WeakMap();
+        this._queue             = new FaceDepthQueue();
+        this._styles            = [];
+        this._styleIndex        = new Map();
+    }
+
+    isAvailable() {
+        return true;
+    }
+
+    // Whether the renderer reads Object3d.pt2d: flat and fast do, webgl and
+    // full project on their own and the engine skips that pass for them.
+    needsProjection() {
+        return true;
+    }
+
+    initCanvas(canvas) {
+        return canvas.getContext('2d');
+    }
+
+    // flat and fast keep this fixed backdrop and get no sky, by design; full and
+    // webgl override it with their own scene background.
+    begin(engine) {
+        engine.scrCtx.fillStyle = Object3dRendererBase.BACKDROP_COLOR;
+        engine.scrCtx.fillRect(0, 0, engine.scrWidth, engine.scrHeight);
+        this._queue.clear();
+        this._styles.length = 0;
+        this._styleIndex.clear();
+    }
+
+    // The frame is drawn here, farthest triangle first, whatever object each
+    // came from. The canvas state is only touched when the style changes, and
+    // the sorted queue keeps those runs long. A no-op for webgl, which
+    // overrides draw and queues nothing.
+    end(engine) {
+        const ctx      = engine.scrCtx;
+        const geometry = this._queue.getGeometry();
+        const styles   = this._queue.getStyles();
+        const order    = this._queue.sorted();
+        let current    = -1;
+        for (let i = 0; i < order.length; i++) {
+            const t = order[i];
+            if (styles[t] !== current) {
+                current = styles[t];
+                ctx.fillStyle   = this._styles[current][0];
+                ctx.strokeStyle = this._styles[current][1];
+            }
+            const o = t * FaceDepthQueue.STRIDE;
+            ctx.beginPath();
+            ctx.moveTo(geometry[o], geometry[o + 1]);
+            ctx.lineTo(geometry[o + 2], geometry[o + 3]);
+            ctx.lineTo(geometry[o + 4], geometry[o + 5]);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+    }
+
+    // Style slot of the frame, -1 when that key has not been registered yet:
+    // the renderers build their colour strings only on a miss.
+    _styleSlot(key) {
+        const id = this._styleIndex.get(key);
+
+        return ((id === undefined) ? -1 : id);
+    }
+
+    _addStyle(key, fill, stroke) {
+        const id = this._styles.length;
+        this._styles.push([fill, stroke]);
+        this._styleIndex.set(key, id);
+
+        return id;
+    }
+
+    // Queue one face, for the renderers whose style costs nothing to resolve.
+    // The others clip first (_faceScreenTriangles) and only pay for the faces
+    // that survive.
+    _pushFace(engine, obj, fc, styleId) {
+        this._pushTriangles(obj, fc, this._faceScreenTriangles(engine, obj, fc), styleId);
+    }
+
+    // Screen triangles of a face, keyed by the depth of its FARTHEST vertex: a
+    // huge floor triangle then sinks to the back of the queue, behind the
+    // bodies standing on it. tris = null means the face is wholly in front.
+    _pushTriangles(obj, fc, tris, styleId) {
+        if (tris === null) {
+            const p0 = obj.pt2d[fc.pts[0]];
+            const p1 = obj.pt2d[fc.pts[1]];
+            const p2 = obj.pt2d[fc.pts[2]];
+            const depth = Math.max(obj.pt3d[fc.pts[0]][2], obj.pt3d[fc.pts[1]][2], obj.pt3d[fc.pts[2]][2]);
+            this._queue.push(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], depth, styleId);
+            return;
+        }
+        for (let t = 0; t < tris.length; t++) {
+            const tri = tris[t];
+            this._queue.push(
+                tri[0][0], tri[0][1], tri[1][0], tri[1][1], tri[2][0], tri[2][1],
+                Math.max(tri[0][2], tri[1][2], tri[2][2]), styleId
+            );
+        }
+    }
+
+    // Draw a textured quad in normalised screen space (x, y top-left, w, h in
+    // 0..1; y downward), over the scene without depth, tinted by light (0..1)
+    // and faded by alpha (0..1, 1 = opaque). Shared by the canvas-2D
+    // renderers; the WebGL one overrides it with its own program.
+    drawScreenSprite(engine, texId, x, y, w, h, light, alpha = 1) {
+        const ctx = engine.scrCtx;
+        const tex = ((texId !== null) ? loader.textures().get(texId) : null);
+        if (!ctx || !tex) {
+            return;
+        }
+        // A scene-wide light floor or flash boost must reach the sprite too.
+        let lit = Math.max(light, (engine.lightOverride ?? 0));
+        if (lit < 1) {
+            lit = Math.min(1, lit + engine.lightBoost);
+        }
+        ctx.save();
+        // Never filtered: these renderers sample their texels nearest-neighbour.
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha           = alpha;
+        ctx.filter                = 'brightness(' + lit + ')';
+        ctx.drawImage(
+            this._spriteCanvas(tex),
+            x * engine.scrWidth,
+            y * engine.scrHeight,
+            w * engine.scrWidth,
+            h * engine.scrHeight
+        );
+        ctx.restore();
+    }
+
+    // drawImage needs a canvas, never the ImageData the loader holds. Straight
+    // alpha, unlike the WebGL upload: the browser composites it.
+    _spriteCanvas(tex) {
+        if (this._spriteCanvases.has(tex)) {
+            return this._spriteCanvases.get(tex);
+        }
+        const canvas  = document.createElement('canvas');
+        canvas.width  = tex.width;
+        canvas.height = tex.height;
+        canvas.getContext('2d').putImageData(new ImageData(tex.data, tex.width, tex.height), 0, 0);
+        this._spriteCanvases.set(tex, canvas);
+
+        return canvas;
+    }
+
+    // Where the segment va→vb crosses the near plane, as {t, cx, cy, sx, sy}:
+    // index-free, so every vertex layout can use it.
+    _nearCrossing(engine, za, cxa, cya, zb, cxb, cyb) {
+        const zNear = engine.zBuffer.getNear();
+        const t     = (zNear - za) / (zb - za);
+        const cx    = cxa + t * (cxb - cxa);
+        const cy    = cya + t * (cyb - cya);
+
+        return {
+            t,
+            cx,
+            cy,
+            sx: Math.trunc(engine.projScaleX * cx / zNear - engine.projOffsetX),
+            sy: Math.trunc(-engine.projScaleY * cy / zNear - engine.projOffsetY)
+        };
+    }
+
+    // Position-only layout [sx, sy, cz, cx, cy], enough for the renderers that
+    // interpolate nothing else. Overridden by those carrying more channels.
+    _clipVertex(engine, va, vb) {
+        const c = this._nearCrossing(engine, va[2], va[3], va[4], vb[2], vb[3], vb[4]);
+
+        return [c.sx, c.sy, engine.zBuffer.getNear(), c.cx, c.cy];
+    }
+
+    // Sutherland-Hodgman near clip of one triangle, into 0, 1 or 2 triangles:
+    // layout-agnostic, the depth sits at index 2 and _clipVertex packs the
+    // vertices it creates.
+    _clipNear(engine, v0, v1, v2) {
+        const zNear       = engine.zBuffer.getNear();
+        const verts       = [v0, v1, v2];
+        const inside      = [(v0[2] >= zNear), (v1[2] >= zNear), (v2[2] >= zNear)];
+        const insideCount = inside.filter(Boolean).length;
+
+        if (insideCount === 3) {
+            return [[v0, v1, v2]];
+        }
+        if (insideCount === 0) {
+            return [];
+        }
+
+        if (insideCount === 1) {
+            const i = inside.indexOf(true);
+            const j = (i + 1) % 3;
+            const k = (i + 2) % 3;
+            return [[
+                verts[i],
+                this._clipVertex(engine, verts[i], verts[j]),
+                this._clipVertex(engine, verts[i], verts[k]),
+            ]];
+        }
+
+        // Two vertices inside: the clipped quad splits into two triangles.
+        const iOut = inside.indexOf(false);
+        const iIn1 = (iOut + 1) % 3;
+        const iIn2 = (iOut + 2) % 3;
+        const a = this._clipVertex(engine, verts[iOut], verts[iIn1]);
+        const b = this._clipVertex(engine, verts[iOut], verts[iIn2]);
+        return [
+            [verts[iIn1], verts[iIn2], a],
+            [verts[iIn2], b, a],
+        ];
+    }
+
+    // Face corner in the position-only layout above.
+    _positionVertex(obj, fc, idx) {
+        const pt3d = obj.pt3d[fc.pts[idx]];
+        const pt2d = obj.pt2d[fc.pts[idx]];
+
+        return [pt2d[0], pt2d[1], pt3d[2], pt3d[0], pt3d[1]];
+    }
+
+    // Near-clipped triangles of a face, null when the whole face is in front —
+    // the common case, drawn straight from pt2d with nothing allocated — and
+    // empty when it is entirely behind.
+    _faceScreenTriangles(engine, obj, fc) {
+        const zNear = engine.zBuffer.getNear();
+        if ((obj.pt3d[fc.pts[0]][2] >= zNear)
+            && (obj.pt3d[fc.pts[1]][2] >= zNear)
+            && (obj.pt3d[fc.pts[2]][2] >= zNear)) {
+            return null;
+        }
+
+        return this._clipNear(
+            engine,
+            this._positionVertex(obj, fc, 0),
+            this._positionVertex(obj, fc, 1),
+            this._positionVertex(obj, fc, 2)
+        );
+    }
+
+    // Light level 0..1 of a face for the depth curve, before the ambient of
+    // _pointColor. Untextured face colours are 0..255.
+    static faceLight(fc, lightFactor, textured) {
+        const colorMax = Math.max(fc.color[0], Math.max(fc.color[1], fc.color[2]));
+
+        return Math.min(1, ((textured) ? colorMax : colorMax / 255) * lightFactor);
+    }
+
+    // The depth curve of the frame, null when off: an active light override
+    // bypasses it, a fullbright scene has no distance attenuation.
+    static frameShading(engine) {
+        return (((engine.depthShading !== null) && ((engine.lightOverride ?? 0) <= 0)) ? engine.depthShading : null);
+    }
+
+    // Camera space puts the eye at the origin, so normal·vertex >= 0 means the
+    // face turns away from it.
+    _isBackFace(normal, pt) {
+        return ((normal[0] * pt[0] + normal[1] * pt[1] + normal[2] * pt[2]) >= 0);
+    }
+
+    _resolveTexId(fc, sceneMs) {
+        if (fc.animTextures === null) {
+            return fc.textureId;
+        }
+        const frameIdx = Math.floor(sceneMs / fc.animTextures.durationMs) % fc.animTextures.ids.length;
+        return fc.animTextures.ids[frameIdx];
+    }
+
+    // Per-frame UV offset of a face: the time scroll (wrapped to [0,1) so the
+    // texture-repeat wrap downstream keeps full float precision) plus the
+    // anchor following a named instance's vertical shift. Shared array.
+    _uvOffset(fc, sceneMs) {
+        const off = this._uvOffsetOut;
+        off[0] = 0;
+        off[1] = 0;
+        if (fc.uvScroll) {
+            const t = sceneMs / 1000;
+            off[0] = (t * fc.uvScroll.u) % 1;
+            off[1] = (t * fc.uvScroll.v) % 1;
+        }
+        if (fc.uvAnchor !== null) {
+            const anchor = fc.uvAnchor;
+            if (anchor.instance === null) {
+                const id = loader.instances().idByCode(anchor.code);
+                anchor.instance = ((id !== null) ? loader.instances().get(id) : null);
+            }
+            if (anchor.instance !== null) {
+                off[1] += anchor.instance.getVerticalShift() * anchor.v;
+            }
+        }
+        return off;
+    }
+
+    _pointColor(engine, color, pt, normal) {
+        const col = this._litColor;
+        col[0] = engine.ambientLight[0];
+        col[1] = engine.ambientLight[1];
+        col[2] = engine.ambientLight[2];
+
+        const contribution = this._lightContribution;
+        for (let k = 0; k < engine.lightList.length; k++) {
+            engine.lightList[k].getColorFor(pt, normal, contribution);
+            col[0] += contribution[0];
+            col[1] += contribution[1];
+            col[2] += contribution[2];
+        }
+
+        if (col[0] < 0.) {
+            col[0] = 0.;
+        }
+        if (col[0] > 255.) {
+            col[0] = 255.;
+        }
+        if (col[1] < 0.) {
+            col[1] = 0.;
+        }
+        if (col[1] > 255.) {
+            col[1] = 255.;
+        }
+        if (col[2] < 0.) {
+            col[2] = 0.;
+        }
+        if (col[2] > 255.) {
+            col[2] = 255.;
+        }
+
+        col[0] = color[0] * col[0] / 255.;
+        col[1] = color[1] * col[1] / 255.;
+        col[2] = color[2] * col[2] / 255.;
+
+        return col;
+    }
+}
+
+// Backdrop of the canvas-2D renderers that paint no scene background: a fixed
+// neutral grey, deliberately not the engine background and no sky.
+Object3dRendererBase.BACKDROP_COLOR = '#666666';

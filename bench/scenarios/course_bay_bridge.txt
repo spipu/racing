@@ -1,0 +1,5 @@
+# Grid start on bay_bridge
+setup formula automatic bay_bridge
+30 -
+240 B
+30 -

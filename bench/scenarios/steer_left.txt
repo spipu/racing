@@ -1,0 +1,10 @@
+# Throttle then left, centred and right steering pulses
+setup formula automatic big_forest
+30 -
+240 B
+45 B+LEFT
+60 B
+45 B+RIGHT
+120 B
+90 B+LEFT
+60 -

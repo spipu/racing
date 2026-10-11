@@ -1,0 +1,453 @@
+/**
+ * Inputs coordinator - unified proxy between the game code and the concrete
+ * input devices:
+ *   - joy 1 axes  : movement, -1..+1 (+X = strafe right, +Y = forward)
+ *   - joy 2 deltas: look, pixel-equivalent (mouse delta passthrough, stick
+ *                   position converted with the look speed and the given dt)
+ *   - buttons     : jump, action, crouch, run, fire, pause
+ * Device priority: gamepad > virtual gamepad (touch-only device) > keyboard+mouse,
+ * unless the page forces an available device (setPreferredMode).
+ * Gamepad presence is event-driven (gamepadconnected / gamepaddisconnected —
+ * the browser only exposes a gamepad after a button has been pressed on it).
+ */
+let Inputs_private = null;
+
+class Inputs {
+    // Default binding of each game action: ONE physical key code per action
+    // (layout independent: WASD = ZQSD on AZERTY), '' = unmapped.
+    // Trap: left Ctrl held with the key printing 'q' (strafe left on AZERTY)
+    // QUITS Firefox, a shortcut no page JS can cancel — hence crouch on C.
+    static get KEYBOARD_DEFAULT_MAPPING() {
+        return {
+            forward:     'KeyW',
+            backward:    'KeyS',
+            strafeLeft:  'KeyA',
+            strafeRight: 'KeyD',
+            run:         'ShiftLeft',
+            jump:        'Space',
+            crouch:      'KeyC',
+            action:      'KeyE',
+            fire:        'KeyQ',
+            weaponPrev:  'KeyF',
+            weaponNext:  'KeyG',
+            toggleHud:   'KeyH',
+            // Layout-independent, unlike a letter: 'KeyM' is the QWERTY
+            // position, which prints ',' on AZERTY.
+            map:         'Tab',
+            // Keyboard look fallback ("fake mouse", pointer lock broken in
+            // some VMs): +/- deltas on both axes.
+            lookUp:      'KeyI',
+            lookDown:    'KeyK',
+            lookLeft:    'KeyJ',
+            lookRight:   'KeyL'
+        };
+    }
+
+    // Order in which the devices are listed to the player.
+    static get MODES() {
+        return ['keyboardMouse', 'gamepad', 'virtualGamepad'];
+    }
+
+    static get AUTO_PRIORITY() {
+        return ['gamepad', 'virtualGamepad', 'keyboardMouse'];
+    }
+
+    // Movement stick reaches full speed at 80% of its travel, not only at the
+    // very edge (the look stick keeps its full range).
+    static get MOVE_SATURATION() {
+        return 0.8;
+    }
+
+    // Creates and owns all the concrete input devices. Soft singleton: the
+    // devices listen to the whole page, so new Inputs() returns the already
+    // existing instance instead of creating a second one.
+    constructor() {
+        if (Inputs_private) {
+            return Inputs_private;
+        }
+        Inputs_private = this;
+
+        this._keyboard       = new AppInputKeyboard().setActionDefaults(Inputs.KEYBOARD_DEFAULT_MAPPING);
+        this._mouse          = new AppInputMouse();
+        this._gamepad        = new InputGamepad();
+        this._virtualGamepad = new InputVirtualGamepad();
+        this._mode           = 'keyboardMouse';
+        this._stickLookSpeed = 1.2;
+        this._keyLookSpeed   = 1.5;
+        this._lastJoy2Dx     = 0;
+        this._lastJoy2Dy     = 0;
+        this._lookInvertY    = {gamepad: false, virtualGamepad: false, keyboardMouse: false};
+
+        this._virtualPadSuppressed = false;
+        this._preferredMode        = null;
+        this._selectMode();
+        // gamepadconnected fires on the first button press of the pad
+        // (anti-fingerprinting), gamepaddisconnected on unplug / BT sleep.
+        // Never removed: the single Inputs instance lives as long as the page
+        window.addEventListener('gamepadconnected', () => {this._selectMode(); });
+        window.addEventListener('gamepaddisconnected', () => {this._selectMode(); });
+    }
+
+    /**
+     * Binds the devices to the screen, which is recreated on each level:
+     * the mouse needs its canvas, the virtual gamepad will need the screen
+     * itself to inject its touch UI and use the virtual ratio.
+     * @param {ScreenManager} screen
+     */
+    bindScreen(screen) {
+        this._mouse.bindCanvas(screen.getCanvas());
+        this._virtualGamepad.bindScreen(screen);
+        // A new screen always starts unsuppressed: a pause left open on the
+        // previous level must not hide the pad of the next one (singleton).
+        this._virtualPadSuppressed = false;
+        this._applyVirtualPadVisibility();
+        return this;
+    }
+
+    // Releases the mouse pointer lock if held — the game calls it when a
+    // level is left for the menus (a gamepad pause can leave it engaged).
+    releaseMouse() {
+        this._mouse.releaseLock();
+        return this;
+    }
+
+    // Grabs the mouse pointer lock back — the game calls it on a user gesture
+    // (resuming from the pause menu); fails silently without one.
+    grabMouse() {
+        this._mouse.requestLock();
+        return this;
+    }
+
+    /**
+     * Hides (or restores) the virtual gamepad overlay while a modal covers the
+     * game. The suppression is remembered, so a device change during the pause
+     * (gamepad unplugged) cannot bring the pad back over the modal.
+     * @param {boolean} visible
+     */
+    setVirtualPadVisible(visible) {
+        this._virtualPadSuppressed = (visible !== true);
+        this._applyVirtualPadVisibility();
+        return this;
+    }
+
+    _applyVirtualPadVisibility() {
+        this._virtualGamepad.setVisible(!this._virtualPadSuppressed && (this.getMode() === 'virtualGamepad'));
+    }
+
+    /**
+     * @returns {string} 'gamepad' | 'virtualGamepad' | 'keyboardMouse'
+     */
+    getMode() {
+        return this._mode;
+    }
+
+    /**
+     * Forces the device to play with; one that is not available falls back
+     * on the automatic choice until it comes back.
+     * @param {string|null} mode - an input mode, null for the automatic choice
+     */
+    setPreferredMode(mode) {
+        this._preferredMode = (mode ?? null);
+        this._selectMode();
+        return this;
+    }
+
+    /**
+     * Devices usable right now: the keyboard and mouse off touch-only
+     * devices, the virtual gamepad on them, a physical gamepad once detected.
+     * @returns {string[]}
+     */
+    getAvailableModes() {
+        const touchOnly = this._isTouchOnlyDevice();
+
+        return Inputs.MODES.filter((mode) => (
+            ((mode === 'keyboardMouse') && !touchOnly)
+            || ((mode === 'virtualGamepad') && touchOnly)
+            || ((mode === 'gamepad') && this._gamepad.isAvailable())
+        ));
+    }
+
+    getAutoMode() {
+        return this._autoModeOf(this.getAvailableModes());
+    }
+
+    // Name (Gamepad.id) of the detected physical gamepad, active or not, null without one.
+    getGamepadName() {
+        return this._gamepad.getName();
+    }
+
+    // Look Y inversion, one flag per input mode ('gamepad' | 'virtualGamepad'
+    // | 'keyboardMouse'). Game settings: the engine only carries the switch.
+    setLookInvertY(mode, inverted) {
+        if (this._lookInvertY[mode] !== undefined) {
+            this._lookInvertY[mode] = (inverted === true);
+        }
+        return this;
+    }
+
+    // Optional keyboard rebinding ({action: code}, see
+    // KEYBOARD_DEFAULT_MAPPING): actions left out keep their defaults.
+    // Game keys only — the DOM menus read their own fixed keys.
+    setKeyMapping(mapping) {
+        this._keyboard.setMapping(mapping);
+        return this;
+    }
+
+    // Optional gamepad button rebinding ({action: index|null}, see
+    // InputGamepad.DEFAULT_MAPPING): actions left out keep their defaults.
+    setGamepadButtonMapping(mapping) {
+        this._gamepad.setButtonMapping(mapping);
+        return this;
+    }
+
+    setGamepadAxisMapping(bindings) {
+        this._gamepad.setAxisMapping(bindings);
+        return this;
+    }
+
+    // The physical gamepad device, shared with the menus so they follow its bindings.
+    getGamepad() {
+        return this._gamepad.getDevice();
+    }
+
+    // Dead zone of one virtual-pad gesture ('move' | 'aim' | 'fire'), as a
+    // fraction of the stick travel. Game settings: the coordinator only carries
+    // the value to the device, which owns the behaviour.
+    setVirtualPadDeadZone(kind, fraction) {
+        this._virtualGamepad.setDeadZone(kind, fraction);
+        return this;
+    }
+
+    // Output sensitivity of the virtual pad's FIRING gesture (1 = same as its
+    // silent aim gesture). Scoped to that device — the physical pad and the
+    // mouse look speed are untouched.
+    setVirtualPadSensitivity(factor) {
+        this._virtualGamepad.setFireSensitivity(factor);
+        return this;
+    }
+
+    /**
+     * Withdraws a control the game has nothing for, so the pad never shows a
+     * target that answers nothing. Only the virtual pad is concerned: on a
+     * physical pad or a keyboard, the game refuses the move itself.
+     *
+     * @param {string}  control 'jump' | 'crouch' | 'action' | 'pause' |
+     *                          'weaponNext' | 'map' | 'fire' | 'move' | 'aim'
+     * @param {boolean} allowed
+     */
+    setVirtualPadControlAllowed(control, allowed) {
+        this._virtualGamepad.allowControl(control, allowed);
+        return this;
+    }
+
+    /**
+     * Same idea for the mouse: a page that never looks with it takes its
+     * pointer lock away, so a click leaves the cursor alone.
+     *
+     * @param {boolean} allowed
+     */
+    setMouseLockAllowed(allowed) {
+        this._mouse.allowLock(allowed);
+        return this;
+    }
+
+    readJoy1X() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return this._saturateMove(pad.readJoy1X(), pad.readJoy1Y()).x;
+        }
+        return this._keyAxis(this._keyboard.readAction('strafeRight'), this._keyboard.readAction('strafeLeft'));
+    }
+
+    readJoy1Y() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return this._saturateMove(pad.readJoy1X(), pad.readJoy1Y()).y;
+        }
+        return this._keyAxis(this._keyboard.readAction('forward'), this._keyboard.readAction('backward'));
+    }
+
+    // dt (milliseconds) is only used to convert a stick position into a
+    // pixel-equivalent delta - the mouse deltas are passed through unchanged.
+    // These reads consume the mouse deltas: call them once per frame.
+    readJoy2DeltaX(dt) {
+        this._lastJoy2Dx = this._computeJoy2DeltaX(dt);
+        return this._lastJoy2Dx;
+    }
+
+    readJoy2DeltaY(dt) {
+        this._lastJoy2Dy = this._computeJoy2DeltaY(dt);
+        return this._lastJoy2Dy;
+    }
+
+    // Idempotent getters for display (HUD)
+    getLastJoy2DeltaX() {
+        return this._lastJoy2Dx;
+    }
+
+    getLastJoy2DeltaY() {
+        return this._lastJoy2Dy;
+    }
+
+    readButtonJump() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonJump();
+        }
+        return this._keyboard.readAction('jump');
+    }
+
+    readButtonAction() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonAction();
+        }
+        return this._keyboard.readAction('action');
+    }
+
+    readButtonCrouch() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonCrouch();
+        }
+        return this._keyboard.readAction('crouch');
+    }
+
+    readButtonFire() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonFire();
+        }
+        return (this._mouse.isLeftClickDown() || this._keyboard.readAction('fire'));
+    }
+
+    readButtonPause() {
+        // Escape on the keyboard side, not remappable: the raw key when the
+        // pointer is not locked, the lock loss (the browser's own Escape
+        // path) when it is. Both are read even with a pad active — Escape
+        // must pause for a hybrid player, and the consumable lock-loss flag
+        // would otherwise go stale and fire a phantom toggle later.
+        const mousePause = this._mouse.consumeLockLoss();
+        const keyPause   = this._keyboard.readKey('Escape');
+        const pad        = this._pad();
+        if (pad !== null) {
+            return (pad.readButtonPause() || keyPause || mousePause);
+        }
+        return (keyPause || mousePause);
+    }
+
+    readButtonRun() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonRun();
+        }
+        return this._keyboard.readAction('run');
+    }
+
+    // Keyboard-only debug cheat (fixed 'o' key, not remappable): grant the
+    // full Doom test kit.
+    readButtonCheatFullKit() {
+        return this._keyboard.readKey('KeyO');
+    }
+
+    // Keyboard-only: toggles between the game HUD and the debug HUD.
+    readButtonToggleHud() {
+        return this._keyboard.readAction('toggleHud');
+    }
+
+    readButtonMap() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonMap();
+        }
+        return this._keyboard.readAction('map');
+    }
+
+    readButtonWeaponNext() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonWeaponNext();
+        }
+        return this._keyboard.readAction('weaponNext');
+    }
+
+    // The virtual gamepad has no previous binding → false.
+    readButtonWeaponPrev() {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readButtonWeaponPrev();
+        }
+        return this._keyboard.readAction('weaponPrev');
+    }
+
+    // Net mouse-wheel weapon steps since the last call (up = next, down = prev).
+    // Discrete and consumable, unlike the held weapon buttons above.
+    readWeaponWheel() {
+        return this._mouse.readWheelNotches();
+    }
+
+    // --- Internal ---
+
+    // Active pad-like device (gamepad and virtual gamepad share the same API),
+    // or null in keyboard+mouse mode
+    _pad() {
+        if (this._mode === 'gamepad') {
+            return this._gamepad;
+        }
+        if (this._mode === 'virtualGamepad') {
+            return this._virtualGamepad;
+        }
+        return null;
+    }
+
+    _keyAxis(positive, negative) {
+        return ((positive) ? 1 : 0) - ((negative) ? 1 : 0);
+    }
+
+    // Pad path only: keyboard axes are already ±1.
+    _saturateMove(x, y) {
+        const mag = Math.sqrt((x * x) + (y * y));
+        if (mag < 1e-10) {
+            return { x: 0, y: 0 };
+        }
+        const factor = Math.min(mag / Inputs.MOVE_SATURATION, 1) / mag;
+        return { x: (x * factor), y: (y * factor) };
+    }
+
+    _computeJoy2DeltaX(dt) {
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readJoy2X() * this._stickLookSpeed * dt;
+        }
+        // The look keys keep a keyboard fallback (pointer lock is broken in some VMs)
+        const keys = this._keyAxis(this._keyboard.readAction('lookRight'), this._keyboard.readAction('lookLeft')) * this._keyLookSpeed * dt;
+        return keys + this._mouse.readDeltaX();
+    }
+
+    _computeJoy2DeltaY(dt) {
+        const factor = ((this._lookInvertY[this._mode] === true) ? -1 : 1);
+        const pad = this._pad();
+        if (pad !== null) {
+            return pad.readJoy2Y() * this._stickLookSpeed * dt * factor;
+        }
+        const keys = this._keyAxis(this._keyboard.readAction('lookDown'), this._keyboard.readAction('lookUp')) * this._keyLookSpeed * dt;
+        return (keys + this._mouse.readDeltaY()) * factor;
+    }
+
+    _selectMode() {
+        const available = this.getAvailableModes();
+
+        this._mode = ((available.includes(this._preferredMode)) ? this._preferredMode : this._autoModeOf(available));
+        this._applyVirtualPadVisibility();
+    }
+
+    _autoModeOf(available) {
+        return Inputs.AUTO_PRIORITY.find((mode) => available.includes(mode));
+    }
+
+    // Primary pointer, not `any-pointer`: the latter reports *possible*
+    // capabilities, so Android/Samsung falsely claim a fine pointer with no mouse.
+    _isTouchOnlyDevice() {
+        return (window.matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints > 0));
+    }
+}

@@ -1,0 +1,15 @@
+# Camera views on a 3-button pad: C steps back and forth through the four views (1 2 3 2 1 0)
+pad 3
+setup formula automatic big_forest
+30 -
+60 B
+5 B+C
+90 B
+5 B+C
+90 B
+5 B+C
+90 B
+5 B+C
+90 B
+5 B+C
+90 B

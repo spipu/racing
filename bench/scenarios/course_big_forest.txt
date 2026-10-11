@@ -1,0 +1,5 @@
+# Grid start on big_forest
+setup formula automatic big_forest
+30 -
+240 B
+30 -

@@ -1,0 +1,5 @@
+# Grid start on sand_park
+setup formula automatic sand_park
+30 -
+240 B
+30 -

@@ -1,0 +1,12 @@
+# Camera views on a 6-button pad: X cockpit (0), Y far chase (2), Z high view (3), X again
+setup formula automatic big_forest
+30 -
+60 B
+5 B+X
+90 B
+5 B+Y
+90 B
+5 B+Z
+90 B
+5 B+X
+90 B

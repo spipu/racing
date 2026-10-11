@@ -1,0 +1,5 @@
+# Straight-line acceleration of the formula car
+setup formula automatic big_forest
+30 -
+300 B
+60 -

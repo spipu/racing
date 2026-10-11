@@ -1,0 +1,8 @@
+# Leaves the track to the left at speed, then drives back
+setup formula automatic big_forest
+30 -
+200 B
+150 B+LEFT
+200 B
+120 B+RIGHT
+120 B

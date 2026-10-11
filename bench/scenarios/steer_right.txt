@@ -1,0 +1,10 @@
+# Mirror of steer_left
+setup formula automatic big_forest
+30 -
+240 B
+45 B+RIGHT
+60 B
+45 B+LEFT
+120 B
+90 B+RIGHT
+60 -
