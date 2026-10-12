@@ -15,7 +15,7 @@ class RacingSettings extends AppSettings {
             {key: 'sound.volume_effects', nameCode: 'settings.sound.volumeEffects',    type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'multiplayer.nickname', nameCode: 'settings.multiplayer.nickname',   type: 'text', default: '', charset: RacingSettings.NICKNAME_CHARSET, maxLength: RacingSettings.NICKNAME_MAX_LENGTH},
             // The Controls page offers the devices available only; a device not available counts as the automatic choice.
-            {key: 'controls.device',      nameCode: 'settings.controls.device',        type: 'list', default: RacingSettings.DEVICE_AUTO, values: [{code: RacingSettings.DEVICE_AUTO, labelCode: 'device.automatic'}, {code: RacingSettings.DEVICE_KEYBOARD, labelCode: 'device.keyboard'}, {code: RacingSettings.DEVICE_GAMEPAD, labelCode: 'device.gamepadAny'}]},
+            {key: 'controls.device',      nameCode: 'settings.controls.device',        type: 'list', default: RacingSettings.DEVICE_AUTO, values: [{code: RacingSettings.DEVICE_AUTO, labelCode: 'device.automatic'}, {code: RacingSettings.DEVICE_KEYBOARD, labelCode: 'device.keyboard'}, {code: RacingSettings.DEVICE_GAMEPAD, labelCode: 'device.gamepadAny'}, {code: RacingSettings.DEVICE_VIRTUAL_PAD, labelCode: 'device.virtualPad'}]},
             // One physical key per action (Escape stays the fixed key leaving the race).
             {key: 'keyboard.steer_left',  nameCode: 'settings.action.steerLeft',       type: 'char', default: 'ArrowLeft',  action: 'steerLeft'},
             {key: 'keyboard.steer_right', nameCode: 'settings.action.steerRight',      type: 'char', default: 'ArrowRight', action: 'steerRight'},
@@ -72,7 +72,7 @@ class RacingSettings extends AppSettings {
     }
 
     /**
-     * @returns {string} RacingSettings.DEVICE_AUTO, DEVICE_KEYBOARD or DEVICE_GAMEPAD, as saved
+     * @returns {string} RacingSettings.DEVICE_AUTO, DEVICE_KEYBOARD, DEVICE_GAMEPAD or DEVICE_VIRTUAL_PAD, as saved
      */
     getControlsDevice() {
         return this.get(RacingSettings.DEVICE_KEY);
@@ -93,6 +93,7 @@ RacingSettings.SPEED_UNIT_MPH      = 'mph';
 RacingSettings.DEVICE_AUTO         = 'auto';
 RacingSettings.DEVICE_KEYBOARD     = 'keyboard';
 RacingSettings.DEVICE_GAMEPAD      = 'gamepad';
+RacingSettings.DEVICE_VIRTUAL_PAD  = 'virtualGamepad';
 RacingSettings.LANGUAGE_KEY        = 'display.language';
 RacingSettings.DEVICE_KEY          = 'controls.device';
 RacingSettings.VOLUME_VALUES       = AppSettings.percentValues([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);

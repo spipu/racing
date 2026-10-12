@@ -44,6 +44,13 @@ const VR_ROM_MAP = {
         dirt:           {table: 0x15A44, frames: 8},
     },
     commonBankSdram: 0x06033000,
+    // Render slots of the effects ($FF6178 + n x $14), placed at the race start ($CFAE) from a table of pointers by car
+    // ($C8CC) to 8 offsets {x, y, z} in model units / 4: tyre smoke left and right (the left one mirrored), sparks,
+    // exhaust flames, grass left and right, sand left and right. The left and right offsets are the same.
+    effectSlots: {
+        table: 0x8955CC,
+        slots: ['smoke', 'smoke', 'sparks', 'flames', 'grass', 'grass', 'sand', 'sand'],
+    },
     // Car scene block: pointers by car to the values the game copies to RAM $C710-$C74B. Exterior view: front left
     // wheel, front right wheel and rear axle models ($C714-$C71C, SDRAM pointers into the car bank, copied to
     // $0603C000 for every car), placed at the first 3 offsets of $C734 (render descriptors $FF6124 + n x $14, checked

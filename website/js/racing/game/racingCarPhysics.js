@@ -90,6 +90,9 @@ class RacingCarPhysics {
         this.wrongWay     = 0;      // $C312
         // $C00C smoke, $C018 flames, $C012 sparks, $C01E / $C024 grass, $C00E / $C010 sand: -1 = off.
         this.effectFrames = {smoke: -1, flames: -1, sparks: -1, grass: [-1, -1], sand: [-1, -1]};
+        // x of the left and right tyre smoke ($FF617A / $FF618E, model units / 4), set by the Stock only; null: the
+        // car's render slots.
+        this.smokeX       = null;
         // Ticks each spray has played, -1 = off: its frame steps once a tick.
         this._sprayTicks  = {grass: [-1, -1], sand: [-1, -1]};
         this.wallHeading  = 0;      // +$64, heading of the deflection
@@ -669,6 +672,7 @@ class RacingCarPhysics {
         const slipDivisor = this._params.C0EE;
         const slideLimit  = this._params.C0F0;
         const slipTurn    = this._params.C0F6;
+        this.smokeX = [RacingCarPhysics.STOCK_SMOKE_X, RacingCarPhysics.STOCK_SMOKE_X];
         let loss = ((Math.abs(this.steerSpeed) * this.brake) >> 7);
         if ((this.displaySpeed > RacingCarPhysics.STOCK_FAST_SPEED) && input.accelerate) {
             loss = w(loss + w((RacingCarPhysics.PEDAL_MAX - this.throttle) << 3));
@@ -686,8 +690,13 @@ class RacingCarPhysics {
         this.slip      = this._word(this.slip + this._scaled(push));
         this.shownSlip = w(this.slip * 2);
         const size = Math.abs(this.slip);
-        if ((size >= RacingCarPhysics.STOCK_SKID_SLIP) && (this.skidTimer < RacingCarPhysics.STOCK_SKID_MAX)) {
-            this.skidTimer += this._scaled(RacingCarPhysics.STOCK_SKID_STEP);
+        if (size >= RacingCarPhysics.STOCK_SKID_SLIP) {
+            // $9A54: the smoke moves towards the side the car slides to.
+            const shift = ((this.slip < 0) ? RacingCarPhysics.STOCK_SMOKE_MOVE : -RacingCarPhysics.STOCK_SMOKE_MOVE);
+            this.smokeX = [(RacingCarPhysics.STOCK_SMOKE_X + shift), (RacingCarPhysics.STOCK_SMOKE_X - shift)];
+            if (this.skidTimer < RacingCarPhysics.STOCK_SKID_MAX) {
+                this.skidTimer += this._scaled(RacingCarPhysics.STOCK_SKID_STEP);
+            }
         }
         this.heading = this._angle(this.heading - this._scaled((this.slip * slipTurn) >> 8));
         this._spinOut(size);
@@ -1270,6 +1279,8 @@ RacingCarPhysics.STOCK_GRIP_MAX   = 0xFF;
 RacingCarPhysics.STOCK_DAMP_MIN   = 0x200;
 RacingCarPhysics.STOCK_SKID_SLIP  = 0x100;
 RacingCarPhysics.STOCK_SKID_MAX   = 11;
+RacingCarPhysics.STOCK_SMOKE_X    = 0xB5;
+RacingCarPhysics.STOCK_SMOKE_MOVE = 0x7F;
 RacingCarPhysics.STOCK_SKID_STEP  = 4;
 RacingCarPhysics.PROTOTYPE_GRIP_MIN = 0x7F;
 RacingCarPhysics.PROTOTYPE_DAMP_MIN = 0x100;

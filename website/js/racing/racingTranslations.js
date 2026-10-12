@@ -135,6 +135,12 @@ class RacingTranslations {
                 it: 'Controller ({name})',
                 es: 'Mando ({name})'
             },
+            'device.virtualPad': {
+                fr: 'Commandes tactiles',
+                en: 'Touch controls',
+                it: 'Comandi touch',
+                es: 'Controles táctiles'
+            },
             'options.clearBestTimesFailed': {
                 fr: 'Impossible d’effacer les meilleurs temps.',
                 en: 'The best times could not be cleared.',

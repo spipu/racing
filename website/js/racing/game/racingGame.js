@@ -118,7 +118,7 @@ class RacingGame {
         this._screen.bindHud(new RacingHud(this._engine));
 
         this._car.bind();
-        this._controls  = new RacingControls();
+        this._controls  = new RacingControls(this._screen.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));
         const parts     = new Set(this._car.getAllInstances());
         this._instances = loader.instances().getAll().filter((instance) => ((instance !== undefined) && !parts.has(instance)));
         this._placeCar(0);
@@ -225,7 +225,7 @@ class RacingGame {
         const pitch = RacingGame._degrees(physics.pitch);
         const roll  = (RacingGame._degrees(physics.roll) * side);
         this._car.setCockpit(this._camera.getView() === RacingCamera.VIEW_COCKPIT)
-            .setEffects(physics.effectFrames, (physics.crashRecovery === 0))
+            .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
             .place(position, yaw, pitch, roll, this._bodyPose(physics, side));
         this._camera.follow(ticks, position, yaw, pitch, roll);

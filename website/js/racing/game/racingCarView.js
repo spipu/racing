@@ -10,9 +10,10 @@
  * shadow, a part of the body (its descriptor relative to the body, angles 0),
  * is hidden while the car recovers from a crash ($2A86). The original paints
  * the car over the road it dips into: its parts carry a depth bias. Outside, the
- * effect models of the common bank play at their render slots ($3F86): tyre
- * smoke, grass and sand behind each rear wheel (the left ones mirrored),
- * sparks under the tail, exhaust flames.
+ * effect models of the common bank play at the car's render slots ($3F86,
+ * cars.json effectOffsets): tyre smoke, grass and sand behind each rear wheel
+ * (the left ones mirrored), sparks under the tail, exhaust flames; the Stock
+ * moves its smoke towards the side it slides to.
  */
 class RacingCarView {
     /**
@@ -23,7 +24,8 @@ class RacingCarView {
      * @param {boolean} mirror
      */
     constructor(converter, cars, car, scale, mirror) {
-        this._side      = (mirror ? -1 : 1);
+        this._side      = ((mirror) ? -1 : 1);
+        this._scale     = scale;
         this._outside   = [];
         this._cockpit   = [];
         this._effects   = [];
@@ -48,23 +50,26 @@ class RacingCarView {
         this._shadow = this._addPart(RacingCarView._screened(model(car.shadow, mirror)), [0, RacingCarView.SHADOW_LIFT, 0], null);
         this._outside.push(this._shadow);
 
-        // One part per frame of each effect: kind (physics effectFrames), side (index in it, null: one for both).
-        const rear      = RacingCarView.EFFECT_REAR_WHEEL;
-        const leftRear  = [-rear[0], rear[1], rear[2]];
-        const addEffect = (kind, side, frames, units, mirrored, screened) => {
+        // One part per frame of each effect at the car's render slot: kind (physics effectFrames), side (index in it,
+        // null: one frame for both), wheel (0 left, mirrored, 1 right, null: centre).
+        const slots     = car.effectOffsets;
+        const addEffect = (kind, side, wheel, frames, screened) => {
+            const units = slots[kind];
+            const left  = (wheel === RacingCarView.LEFT);
             frames.forEach((code, frame) => {
-                const data = model(code, (mirror !== mirrored));
-                this._effects.push({kind, side, frame, part: this._addPart((screened ? RacingCarView._screened(data) : data), offset(units), null)});
+                const data = model(code, (mirror !== left));
+                const part = this._addPart(((screened) ? RacingCarView._screened(data) : data), offset([((left) ? -units[0] : units[0]), units[1], units[2]]), null);
+                this._effects.push({kind, side, wheel, frame, part});
             });
         };
-        addEffect('smoke', null, cars.effects.tyre_smoke, leftRear, true, true);
-        addEffect('smoke', null, cars.effects.tyre_smoke, rear, false, true);
-        addEffect('sparks', null, cars.effects.sparks, RacingCarView.EFFECT_SPARKS, false, false);
-        addEffect('flames', null, cars.effects.exhaust_flames, RacingCarView.EFFECT_FLAMES, false, false);
-        addEffect('grass', 0, cars.effects.grass, leftRear, true, false);
-        addEffect('grass', 1, cars.effects.grass, rear, false, false);
-        addEffect('sand', 0, cars.effects.dirt, leftRear, true, false);
-        addEffect('sand', 1, cars.effects.dirt, rear, false, false);
+        addEffect('smoke', null, RacingCarView.LEFT, cars.effects.tyre_smoke, true);
+        addEffect('smoke', null, RacingCarView.RIGHT, cars.effects.tyre_smoke, true);
+        addEffect('sparks', null, null, cars.effects.sparks, false);
+        addEffect('flames', null, null, cars.effects.exhaust_flames, false);
+        addEffect('grass', RacingCarView.LEFT, RacingCarView.LEFT, cars.effects.grass, false);
+        addEffect('grass', RacingCarView.RIGHT, RacingCarView.RIGHT, cars.effects.grass, false);
+        addEffect('sand', RacingCarView.LEFT, RacingCarView.LEFT, cars.effects.dirt, false);
+        addEffect('sand', RacingCarView.RIGHT, RacingCarView.RIGHT, cars.effects.dirt, false);
 
         const [shell, left, right] = car.cockpit;
         this._cockpit.push(this._addPart(model(shell, mirror), [0, 0, 0], null));
@@ -94,12 +99,21 @@ class RacingCarView {
     }
 
     /**
-     * @param {object}  frames - RacingCarPhysics.effectFrames, read when the car is placed
-     * @param {boolean} shadow - the shadow shown
+     * @param {object}        frames - RacingCarPhysics.effectFrames, read when the car is placed
+     * @param {boolean}       shadow - the shadow shown
+     * @param {number[]|null} smokeX - RacingCarPhysics.smokeX: x of the left and right tyre smoke, model units / 4
      */
-    setEffects(frames, shadow) {
+    setEffects(frames, shadow, smokeX) {
         this._frames   = frames;
         this._shadowOn = shadow;
+        if (smokeX !== null) {
+            for (const effect of this._effects) {
+                if (effect.kind === 'smoke') {
+                    const x = ((effect.wheel === RacingCarView.LEFT) ? -smokeX[RacingCarView.LEFT] : smokeX[RacingCarView.RIGHT]);
+                    effect.part.offset[0] = (x * RacingCarView.SLOT_UNITS * this._scale * this._side);
+                }
+            }
+        }
 
         return this;
     }
@@ -256,7 +270,8 @@ RacingCarView.SPIN_FAST_FACTOR = 4;
 RacingCarView.SPIN_LIMIT       = 0x7000;
 RacingCarView.SPIN_MAX         = 0x7080;
 RacingCarView.STEERING_TURN    = 8192;
-// Render slots of the effects ($FF6178...), model units: behind the rear wheels, under the tail, at the exhaust.
-RacingCarView.EFFECT_REAR_WHEEL = [(215 * 4), 0, (-768 * 4)];
-RacingCarView.EFFECT_SPARKS     = [0, 0, (-778 * 4)];
-RacingCarView.EFFECT_FLAMES     = [0, 0, (-758 * 4)];
+// Wheel of an effect pair; the left one is mirrored.
+RacingCarView.LEFT             = 0;
+RacingCarView.RIGHT            = 1;
+// Model units per unit of the render slots.
+RacingCarView.SLOT_UNITS       = 4;

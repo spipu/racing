@@ -1,7 +1,7 @@
 /**
  * The 4 camera views of the original ($C048): 0 cockpit, 1 close chase (start
- * view), 2 far chase, 3 high view. One button steps through them back and
- * forth, 1 2 3 2 1 0 1... (project decision).
+ * view), 2 far chase, 3 high view. One button steps through them in a loop,
+ * 0 1 2 3 0... (project decision); the race starts on view 1.
  *
  * The camera hangs on a boom from the car's ground point: the boom leaves it
  * backwards and upwards ($C056, $C054, in 1/256 m) in a frame tilted down by
@@ -39,7 +39,7 @@ class RacingCamera {
         return this._view;
     }
 
-    // The next view of the back and forth order, its boom moving over the transition ticks.
+    // The next view of the loop, its boom moving over the transition ticks.
     cycleView() {
         this._order = ((this._order + 1) % RacingCamera.ORDER.length);
         const next  = RacingCamera.ORDER[this._order];
@@ -131,8 +131,7 @@ class RacingCamera {
 RacingCamera.VIEWS           = 4;
 RacingCamera.VIEW_COCKPIT    = 0;
 RacingCamera.START_VIEW      = 1;
-// The 3-button pad of the original steps back and forth.
-RacingCamera.ORDER           = [1, 2, 3, 2, 1, 0];
+RacingCamera.ORDER           = [0, 1, 2, 3];
 RacingCamera.UNITS_PER_METRE = 256;
 // $C0C8 = 192 / 8192 turn.
 RacingCamera.PITCH_DEGREES   = ((192 / 8192) * 360);

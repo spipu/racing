@@ -1,15 +1,26 @@
 /**
- * Race controls from the device chosen in the settings (the automatic choice
- * reads both the keyboard and the gamepad), with the player's bindings
- * (RacingSettings keyboard.* / pad.*). The original pad is digital: the stick
- * steers past a threshold. Gear and view presses count once per press.
+ * Race controls from one device at a time, chosen as doom_js does (Inputs):
+ * the device forced in the settings while it is available, otherwise the
+ * first available of gamepad > touch controls > keyboard. The keyboard is
+ * offered off touch-only devices, the touch controls on them, the gamepad once
+ * detected. The player's bindings come from RacingSettings (keyboard.* / pad.*).
+ * The original pad is digital: a stick steers past a threshold. Gear, view and
+ * pause presses count once per press.
  */
 class RacingControls {
-    constructor() {
-        this._keyboard = new AppInputKeyboard();
-        this._gamepad  = new AppInputGamepad();
-        this._held     = new Set();
+    /**
+     * @param {HTMLElement} display - the race display, which receives the touch controls
+     * @param {boolean}     manual  - manual gearbox: the touch controls show the gear buttons
+     */
+    constructor(display, manual) {
+        this._keyboard       = new AppInputKeyboard();
+        this._gamepad        = new AppInputGamepad();
+        this._virtualGamepad = new AppInputVirtualGamepad(RacingControls.VIRTUAL_PAD_LAYOUT);
+        this._held           = new Set();
+        this._device         = null;
         racingSettings.applyBindings(this._keyboard, this._gamepad);
+        this._virtualGamepad.allowControl('gearUp', manual).allowControl('gearDown', manual).bindDisplay(display);
+        this._selectDevice();
     }
 
     /**
@@ -17,14 +28,11 @@ class RacingControls {
      *          steer: +1 left, -1 right; gearUp / gearDown / view / quit: pressed since the last read
      */
     read() {
-        const padOn  = this._gamepad.isAvailable();
-        const choice = RacingControls.deviceChoice(padOn);
-        const keys   = (choice !== RacingSettings.DEVICE_GAMEPAD);
-        const pad    = (padOn && (choice !== RacingSettings.DEVICE_KEYBOARD));
-        const held   = (action) => ((keys && this._keyboard.readAction(action)) || (pad && this._gamepad.readAction(action)));
-        const stick  = ((pad) ? this._gamepad.readSlot('steer') : 0);
-        const left   = (held('steerLeft') || (stick <= -RacingControls.STICK_THRESHOLD));
-        const right  = (held('steerRight') || (stick >= RacingControls.STICK_THRESHOLD));
+        this._selectDevice();
+        const held  = (action) => this._readAction(action);
+        const stick = this._readSteer();
+        const left  = (held('steerLeft') || (stick <= -RacingControls.STICK_THRESHOLD));
+        const right = (held('steerRight') || (stick >= RacingControls.STICK_THRESHOLD));
 
         return {
             accelerate: held('accelerate'),
@@ -39,10 +47,16 @@ class RacingControls {
 
     /**
      * @param {boolean} padOn - a gamepad is connected
-     * @returns {string[]} the devices that can be chosen
+     * @returns {string[]} the devices usable right now, in the order shown to the player
      */
     static availableDevices(padOn) {
-        return ((padOn) ? [RacingSettings.DEVICE_KEYBOARD, RacingSettings.DEVICE_GAMEPAD] : [RacingSettings.DEVICE_KEYBOARD]);
+        const touchOnly = RacingControls.isTouchOnlyDevice();
+
+        return RacingControls.DEVICES.filter((device) => (
+            ((device === RacingSettings.DEVICE_KEYBOARD) && !touchOnly)
+            || ((device === RacingSettings.DEVICE_VIRTUAL_PAD) && touchOnly)
+            || ((device === RacingSettings.DEVICE_GAMEPAD) && padOn)
+        ));
     }
 
     /**
@@ -57,15 +71,54 @@ class RacingControls {
 
     /**
      * @param {boolean} padOn - a gamepad is connected
-     * @returns {string} the device the player drives with, the gamepad first for the automatic choice
+     * @returns {string} the device the player drives with
      */
     static deviceInUse(padOn) {
         const choice = RacingControls.deviceChoice(padOn);
         if (choice !== RacingSettings.DEVICE_AUTO) {
             return choice;
         }
+        const available = RacingControls.availableDevices(padOn);
 
-        return ((padOn) ? RacingSettings.DEVICE_GAMEPAD : RacingSettings.DEVICE_KEYBOARD);
+        return RacingControls.AUTO_PRIORITY.find((device) => available.includes(device));
+    }
+
+    // Primary pointer, not `any-pointer`: the latter reports *possible*
+    // capabilities, so Android/Samsung falsely claim a fine pointer with no mouse.
+    static isTouchOnlyDevice() {
+        return (window.matchMedia('(pointer: coarse)').matches && (navigator.maxTouchPoints > 0));
+    }
+
+    // Only the device in use shows the touch controls; a gamepad plugged in or out switches the device.
+    _selectDevice() {
+        const device = RacingControls.deviceInUse(this._gamepad.isAvailable());
+        if (device === this._device) {
+            return;
+        }
+        this._device = device;
+        this._virtualGamepad.setVisible(device === RacingSettings.DEVICE_VIRTUAL_PAD);
+    }
+
+    _readAction(action) {
+        if (this._device === RacingSettings.DEVICE_GAMEPAD) {
+            return this._gamepad.readAction(action);
+        }
+        if (this._device === RacingSettings.DEVICE_VIRTUAL_PAD) {
+            return this._virtualGamepad.readButton(action);
+        }
+
+        return this._keyboard.readAction(action);
+    }
+
+    _readSteer() {
+        if (this._device === RacingSettings.DEVICE_GAMEPAD) {
+            return this._gamepad.readSlot('steer');
+        }
+        if (this._device === RacingSettings.DEVICE_VIRTUAL_PAD) {
+            return this._virtualGamepad.readMoveX();
+        }
+
+        return 0;
     }
 
     _press(action, down) {
@@ -81,3 +134,45 @@ class RacingControls {
 }
 
 RacingControls.STICK_THRESHOLD = 0.5;
+// Order in which the devices are listed to the player.
+RacingControls.DEVICES         = [RacingSettings.DEVICE_KEYBOARD, RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD];
+RacingControls.AUTO_PRIORITY   = [RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD, RacingSettings.DEVICE_KEYBOARD];
+
+// --- Touch controls layout, in fractions of the letterboxed display ---
+
+// Icon drawings in a 24×24 box; the menu icon is doom_js's.
+RacingControls.VIRTUAL_PAD_ICONS = {
+    menu:       {shapes: '<rect x="4" y="6.2" width="16" height="2.6" rx="1.3"/>'
+                       + '<rect x="4" y="10.7" width="16" height="2.6" rx="1.3"/>'
+                       + '<rect x="4" y="15.2" width="16" height="2.6" rx="1.3"/>'},
+    view:       {shapes: '<path d="M2 12 C6 5.5 18 5.5 22 12 C18 18.5 6 18.5 2 12 Z" fill="none" stroke="currentColor" stroke-width="1.7"/>'
+                       + '<circle cx="12" cy="12" r="3.4"/>'},
+    accelerate: {shapes: '<path d="M12 4 L20 18 H4 Z"/>'},
+    brake:      {shapes: '<path d="M12 20 L4 6 H20 Z"/>'},
+    gearUp:     {shapes: '<rect x="10.6" y="4" width="2.8" height="16" rx="1.4"/>'
+                       + '<rect x="4" y="10.6" width="16" height="2.8" rx="1.4"/>'},
+    gearDown:   {shapes: '<rect x="4" y="10.6" width="16" height="2.8" rx="1.4"/>'}
+};
+
+// Pause and view in the top-left corner, at the same edge margin as the right
+// column; accelerate and brake in the bottom-right corner at the same margin,
+// under the right thumb, held for the whole race, hence larger; gear up right
+// above accelerate and gear down above brake, same width, ship hidden and the
+// manual gearbox shows them.
+RacingControls.VIRTUAL_PAD_BUTTONS = {
+    pause:      {x: 0.019, y: 0.020, w: 0.079, h: 0.112, icon: 'menu'},
+    view:       {x: 0.107, y: 0.020, w: 0.079, h: 0.112, icon: 'view'},
+    gearUp:     {x: 0.871, y: 0.600, w: 0.110, h: 0.112, icon: 'gearUp', allowed: false},
+    gearDown:   {x: 0.749, y: 0.600, w: 0.110, h: 0.112, icon: 'gearDown', allowed: false},
+    accelerate: {x: 0.871, y: 0.720, w: 0.110, h: 0.260, icon: 'accelerate'},
+    brake:      {x: 0.749, y: 0.720, w: 0.110, h: 0.260, icon: 'brake'}
+};
+
+RacingControls.VIRTUAL_PAD_LAYOUT = {
+    // Bottom-left quadrant, left thumb, as doom_js's move stick.
+    moveArea:   {x: 0, y: 0.5, w: 0.5, h: 0.5},
+    aimArea:    null,
+    stickHints: {move: {x: 0.170, y: 0.698}},
+    buttons:    RacingControls.VIRTUAL_PAD_BUTTONS,
+    icons:      RacingControls.VIRTUAL_PAD_ICONS
+};

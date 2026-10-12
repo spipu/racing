@@ -73,9 +73,11 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         this._renderPage();
     }
 
-    // What the page shows depends on the gamepad connected and its name.
+    // What the page shows depends on: the devices offered, the one in use, the gamepad's name.
     _devicesState() {
-        return ((this._gamepad.isAvailable()) ? this._gamepad.getName() : '');
+        const padOn = this._gamepad.isAvailable();
+
+        return [RacingControls.availableDevices(padOn).join(','), RacingControls.deviceInUse(padOn), (this._gamepad.getName() ?? '')].join('|');
     }
 
     _deviceChoiceLabel(choice) {
@@ -87,6 +89,9 @@ class RacingOptionsModal extends AppMenuSettingsModal {
     }
 
     _deviceLabel(device) {
+        if (device === RacingSettings.DEVICE_VIRTUAL_PAD) {
+            return appTranslator.get('device.virtualPad');
+        }
         if (device === RacingSettings.DEVICE_GAMEPAD) {
             return appTranslator.get('device.gamepad', {name: AppInputGamepad.displayName(this._gamepad.getName() ?? '')});
         }
@@ -135,4 +140,4 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 
 RacingOptionsModal.DEVICE_REFRESH_MS = 500;
 // Settings key prefix of each device.
-RacingOptionsModal.SETTING_PREFIXES  = {[RacingSettings.DEVICE_KEYBOARD]: 'keyboard.', [RacingSettings.DEVICE_GAMEPAD]: 'pad.'};
+RacingOptionsModal.SETTING_PREFIXES  = {[RacingSettings.DEVICE_KEYBOARD]: 'keyboard.', [RacingSettings.DEVICE_GAMEPAD]: 'pad.', [RacingSettings.DEVICE_VIRTUAL_PAD]: 'virtual_pad.'};

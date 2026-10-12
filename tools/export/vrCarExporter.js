@@ -34,6 +34,7 @@ class VrCarExporter {
                 cockpit:             car.cockpit.map((offset) => id(offset)),
                 wheels:              this._wheels(car, scene),
                 steeringWheelOffset: this._offsets(scene, map.carScene.steeringOffset, 1)[0],
+                effectOffsets:       this._effectOffsets(index),
                 bank:                this._bank(car.bank),
             };
         });
@@ -74,6 +75,18 @@ class VrCarExporter {
     _offsets(scene, variable, count) {
         const words = scene.words(variable, (count * VrCarExporter.AXES));
         return Array.from({length: count}, (unused, i) => words.slice((i * VrCarExporter.AXES), ((i + 1) * VrCarExporter.AXES)).map((word) => (word * this._map.carScene.offsetScale)));
+    }
+
+    // {smoke, sparks, flames, grass, sand}: offset of each effect in model units, the right one of a pair.
+    _effectOffsets(car) {
+        const map     = this._map.effectSlots;
+        const slots   = this._rom.pointer68k(map.table, car);
+        const offsets = {};
+        map.slots.forEach((kind, slot) => {
+            offsets[kind] = this._rom.words((slots + (slot * VrCarExporter.AXES * 2)), VrCarExporter.AXES, true).map((word) => (word * this._map.carScene.offsetScale));
+        });
+
+        return offsets;
     }
 
     _bankModel(car, sdram) {
