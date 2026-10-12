@@ -3,7 +3,9 @@
  * (one instance per scenery cell, the player's car, the sky panorama), drives
  * the car with the physics of the original transposed to the frame time
  * (RacingCarContinuousPhysics) and renders it every display frame through
- * the camera views of the original (RacingCamera). Escape returns to the menus.
+ * the camera views of the original (RacingCamera). Escape, or the pause button
+ * of the gamepad or of the touch controls, opens the pause menu over the frozen
+ * race (RacingPauseModal), as doom_js does.
  *
  * The physics runs on the unmirrored course: a mirrored race flips the scene
  * along x and the steering.
@@ -22,14 +24,19 @@ class RacingGame {
         this._car       = null;
         this._physics   = null;
         this._controls  = null;
-        this._instances = [];
-        this._running   = false;
-        this._side      = ((selection.mirror) ? -1 : 1);
-        this._onFrame   = (timestamp) => this._guard(this._frame, timestamp);
-        this._onKey     = (event) => {
+        this._instances    = [];
+        this._running      = false;
+        this._paused       = false;
+        this._pauseDisplay = null;
+        this._pauseModal   = null;
+        this._skyId        = null;
+        this._rendererCode = null;
+        this._side         = ((selection.mirror) ? -1 : 1);
+        this._onFrame      = (timestamp) => this._guard(this._frame, timestamp);
+        this._onKey        = (event) => {
             if (event.code === 'Escape') {
                 event.preventDefault();
-                this.quit();
+                this._togglePause();
             }
         };
     }
@@ -83,9 +90,12 @@ class RacingGame {
         this._navigator.endRace();
     }
 
-    // The race scene and its listener go: the menus come back.
+    // The race scene, its pause menu and its listener go: the menus come back.
     _teardown() {
         this._running = false;
+        if (this._pauseModal !== null) {
+            this._closePause();
+        }
         new ScreenWakeLock().release();
         document.removeEventListener('keydown', this._onKey);
         if (this._screen !== null) {
@@ -108,15 +118,8 @@ class RacingGame {
     }
 
     _begin(skyId) {
-        this._screen = new ScreenManager('screen', {fullscreen: true, virtualWidth: RacingGame.VIRTUAL_WIDTH, virtualHeight: RacingGame.VIRTUAL_HEIGHT});
-        this._engine = new Engine3d(this._screen, new Object3dRendererList().getRenderer(racingSettings.getRenderer()));
-        this._engine.setFov(this._horizontalFov())
-            .setZBuffer(RacingGame.NEAR, RacingGame.FAR)
-            .setBackground(...racingCatalog.getCourse(this._selection.course).skyColor)
-            .setLightAmbient(RacingGame.AMBIENT)
-            .setSky(this._sky(skyId));
-        this._screen.bindHud(new RacingHud(this._engine));
-
+        this._skyId = skyId;
+        this._buildDisplay();
         this._car.bind();
         this._controls  = new RacingControls(this._screen.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));
         const parts     = new Set(this._car.getAllInstances());
@@ -127,6 +130,83 @@ class RacingGame {
         new ScreenWakeLock().init();
         document.addEventListener('keydown', this._onKey);
         requestAnimationFrame(this._onFrame);
+    }
+
+    // The screen, the engine and the HUD; built again when the renderer changes in the pause options.
+    _buildDisplay() {
+        this._rendererCode = racingSettings.getRenderer();
+        this._screen       = new ScreenManager('screen', {fullscreen: true, virtualWidth: RacingGame.VIRTUAL_WIDTH, virtualHeight: RacingGame.VIRTUAL_HEIGHT});
+        this._engine       = new Engine3d(this._screen, new Object3dRendererList().getRenderer(this._rendererCode));
+        this._engine.setFov(this._horizontalFov())
+            .setZBuffer(RacingGame.NEAR, RacingGame.FAR)
+            .setBackground(...racingCatalog.getCourse(this._selection.course).skyColor)
+            .setLightAmbient(RacingGame.AMBIENT)
+            .setSky(this._sky(this._skyId));
+        this._screen.bindHud(new RacingHud(this._engine));
+    }
+
+    // --- Pause menu ---
+
+    // From the root of the pause only: the stacked options handle Escape as one step back.
+    _togglePause() {
+        if (!this._running) {
+            return;
+        }
+        if (!this._paused) {
+            this._enterPause();
+            return;
+        }
+        if (this._pauseModal.isAtRoot()) {
+            this._leavePause();
+        }
+    }
+
+    // The race stops under the menu: physics, controls, touch controls.
+    _enterPause() {
+        this._paused = true;
+        this._controls.setVirtualPadVisible(false);
+        this._pauseDisplay = new AppMenuDisplay('screen').init(true);
+        this._pauseModal   = new RacingPauseModal(this._pauseDisplay)
+            .setOnResume(() => this._leavePause())
+            .setOnRestart(() => this._restart())
+            .setOnQuit(() => this.quit())
+            .show(() => this._pauseTitle());
+    }
+
+    // The settings changed in the pause apply on resume, a renderer change rebuilding the screen.
+    _leavePause() {
+        this._closePause();
+        this._paused = false;
+        if (racingSettings.getRenderer() !== this._rendererCode) {
+            this._screen.destroyContainer();
+            this._buildDisplay();
+            this._controls.bindDisplay(this._screen.getDisplay());
+        }
+        this._engine.resetDeltaClock();
+        this._controls.applySettings().setVirtualPadVisible(true);
+    }
+
+    _closePause() {
+        this._pauseModal.close();
+        this._pauseDisplay.destroy();
+        this._pauseModal   = null;
+        this._pauseDisplay = null;
+    }
+
+    // From the start grid again, with the same course, car and gearbox.
+    _restart() {
+        this._teardown();
+        this._navigator.startRace(this._selection);
+    }
+
+    _pauseTitle() {
+        const course = racingCatalog.getCourse(this._selection.course).name;
+        const car    = racingCatalog.getCars().find((entry) => (entry.code === this._selection.car)).name;
+
+        return appTranslator.get('race.pause.title', {
+            course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
+            car:    car
+        });
     }
 
     // Any error of the race stops it and brings the menus back with the error.
@@ -159,15 +239,19 @@ class RacingGame {
         if (!this._running) {
             return;
         }
-        const engine = this._engine;
-        engine.calculateDeltaTime(timestamp);
-        const ticks = (engine.getDeltaTime() / RacingGame.TICK_MS);
-        this._simulate(ticks);
-        if (!this._running) {
-            return;
+        this._engine.calculateDeltaTime(timestamp);
+        // Read on paused frames too: the pause button closes the menu from its root, and keeps its press edge.
+        const input = this._controls.read();
+        if (input.quit) {
+            this._togglePause();
+        }
+        const ticks = ((this._paused) ? 0 : (this._engine.getDeltaTime() / RacingGame.TICK_MS));
+        if (!this._paused) {
+            this._simulate(input, ticks);
         }
         this._placeCar(ticks);
 
+        const engine = this._engine;
         engine.setCamera(this._camera);
         engine.lightsCalculatePosition();
         engine.drawInit();
@@ -196,12 +280,7 @@ class RacingGame {
         }
     }
 
-    _simulate(ticks) {
-        const input = this._controls.read();
-        if (input.quit) {
-            this.quit();
-            return;
-        }
+    _simulate(input, ticks) {
         if (input.view) {
             this._camera.cycleView();
         }

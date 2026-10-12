@@ -1,5 +1,5 @@
 {
-    "version": "v1.0060",
+    "version": "v1.0062",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -118,6 +118,7 @@
             "/js/racing/menu/courseScreen.js",
             "/js/racing/menu/carScreen.js",
             "/js/racing/menu/racingOptionsModal.js",
+            "/js/racing/menu/racingPauseModal.js",
             "/js/racing/menu/racingMenuNavigator.js",
             "/js/main.js"
         ]

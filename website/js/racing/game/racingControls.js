@@ -18,9 +18,40 @@ class RacingControls {
         this._virtualGamepad = new AppInputVirtualGamepad(RacingControls.VIRTUAL_PAD_LAYOUT);
         this._held           = new Set();
         this._device         = null;
-        racingSettings.applyBindings(this._keyboard, this._gamepad);
+        this._padSuppressed  = false;
         this._virtualGamepad.allowControl('gearUp', manual).allowControl('gearDown', manual).bindDisplay(display);
+        this.applySettings();
+    }
+
+    // The bindings and the device, read again after a change in the pause options.
+    applySettings() {
+        racingSettings.applyBindings(this._keyboard, this._gamepad);
+        this._device = null;
         this._selectDevice();
+
+        return this;
+    }
+
+    /**
+     * Rebuilds the touch controls into the display of a screen built again (a renderer changed in the pause).
+     * @param {HTMLElement} display
+     */
+    bindDisplay(display) {
+        this._virtualGamepad.bindDisplay(display);
+
+        return this;
+    }
+
+    /**
+     * Hides (or restores) the touch controls while a menu covers the race. The suppression is remembered, so a
+     * device change during the pause cannot bring them back over the menu.
+     * @param {boolean} visible
+     */
+    setVirtualPadVisible(visible) {
+        this._padSuppressed = (visible !== true);
+        this._applyVirtualPadVisibility();
+
+        return this;
     }
 
     /**
@@ -96,7 +127,11 @@ class RacingControls {
             return;
         }
         this._device = device;
-        this._virtualGamepad.setVisible(device === RacingSettings.DEVICE_VIRTUAL_PAD);
+        this._applyVirtualPadVisibility();
+    }
+
+    _applyVirtualPadVisibility() {
+        this._virtualGamepad.setVisible(!this._padSuppressed && (this._device === RacingSettings.DEVICE_VIRTUAL_PAD));
     }
 
     _readAction(action) {

@@ -307,12 +307,48 @@ class RacingTranslations {
                 it: 'La gara si è interrotta per un errore.',
                 es: 'La carrera se detuvo por un error.'
             },
+            'race.pause.title': {
+                fr: '{course} — {car}',
+                en: '{course} — {car}',
+                it: '{course} — {car}',
+                es: '{course} — {car}'
+            },
+            'race.pause.resume': {
+                fr: 'Revenir à la course',
+                en: 'Back to the race',
+                it: 'Torna alla gara',
+                es: 'Volver a la carrera'
+            },
+            'race.pause.restart': {
+                fr: 'Recommencer la course',
+                en: 'Restart the race',
+                it: 'Ricomincia la gara',
+                es: 'Reiniciar la carrera'
+            },
+            'race.pause.restartConfirm': {
+                fr: 'Recommencer la course ?',
+                en: 'Restart the race?',
+                it: 'Ricominciare la gara?',
+                es: '¿Reiniciar la carrera?'
+            },
+            'race.pause.restartButton': {
+                fr: 'Recommencer',
+                en: 'Restart',
+                it: 'Ricomincia',
+                es: 'Reiniciar'
+            },
+            'race.pause.quit': {
+                fr: 'Quitter la course',
+                en: 'Leave the race',
+                it: 'Esci dalla gara',
+                es: 'Salir de la carrera'
+            },
             // --- Help ---
             'help.pauseKey': {
-                fr: 'La touche Échap et le bouton Pause de la manette quittent toujours la course. Les commandes se changent dans Options.',
-                en: 'The Escape key and the Pause button of the gamepad always leave the race. The controls are changed in Options.',
-                it: 'Il tasto Esc e il pulsante Pausa del gamepad lasciano sempre la gara. I comandi si cambiano in Opzioni.',
-                es: 'La tecla Esc y el botón Pausa del mando siempre salen de la carrera. Los controles se cambian en Opciones.'
+                fr: 'En course, la touche Échap et le bouton Pause de la manette ouvrent toujours le menu pause. Les commandes se changent dans Options.',
+                en: 'During a race, the Escape key and the Pause button of the gamepad always open the pause menu. The controls are changed in Options.',
+                it: 'In gara, il tasto Esc e il pulsante Pausa del gamepad aprono sempre il menu di pausa. I comandi si cambiano in Opzioni.',
+                es: 'En carrera, la tecla Esc y el botón Pausa del mando siempre abren el menú de pausa. Los controles se cambian en Opciones.'
             },
             'help.about': {
                 fr: 'À propos',

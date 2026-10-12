@@ -13,6 +13,14 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 
         this._gamepad      = new AppInputGamepad();
         this._shownDevices = null;
+        this._inGame       = false;
+    }
+
+    // Opened from the race pause: the multiplayer settings are left out, as doom_js does in game.
+    setInGame(inGame) {
+        this._inGame = (inGame === true);
+
+        return this;
     }
 
     show() {
@@ -29,7 +37,9 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         const list = this._addList();
         this._addTopic(list, 'options.display', 'display.');
         this._addTopic(list, 'options.sound', 'sound.');
-        this._addTopic(list, 'options.multiplayer', 'multiplayer.');
+        if (!this._inGame) {
+            this._addTopic(list, 'options.multiplayer', 'multiplayer.');
+        }
         this._nav.addItemIn(list, appTranslator.get('options.controls'), () => this._pushPage('options.controls', () => this._buildControls()));
         this._nav.addItemIn(list, appTranslator.get('options.reset'), () => this._confirmReset());
         this._nav.addItemIn(list, appTranslator.get('options.clearBestTimes'), () => this._confirmClearBestTimes());
