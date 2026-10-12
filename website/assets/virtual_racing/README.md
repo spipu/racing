@@ -17,7 +17,7 @@ only (see `LICENSE.md`).
 |---|---|
 | `catalog.json` | Codes and names of the courses and cars, in the order of the original menus; `sky` = size of the sky panoramas and their row on the horizon |
 | `palettes.json` | 256-colour palette of each course, and the 64 colours of each car copied over indices 32-95 |
-| `cars.json` | Every model of the three car banks, the opponents' low-detail bank and the common bank; per car: body, cockpit models, steering wheel with the driver's arms (shared), render slot offsets of the effects (`effectOffsets`) |
+| `cars.json` | Every model of the three car banks, the opponents' low-detail bank and the common bank; per car: body, cockpit models and whether the cockpit view shows its front wheels (`cockpitWheels`), steering wheel with the driver's arms (shared), render slot offsets of the effects (`effectOffsets`) |
 | `courses/<course>.json` | Scenery and road of a course: 32 × 32 grid of model ids (`null` = empty cell) and the models |
 | `skies/<course>.png` | Sky panorama of a course (Mega Drive plane B): 128 × 36 cells of 8 × 8 pixels = 1024 × 288, wrapping around 360 degrees; transparent where the VDP shows colour 0 |
 | `sounds.json`, `sounds/dac_XX.wav` | The 49 Z80 DAC samples (unsigned 8-bit mono; rate computed from the Z80 loop timing, not measured) and, per sound effect id `$A0-$D2`, the samples its script plays (`type: fm` = synthesised, not exported) |

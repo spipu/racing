@@ -6,6 +6,8 @@ const VR_ROM_MAP = {
     // shadow: the only model of the bank lying flat at height 0, colour 4.
     // cockpit: interior view models, in the order of the player's render descriptors $FF6124 + n x $14 (n = 0..3);
     // the first one is the cockpit shell, the steering wheel with the driver's arms follows at $FF6174.
+    // cockpitWheels: whether the cockpit view draws the front wheels (descriptors $FF6128 / $FF613C: flag 1 for the
+    // Formula, 0 for the others, read in emulation).
     cars: [
         {
             code: 'formula',
@@ -14,6 +16,7 @@ const VR_ROM_MAP = {
             body: 0x280000,
             shadow: 0x2806A8,
             cockpit: [0x281BA6, 0x2824AE, 0x2826E4, 0x281664],
+            cockpitWheels: true,
         },
         {
             code: 'stock',
@@ -22,6 +25,7 @@ const VR_ROM_MAP = {
             body: 0x283D96,
             shadow: 0x284364,
             cockpit: [0x285524, 0x284FAA, 0x28506C, 0x28512E],
+            cockpitWheels: false,
         },
         {
             code: 'prototype',
@@ -30,6 +34,7 @@ const VR_ROM_MAP = {
             body: 0x286EE2,
             shadow: 0x28750E,
             cockpit: [0x288738, 0x28819A, 0x28825C, 0x28831E],
+            cockpitWheels: false,
         },
     ],
     opponentBank:  {start: 0x289CC8, end: 0x28C43C},

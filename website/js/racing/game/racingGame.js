@@ -172,7 +172,16 @@ class RacingGame {
         engine.lightsCalculatePosition();
         engine.drawInit();
         this._draw(this._instances);
+        // The original has no depth buffer and paints the cockpit last: it stays over the road it dips into. In its own
+        // depth layer, the cockpit gets a near plane close enough for the roof right above the eye.
+        const cockpit = this._camera.isCockpitShown();
+        if (cockpit) {
+            engine.clearDepth().setZBuffer(RacingGame.COCKPIT_NEAR, RacingGame.COCKPIT_FAR);
+        }
         this._draw(this._car.getInstances());
+        if (cockpit) {
+            engine.setZBuffer(RacingGame.NEAR, RacingGame.FAR);
+        }
         engine.drawFinish();
         this._screen.update();
 
@@ -260,6 +269,8 @@ RacingGame.VIRTUAL_WIDTH                  = 1920;
 RacingGame.VIRTUAL_HEIGHT                 = 1080;
 RacingGame.NEAR                           = 0.1;
 RacingGame.FAR                            = 2000;
+RacingGame.COCKPIT_NEAR                   = 0.01;
+RacingGame.COCKPIT_FAR                    = 10;
 RacingGame.AMBIENT                        = [255, 255, 255];
 RacingGame.LIFT_UNITS_PER_METRE           = 16;
 RacingGame.METRES_PER_ENTITY_UNIT         = (RacingGame.SCENERY_UNITS_PER_ENTITY_UNIT / RacingGame.SCENERY_UNITS_PER_METRE);

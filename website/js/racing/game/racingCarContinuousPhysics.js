@@ -6,7 +6,8 @@
  * the time hooks then apply the elapsed share of it:
  *   - a change per tick is scaled by the share (speed, pedals, heading, position...);
  *   - a decay or an averaging per tick is raised to its power;
- *   - a tick counter becomes a duration in ticks (timers, deflection, carrying back).
+ *   - a tick counter becomes a duration in ticks (timers, deflection, carrying back);
+ *   - an animation table read once a tick is blended between its rows (crash, shake).
  * Values are no longer kept in 16-bit words; headings still wrap at a turn.
  * Behaviour matches the original up to rounding: the bench compares it with
  * the traces (bench/comparePhysics.js --continuous).
@@ -74,10 +75,35 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
         return (((value * end) < 0) ? 0 : end);
     }
 
+    _shakeYawAt(position) {
+        const table = this._common.shakeTable;
+        const last  = (table.length - 1);
+        const low   = Math.min(Math.floor(position), last);
+        const high  = Math.min((low + 1), last);
+
+        return (table[low] + ((table[high] - table[low]) * Math.min((position - low), 1)));
+    }
+
+    // The lift is a length, the other columns angles blended the shorter way round.
+    _crashPoseAt(position) {
+        const table = this._common.crashRecovery;
+        const low   = Math.floor(position);
+        const high  = Math.min((low + 1), (table.length - 1));
+        const share = (position - low);
+
+        return table[low].map((value, column) => {
+            const gap = (table[high][column] - value);
+
+            return (value + (((column === RacingCarContinuousPhysics.CRASH_LIFT) ? gap : this._angle(gap)) * share));
+        });
+    }
+
     _quarter(value) {
         return (value / 4);
     }
 }
 
 // At most one original tick per physics step: a long frame is cut, so walls and probes are not skipped.
-RacingCarContinuousPhysics.MAX_STEP = 1;
+RacingCarContinuousPhysics.MAX_STEP   = 1;
+// Column of the crash table holding the lift, a length.
+RacingCarContinuousPhysics.CRASH_LIFT = 0;

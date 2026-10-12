@@ -175,7 +175,7 @@ RacingCamera.ORDER           = [0, 1, 2, 3];
 RacingCamera.UNITS_PER_METRE = 256;
 // $C0C8 = 192 / 8192 turn.
 RacingCamera.PITCH_DEGREES   = ((192 / 8192) * 360);
-// Vertical half field of the original: focal of ~125 pixels on 320, pixels 0.933 as wide as high, 112 lines up.
-RacingCamera.VERTICAL_HALF_FOV_DEGREES = 40;
+// Vertical half field of the original, measured on far scenery against captures of the original (112 lines up).
+RacingCamera.VERTICAL_HALF_FOV_DEGREES = 47.4;
 // Share of the move into the cockpit after which its models are shown.
 RacingCamera.COCKPIT_SHOWN_SHARE = 0.75;

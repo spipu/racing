@@ -304,7 +304,7 @@ class RacingCarPhysics {
     // $A350: a shock (car contact, spin) shakes the car for 30 ticks and closes the throttle.
     _shock() {
         if (this.shakeTimer > 0) {
-            this.shakeYaw   = this._common.shakeTable[Math.min(Math.trunc(this.shake), (this._common.shakeTable.length - 1))];
+            this.shakeYaw   = this._shakeYawAt(this.shake);
             this.shakeTimer = this._countDown(this.shakeTimer);
             this.shake     += this._scaled(1);
             return;
@@ -322,6 +322,18 @@ class RacingCarPhysics {
             this.shakeTimer = RacingCarPhysics.SHOCK_TICKS;
             this.crashTimer = RacingCarPhysics.SHOCK_TICKS;
         }
+    }
+
+    // Yaw of the shake table at a shake position, a whole tick for the original.
+    _shakeYawAt(position) {
+        const table = this._common.shakeTable;
+
+        return table[Math.min(Math.trunc(position), (table.length - 1))];
+    }
+
+    // Pose of the crash table ($939EEC: lift, tumble, yaw, roll) at a recovery position, a whole tick for the original.
+    _crashPoseAt(position) {
+        return this._common.crashRecovery[Math.ceil(position)].slice();
     }
 
     // $8170: end of a wall deflection, the throttle held back a while.
@@ -343,7 +355,7 @@ class RacingCarPhysics {
         if (this.crashRecovery === 0) {
             return;
         }
-        this.crashPose     = this._common.crashRecovery[Math.ceil(this.crashRecovery)].slice();
+        this.crashPose     = this._crashPoseAt(this.crashRecovery);
         this.crashRecovery = this._countDown(this.crashRecovery);
         if (this.crashRecovery > 0) {
             return;

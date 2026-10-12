@@ -32,6 +32,7 @@ class VrCarExporter {
                 body:                id(car.body),
                 shadow:              id(car.shadow),
                 cockpit:             car.cockpit.map((offset) => id(offset)),
+                cockpitWheels:       car.cockpitWheels,
                 wheels:              this._wheels(car, scene),
                 steeringWheelOffset: this._offsets(scene, map.carScene.steeringOffset, 1)[0],
                 effectOffsets:       this._effectOffsets(index),

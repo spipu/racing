@@ -3,8 +3,9 @@
  * car position, its offset and turn given as animation deltas:
  *   - outside: the body, the two front wheels and the rear axle at their
  *     offsets (cars.json wheels), and the flat shadow darkening the ground;
- *   - cockpit view: the cockpit shell, its front wheels at the same offsets,
- *     and the steering wheel with the driver's arms (the rear axle is not drawn).
+ *   - cockpit view: the cockpit shell, its front wheels at the same offsets
+ *     when the car shows them (cars.json cockpitWheels: the Formula only), and
+ *     the steering wheel with the driver's arms (the rear axle is not drawn).
  * The wheels spin with the speed ($859A), the front wheels steer by the turn
  * rate (+$90, $2984), the steering wheel follows the steering ($C088). The
  * shadow, a part of the body (its descriptor relative to the body, angles 0),
@@ -73,7 +74,9 @@ class RacingCarView {
 
         const [shell, left, right] = car.cockpit;
         this._cockpit.push(this._addPart(model(shell, mirror), [0, 0, 0], null));
-        [left, right].forEach((code, i) => this._cockpit.push(this._addPart(model(code, mirror), offset(car.wheels[i].offset), 'front')));
+        if (car.cockpitWheels) {
+            [left, right].forEach((code, i) => this._cockpit.push(this._addPart(model(code, mirror), offset(car.wheels[i].offset), 'front')));
+        }
         this._cockpit.push(this._addPart(model(cars.steeringWheel, mirror), offset(car.steeringWheelOffset), 'steer'));
     }
 
