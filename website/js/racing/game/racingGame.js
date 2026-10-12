@@ -224,11 +224,12 @@ class RacingGame {
         const yaw   = (-RacingGame._degrees(physics.heading + physics.shownSlip) * side);
         const pitch = RacingGame._degrees(physics.pitch);
         const roll  = (RacingGame._degrees(physics.roll) * side);
-        this._car.setCockpit(this._camera.getView() === RacingCamera.VIEW_COCKPIT)
+        const pose  = this._bodyPose(physics, side);
+        this._car.setCockpit(this._camera.isCockpitShown())
             .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
-            .place(position, yaw, pitch, roll, this._bodyPose(physics, side));
-        this._camera.follow(ticks, position, yaw, pitch, roll);
+            .place(position, yaw, pitch, roll, pose);
+        this._camera.follow(ticks, position, yaw, pitch, roll, pose);
     }
 
     // $2984 / $70AA: a crash lifts the body by +$9C x 16 / 256 m and tumbles it (+$44 pitch); the slip and the shock

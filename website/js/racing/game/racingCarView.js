@@ -9,7 +9,7 @@
  * rate (+$90, $2984), the steering wheel follows the steering ($C088). The
  * shadow, a part of the body (its descriptor relative to the body, angles 0),
  * is hidden while the car recovers from a crash ($2A86). The original paints
- * the car over the road it dips into: its parts carry a depth bias. Outside, the
+ * the car over the road it dips into: its outside parts carry a depth bias. Outside, the
  * effect models of the common bank play at the car's render slots ($3F86,
  * cars.json effectOffsets): tyre smoke, grass and sand behind each rear wheel
  * (the left ones mirrored), sparks under the tail, exhaust flames; the Stock
@@ -81,8 +81,12 @@ class RacingCarView {
      * Instances are created by the loader: the parts are bound once it has loaded them.
      */
     bind() {
-        for (const part of [...this._outside, ...this._cockpit, ...this._effects.map((effect) => effect.part)]) {
+        const outside = [...this._outside, ...this._effects.map((effect) => effect.part)];
+        for (const part of [...outside, ...this._cockpit]) {
             part.instance = loader.instances().get(part.instanceId);
+        }
+        // Not the cockpit: within the bias of the eye, its parts would all share the near plane depth.
+        for (const part of outside) {
             part.instance.setRenderDepthBias(RacingCarView.DEPTH_BIAS);
         }
 

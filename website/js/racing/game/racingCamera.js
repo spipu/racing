@@ -39,6 +39,19 @@ class RacingCamera {
         return this._view;
     }
 
+    /**
+     * The cockpit models replace the whole car once the camera moving into the cockpit has come close enough,
+     * so the car stays whole on screen for most of the move.
+     * @returns {boolean}
+     */
+    isCockpitShown() {
+        if (this._view !== RacingCamera.VIEW_COCKPIT) {
+            return false;
+        }
+
+        return ((this._steps === null) || (this._elapsed >= (this._steps.length * RacingCamera.COCKPIT_SHOWN_SHARE)));
+    }
+
     // The next view of the loop, its boom moving over the transition ticks.
     cycleView() {
         this._order = ((this._order + 1) % RacingCamera.ORDER.length);
@@ -59,11 +72,15 @@ class RacingCamera {
      * @param {number}   yaw      - car yaw, degrees
      * @param {number}   pitch    - car pitch, degrees, nose down positive
      * @param {number}   roll     - car roll, degrees, the engine's lean
+     * @param {{lift: number, yaw: number, pitch: number, roll: number}|null} pose - the body's own pose, as RacingCarView.place
      */
-    follow(ticks, position, yaw, pitch = 0, roll = 0) {
+    follow(ticks, position, yaw, pitch = 0, roll = 0, pose = null) {
         this._advance(ticks);
         const up    = (this._units[0] / RacingCamera.UNITS_PER_METRE);
         const back  = (this._units[1] / RacingCamera.UNITS_PER_METRE);
+        if (this.isCockpitShown() && (pose !== null)) {
+            return this._followBody(position, (yaw + pose.yaw), (pitch + pose.pitch), (roll + pose.roll), pose.lift, up, back);
+        }
         const down  = (RacingCamera.PITCH_DEGREES + pitch);
         const tilt  = ((down * Math.PI) / 180);
         const ahead = ((up * Math.sin(tilt)) - (back * Math.cos(tilt)));
@@ -75,6 +92,29 @@ class RacingCamera {
         this._x     = (position[0] + (Math.sin(turn) * ahead));
         this._y     = (position[1] + rise);
         this._z     = (position[2] + (Math.cos(turn) * ahead));
+
+        return this;
+    }
+
+    // The cockpit stays still on screen: the eye is a part of the body, turned by the same rotation as the parts
+    // (RacingCarView.place: Ry(yaw) · Rx(pitch) · Rz(roll)), then by the boom's own tilt; that rotation is split
+    // back into the engine's camera angles, its camera-to-world rotation being Ry(yaw) · Rz(-lean) · Rx(-pitch).
+    _followBody(position, yaw, pitch, roll, lift, up, back) {
+        const body = new Matrix().identity();
+        const step = new Matrix();
+        body.multiply(step.rotationX((pitch * Math.PI) / 180));
+        body.multiply(step.rotationZ((roll * Math.PI) / 180));
+        body.multiply(step.rotationX((RacingCamera.PITCH_DEGREES * Math.PI) / 180));
+        const m    = body.v;
+        const eye  = body.multiplyPosition([0, up, -back, 1]);
+        const turn = ((yaw * Math.PI) / 180);
+        // Column-major storage: m[column][row].
+        this.yaw    = (yaw + ((Math.atan2(-m[0][2], m[0][0]) * 180) / Math.PI));
+        this._roll  = -((Math.asin(Math.max(-1, Math.min(1, m[0][1]))) * 180) / Math.PI);
+        this.pitch  = -((Math.atan2(-m[2][1], m[1][1]) * 180) / Math.PI);
+        this._x     = (position[0] + (Math.cos(turn) * eye[0]) + (Math.sin(turn) * eye[2]));
+        this._y     = (position[1] + lift + eye[1]);
+        this._z     = (position[2] - (Math.sin(turn) * eye[0]) + (Math.cos(turn) * eye[2]));
 
         return this;
     }
@@ -137,3 +177,5 @@ RacingCamera.UNITS_PER_METRE = 256;
 RacingCamera.PITCH_DEGREES   = ((192 / 8192) * 360);
 // Vertical half field of the original: focal of ~125 pixels on 320, pixels 0.933 as wide as high, 112 lines up.
 RacingCamera.VERTICAL_HALF_FOV_DEGREES = 40;
+// Share of the move into the cockpit after which its models are shown.
+RacingCamera.COCKPIT_SHOWN_SHARE = 0.75;
