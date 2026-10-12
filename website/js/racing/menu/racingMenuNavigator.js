@@ -80,10 +80,10 @@ class RacingMenuNavigator {
         new AppMenuModal(this._display).showError(appTranslator.get('race.failed'), error.message);
     }
 
-    // Back from a race: the course choice, for the next one.
+    // Back from a race: the main menu.
     endRace() {
         this._display.init();
-        this.openCourses();
+        this.showMainMenu();
     }
 
     // Gearbox kept for the session, shown on the car screen.

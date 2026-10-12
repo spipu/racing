@@ -269,5 +269,12 @@
 }
 
 .app-menu-text-caret {
-    color: #C41818;
+    background: #C41818;
+}
+
+.app-menu-button.app-menu-key {
+    font-size: 1.35em;
+    /* Single glyph: the button letter-spacing would trail it off-centre. */
+    letter-spacing: 0;
+    line-height: 1;
 }
