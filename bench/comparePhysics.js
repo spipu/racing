@@ -25,7 +25,7 @@
  *
  * --watch / --show print, for each tick of the range, the input and the traced and computed values of the fields
  * (computed before being set back to the trace), a differing value marked with '!'; with --resync, for the run from
- * the first tick of the range: traced / exact physics / variable step at 1 / at n steps a tick.
+ * the first tick of the range: traced / exact physics / variable step at 1 / at n steps a tick (or by --step).
  */
 const fs   = require('fs');
 const path = require('path');
@@ -349,12 +349,27 @@ class PhysicsComparator {
     // The watched fields of a run from the traced tick t, at 1 and at n steps a tick, next to the trace.
     _traceRun(Physics, car, gearbox, course, ticks, t) {
         const Reference = vm.runInContext('RacingCarPhysics', this._ctx);
-        const runs = [0, 1, this._rate].map((rate) => {
+        const runs = [0, 1, ((this._step > 0) ? PhysicsComparator.BY_STEP : this._rate)].map((rate) => {
             const physics = new (((rate === 0) ? Reference : Physics))(this._physics, car, (gearbox === 'manual'), course);
             this._load(physics, ticks[t].frame);
             physics.settle();
             this._load(physics, ticks[t].frame);
             const rows = [];
+            // The last run takes the steps of --step when given, its rows read at the end of each tick.
+            if (rate === PhysicsComparator.BY_STEP) {
+                const saved = this._resync;
+                for (let k = 1; k <= saved; k++) {
+                    this._resync = k;
+                    const run = new Physics(this._physics, car, (gearbox === 'manual'), course);
+                    this._load(run, ticks[t].frame);
+                    run.settle();
+                    this._load(run, ticks[t].frame);
+                    this._runSteps(run, ticks, t);
+                    rows.push(this._watch.map((name) => this._get(run, name)));
+                }
+                this._resync = saved;
+                return rows;
+            }
             for (let k = 1; k <= this._resync; k++) {
                 const input = this._input(ticks[t + k]);
                 if (rate === 0) {
@@ -526,6 +541,9 @@ class PhysicsComparator {
         return ((value << 16) >> 16);
     }
 }
+
+// Run of the detailed view taking the steps of --step.
+PhysicsComparator.BY_STEP = -1;
 
 try {
     process.exitCode = ((new PhysicsComparator(process.argv.slice(2)).run() > 0) ? 1 : 0);

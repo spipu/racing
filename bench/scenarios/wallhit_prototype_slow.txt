@@ -1,0 +1,10 @@
+# Walls hit at slow speed, shallow then steep, both sides (prototype)
+setup prototype automatic bay_bridge
+30 -
+120 B
+150 B+LEFT
+120 B
+150 B+RIGHT
+120 B
+90 B+LEFT
+90 -

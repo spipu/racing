@@ -194,7 +194,9 @@ class RacingCarPhysics {
     // (mode 8, $662A) its engine is stopped first and the forces are skipped ($C26C = 4 in the traces); after a
     // frontal crash (mode $1C) it keeps its speed under the crash drag, tumbling (+$9C..+$A2).
     _respawnTick() {
-        const idle = {accelerate: false, brake: false, gearUp: false, gearDown: false, steer: 0};
+        // $49EE / $4A0C mask the pad copy the steering reads but write $FFFF in the raw pad $C970: the Stock's grip
+        // ($99C8) sees B held.
+        const idle = {accelerate: true, brake: false, gearUp: false, gearDown: false, steer: 0};
         const carried = (this.mode === RacingCarPhysics.MODE_RESPAWN);
         if (carried) {
             this.speed = 0;
@@ -430,7 +432,7 @@ class RacingCarPhysics {
         } else if ((sense !== 0) && !this._steerChangedThisTick()) {
             let step = (table * sense);
             // The sign test of EOR.W: same signs, a zero slip counting as positive.
-            if ((this._carIndex !== RacingCarPhysics.CAR_FORMULA) && ((this.slip < 0) === (step < 0))) {
+            if ((this._carIndex !== RacingCarPhysics.CAR_FORMULA) && ((this._lastTick('slip') < 0) === (step < 0))) {
                 step >>= 1;
                 this.slip = this._decay(this.slip, 3);
             }
@@ -455,9 +457,9 @@ class RacingCarPhysics {
     _forces() {
         const brakeLimit    = this._params.C0EC;
         const tractionLimit = this._params.C0EA;
-        const rpm  = RacingCarPhysics._clamp(this.rpm, 0, RacingCarPhysics.RPM_MAX);
+        const rpm  = RacingCarPhysics._clamp(this._lastTick('rpm'), 0, RacingCarPhysics.RPM_MAX);
         const tq   = this._torque[rpm >> 7];
-        let force  = ((tq * this._car.gears[this.gear]) >>> 5);
+        let force  = ((tq * this._car.gears[this._lastTick('gear')]) >>> 5);
         force = ((RacingCarPhysics._w(force) * this._lastTick('throttle')) >> 7);
         if (force <= 0) {
             force = Math.min(force, RacingCarPhysics.MIN_ENGINE_FORCE);
@@ -1214,8 +1216,8 @@ class RacingCarPhysics {
     }
 
     // A value the original reads as the previous tick left it (pedals and speed in the forces, slip input, sliding,
-    // wheels off the road, yaw gain, probe heights and flags before the move, variant): computed later in the tick, it
-    // is that of the tick before.
+    // wheels off the road, yaw gain, slip in the steering, probe heights and flags before the move, variant): computed
+    // later in the tick, it is that of the tick before.
     _lastTick(name) {
         return this[name];
     }

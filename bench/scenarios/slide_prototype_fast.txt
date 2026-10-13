@@ -1,0 +1,10 @@
+# Full lock at fast speed both ways, then braking in the turn: grip and slides (prototype)
+setup prototype automatic big_forest
+30 -
+480 B
+90 B+LEFT
+60 B
+90 B+RIGHT
+60 A+RIGHT
+60 B+LEFT
+60 -

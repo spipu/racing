@@ -199,7 +199,7 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
     }
 
     _tickEnd(value, rate) {
-        const end = (value + (rate * (1 - this._t)));
+        const end = (value + (rate * this._tickRemainder() * this._t));
 
         // A move towards zero stops there.
         return (((value * end) < 0) ? 0 : end);
@@ -234,7 +234,7 @@ RacingCarContinuousPhysics.MAX_STEP   = 1;
 // Turn of a tick past which a change of angle is a jump (a spin turns about 3300 a tick at most).
 RacingCarContinuousPhysics.MAX_TURN   = 8192;
 // Read by a tick as the tick before left them (RacingCarPhysics._lastTick).
-RacingCarContinuousPhysics.LAST_TICK_FIELDS = ['mode', 'throttle', 'brake', 'displaySpeed', 'offRoadWheels', 'sliding', 'probeHeights', 'probeFlags', 'slipInput', 'yawGain'];
+RacingCarContinuousPhysics.LAST_TICK_FIELDS = ['mode', 'throttle', 'brake', 'displaySpeed', 'offRoadWheels', 'sliding', 'probeHeights', 'probeFlags', 'slipInput', 'yawGain', 'slip', 'rpm', 'gear'];
 // Below it a share of a tick is a rounding error.
 RacingCarContinuousPhysics.EPSILON    = 1e-6;
 // Column of the crash table holding the lift, a length.

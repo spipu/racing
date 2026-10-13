@@ -1,0 +1,10 @@
+# Full lock at medium speed both ways, then braking in the turn: grip and slides (stock)
+setup stock automatic big_forest
+30 -
+240 B
+90 B+LEFT
+60 B
+90 B+RIGHT
+60 A+RIGHT
+60 B+LEFT
+60 -
