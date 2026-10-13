@@ -3,8 +3,8 @@
  * in the corners, sized in cqh of the letterbox (race.md § HUD):
  *   - top left: the rev counter of the car (needle from the smoothed rpm +$7E,
  *     $B06A: a quarter turn from 6000 rpm, its own scale by car);
- *   - top right: the lap time, the fastest lap (the record of the course and
- *     car);
+ *   - top right: the fastest lap (the record of the course and car), the lap
+ *     time, then the times of the last laps done (user request);
  *   - bottom left: the lap of the race, the speed (km/h or mph), the gear with
  *     every gearbox, "(A)" beside it in automatic (the original shows it with a
  *     manual one only: user request);
@@ -25,6 +25,7 @@ class RacingHud extends AbstractHud {
         this._manual  = false;
         this._els     = {};
         this._shown   = {};
+        this._lapsShown = -1;
     }
 
     /**
@@ -51,10 +52,12 @@ class RacingHud extends AbstractHud {
         this._buildTach(els.tach);
 
         const times = this._add(root, 'racing-hud-block racing-hud-times');
-        this._add(times, 'racing-hud-label', appTranslator.get('hud.lapTime'));
-        els.lapTime = this._add(times, 'racing-hud-time');
         this._add(times, 'racing-hud-label', appTranslator.get('hud.fastestLap'));
         els.record  = this._add(times, 'racing-hud-time racing-hud-record');
+        this._add(times, 'racing-hud-label', appTranslator.get('hud.lapTime'));
+        els.lapTime = this._add(times, 'racing-hud-time');
+        els.lastLaps = this._add(times, 'racing-hud-last-laps');
+        this._lapsShown = -1;
 
         const status = this._add(root, 'racing-hud-block racing-hud-status');
         const lapRow = this._add(status, 'racing-hud-row');
@@ -109,6 +112,7 @@ class RacingHud extends AbstractHud {
         this._needle(physics.smoothRpm);
         this._text('lapTime', RacingTime.format(race.lapMs));
         this._text('record', RacingTime.format((race.record === null) ? null : race.record.lapMs));
+        this._updateLastLaps(race.lapTimes);
         this._text('lap', String(Math.min((physics.lap + 1), race.laps)));
         this._text('laps', '/' + race.laps);
         const mph = (racingSettings.getSpeedUnit() === RacingSettings.SPEED_UNIT_MPH);
@@ -166,6 +170,22 @@ class RacingHud extends AbstractHud {
                 const green = ((r === RacingHud.ROW_GREEN) && (race.lights === RacingRaceControl.LIGHTS_GREEN));
                 lamp.className = 'racing-hud-lamp' + (red ? ' racing-hud-lamp-red' : '') + (green ? ' racing-hud-lamp-green' : '');
             }));
+        }
+    }
+
+    // The last laps done, oldest first; rebuilt when a lap is added.
+    _updateLastLaps(lapTimes) {
+        if (lapTimes.length === this._lapsShown) {
+            return;
+        }
+        this._lapsShown = lapTimes.length;
+        const list  = this._els.lastLaps;
+        const first = Math.max(0, (lapTimes.length - RacingHud.LAST_LAPS));
+        list.textContent = '';
+        for (let i = first; i < lapTimes.length; i++) {
+            const row = this._add(list, 'racing-hud-last-lap');
+            this._add(row, 'racing-hud-label', appTranslator.get('hud.lapTimeOf', {lap: (i + 1)}));
+            this._add(row, 'racing-hud-last-lap-time', RacingTime.format(lapTimes[i]));
         }
     }
 
@@ -287,6 +307,7 @@ class RacingHud extends AbstractHud {
 RacingHud.SVG          = 'http://www.w3.org/2000/svg';
 RacingHud.MPH_PER_KMH  = 0.621371;
 RacingHud.LAMPS        = 5;
+RacingHud.LAST_LAPS    = 5;
 RacingHud.SLATS        = 12;
 // Rev counter: 6000 rpm on the top graduation, a quarter turn ($800 / 8192) for 11000 more (reached about 16900).
 RacingHud.TACH_FROM    = 6000;

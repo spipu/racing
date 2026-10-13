@@ -331,3 +331,23 @@
     font-weight: 800;
     margin-left: -1cqh;
 }
+
+/* The last laps done, under the lap time: label and time on one line. */
+.racing-hud-last-laps:not(:empty) {
+    margin-top: 0.6cqh;
+    padding-top: 0.6cqh;
+    border-top: 0.15cqh solid rgba(255, 255, 255, 0.3);
+}
+
+.racing-hud-last-lap {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 1.5cqh;
+}
+
+.racing-hud-last-lap-time {
+    font-size: 2.6cqh;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
