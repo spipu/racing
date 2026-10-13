@@ -282,17 +282,16 @@ class RacingRaceControl {
         }
     }
 
-    // A sound some ticks later; one of a checkpoint is dropped if a lap message shows by then.
-    _later(ticks, command, unlessMessage = false) {
+    _later(ticks, command) {
         if (command !== undefined) {
-            this._sounds.push({ticks: ticks, command: command, unlessMessage: unlessMessage});
+            this._sounds.push({ticks: ticks, command: command});
         }
     }
 
     _delayedSounds() {
         for (const sound of this._sounds) {
             sound.ticks--;
-            if ((sound.ticks === 0) && !(sound.unlessMessage && (this._message !== null))) {
+            if (sound.ticks === 0) {
                 this._onSound(sound.command);
             }
         }
@@ -300,12 +299,13 @@ class RacingRaceControl {
     }
 
     // $825C: the lap time at a checkpoint (less its correction) against the record's, unless a lap message shows.
-    // The sounds of the mode Virtua Racing (user request, Time Attack has none): the voice $BF, then 20 ticks later the
-    // music of the laps done unless a lap message shows ($81D8).
+    // The music of the mode Virtua Racing at once (user request, Time Attack has none; the original plays it 20 ticks
+    // after its voice $BF, left out), by laps done, unless a lap message shows ($81D8).
     _checkpoint(checkpoint) {
-        this._onSound(RacingRaceControl.SOUND_CHECKPOINT);
         const jingles = this._checkpointJingles;
-        this._later(RacingRaceControl.CHECKPOINT_JINGLE_TICKS, jingles[Math.min(this._physics.lap, (jingles.length - 1))], true);
+        if (this._message === null) {
+            this._onSound(jingles[Math.min(this._physics.lap, (jingles.length - 1))]);
+        }
         const ms = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
         this._splitsMs[checkpoint - 1] = ms;
         const recordMs = ((this.record === null) ? null : this.record.checkpointsMs[checkpoint - 1]);
@@ -409,7 +409,6 @@ RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
 RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
 RacingRaceControl.LAP_JINGLE_TICKS          = 7;
 RacingRaceControl.LAST_LAP_JINGLE_TICKS     = 15;
-RacingRaceControl.CHECKPOINT_JINGLE_TICKS   = 20;
 RacingRaceControl.LINE_CORRECTION_MAX    = 50;
 RacingRaceControl.LINE_CORRECTION_FACTOR = 800;
 RacingRaceControl.SIGN_GO                = 'go';
@@ -422,4 +421,3 @@ RacingRaceControl.SOUND_BEEP_LOW         = 'A6';
 RacingRaceControl.SOUND_BEEP_HIGH        = 'A7';
 RacingRaceControl.JINGLE_START           = '93';
 RacingRaceControl.JINGLE_RECORD          = '97';
-RacingRaceControl.SOUND_CHECKPOINT       = 'BF';
