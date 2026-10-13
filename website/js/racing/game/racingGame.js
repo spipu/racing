@@ -151,7 +151,8 @@ class RacingGame {
         const course = race.courses[this._selection.course];
         const record = (((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
 
-        return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course), racingSound.laps)
+        return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course), racingSound.laps,
+            race.checkpointJingles)
             .setOnSound((command) => racingSound.send(command))
             .setOnRecord((lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs))
             .setOnFinish((result) => this._guard(this._finish, result));

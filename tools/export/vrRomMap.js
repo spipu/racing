@@ -191,6 +191,8 @@ const VR_ROM_MAP = {
         // Time taken off a lap at the line ($B2E4: (K + +$E2) x 800 / +$06 ms, at most 50) and at the checkpoints
         // ($B386: K of checkpoint 1 then 2), by course.
         lineCorrection:        0x88B2D8,
+        // Mode Virtua Racing ($81D8): the music command 20 ticks after a checkpoint, by laps done.
+        checkpointJingles:     {address: 0x888256, count: 5},
         checkpointCorrections: 0x88B36E,
     },
     // Objects placed around a course besides the scenery grid (VrCourseObjectReader): $37B6 places one of 3 animated

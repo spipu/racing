@@ -140,6 +140,7 @@ class VirtualRacingExporter {
             format:     VirtualRacingExporter.FORMAT,
             startGrids: this._byCode(map.cars, race.startGrids.map((groups) => Object.fromEntries(map.gameData.startGridGroups.map((group, g) => [group, groups[g]])))),
             courses:    this._byCode(map.courses, race.courses),
+            checkpointJingles: race.checkpointJingles,
             // The mechanics and the pit boxes; car-scale models (1024 units a metre).
             pit:        pit,
             pitModels:  Object.fromEntries([...pitModels].map(([id, model]) => [id, this._encoder.encode(model)])),

@@ -43,6 +43,8 @@ class VrGameDataReader {
         return {
             startGrids: this._carIndexes().map((car) => this._startGrids(car)),
             courses:    courseSections.map((sections, course) => this._course(course, sections)),
+            checkpointJingles: Array.from(this._rom.getBytes(this._rom.fileFrom68k(this._map.checkpointJingles.address), this._map.checkpointJingles.count))
+                .map((id) => id.toString(16).toUpperCase()),
         };
     }
 

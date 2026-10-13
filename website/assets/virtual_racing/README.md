@@ -24,7 +24,7 @@ only (see `LICENSE.md`).
 | `jingles.json`, `jingles/XX.mp3` | The FM music of the Time Attack race, which is not stored as samples: recorded from the emulated game by `tools/export/recordJingles.js` (each command played alone, silence cut, mono MP3): start, lap done (`laps`: command by laps done), new lap record, pits, results (looping), start beeps of the lights |
 | `sounds/pwm_jingle.wav` | The only 32X PWM sample (stereo, 22 kHz), played on game mode transitions |
 | `physics.json` | Tables of the player car physics: gear ratios and shift points, torque curves, sine quarter wave, crash recovery; per car: parameters (named after the RAM variables they are loaded into), gears, drag tables and maximum speeds by gearbox, wheel probe offsets, hitbox, camera view transitions (playback order) |
-| `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`), per-course section tables and lap time corrections at the line and the checkpoints, the pit (`pit`: the 4 mechanics' animation frames of 4 models, where they stand by course and car, the pit boxes) and the mechanics' models (`pitModels`, car scale) |
+| `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`), per-course section tables and lap time corrections at the line and the checkpoints, the music command after a checkpoint by laps done (`checkpointJingles`, mode Virtua Racing), the pit (`pit`: the 4 mechanics' animation frames of 4 models, where they stand by course and car, the pit boxes) and the mechanics' models (`pitModels`, car scale) |
 
 ## Model format
 

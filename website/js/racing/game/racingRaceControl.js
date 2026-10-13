@@ -23,9 +23,11 @@ class RacingRaceControl {
      *        before any lap: the first lap makes it
      * @param {boolean} pitStart - the start in the pit box with the mechanics (Big Forest)
      * @param {string[]} lapJingles - music command of the lap done, by laps done ($8989EE)
+     * @param {string[]} checkpointJingles - music command after a checkpoint, by laps done ($8256, mode Virtua Racing)
      */
-    constructor(physics, course, record, pitStart, lapJingles) {
+    constructor(physics, course, record, pitStart, lapJingles, checkpointJingles) {
         this._lapJingles = lapJingles;
+        this._checkpointJingles = checkpointJingles;
         this._sounds     = [];          // {ticks, command}: sounds the race sends some ticks later
         this._physics   = physics;
         this._course    = course;
@@ -280,16 +282,17 @@ class RacingRaceControl {
         }
     }
 
-    _later(ticks, command) {
+    // A sound some ticks later; one of a checkpoint is dropped if a lap message shows by then.
+    _later(ticks, command, unlessMessage = false) {
         if (command !== undefined) {
-            this._sounds.push({ticks: ticks, command: command});
+            this._sounds.push({ticks: ticks, command: command, unlessMessage: unlessMessage});
         }
     }
 
     _delayedSounds() {
         for (const sound of this._sounds) {
             sound.ticks--;
-            if (sound.ticks === 0) {
+            if ((sound.ticks === 0) && !(sound.unlessMessage && (this._message !== null))) {
                 this._onSound(sound.command);
             }
         }
@@ -297,7 +300,12 @@ class RacingRaceControl {
     }
 
     // $825C: the lap time at a checkpoint (less its correction) against the record's, unless a lap message shows.
+    // The sounds of the mode Virtua Racing (user request, Time Attack has none): the voice $BF, then 20 ticks later the
+    // music of the laps done unless a lap message shows ($81D8).
     _checkpoint(checkpoint) {
+        this._onSound(RacingRaceControl.SOUND_CHECKPOINT);
+        const jingles = this._checkpointJingles;
+        this._later(RacingRaceControl.CHECKPOINT_JINGLE_TICKS, jingles[Math.min(this._physics.lap, (jingles.length - 1))], true);
         const ms = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
         this._splitsMs[checkpoint - 1] = ms;
         const recordMs = ((this.record === null) ? null : this.record.checkpointsMs[checkpoint - 1]);
@@ -401,6 +409,7 @@ RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
 RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
 RacingRaceControl.LAP_JINGLE_TICKS          = 7;
 RacingRaceControl.LAST_LAP_JINGLE_TICKS     = 15;
+RacingRaceControl.CHECKPOINT_JINGLE_TICKS   = 20;
 RacingRaceControl.LINE_CORRECTION_MAX    = 50;
 RacingRaceControl.LINE_CORRECTION_FACTOR = 800;
 RacingRaceControl.SIGN_GO                = 'go';
@@ -413,3 +422,4 @@ RacingRaceControl.SOUND_BEEP_LOW         = 'A6';
 RacingRaceControl.SOUND_BEEP_HIGH        = 'A7';
 RacingRaceControl.JINGLE_START           = '93';
 RacingRaceControl.JINGLE_RECORD          = '97';
+RacingRaceControl.SOUND_CHECKPOINT       = 'BF';
