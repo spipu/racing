@@ -22,8 +22,11 @@ class RacingRaceControl {
      * @param {{lapMs: number, checkpointsMs: (number|null)[]}|null} record - the record of the course and car, null
      *        before any lap: the first lap makes it
      * @param {boolean} pitStart - the start in the pit box with the mechanics (Big Forest)
+     * @param {string[]} lapJingles - music command of the lap done, by laps done ($8989EE)
      */
-    constructor(physics, course, record, pitStart) {
+    constructor(physics, course, record, pitStart, lapJingles) {
+        this._lapJingles = lapJingles;
+        this._sounds     = [];          // {ticks, command}: sounds the race sends some ticks later
         this._physics   = physics;
         this._course    = course;
         this._pitStart  = pitStart;
@@ -55,7 +58,6 @@ class RacingRaceControl {
         this._message   = null;
         this._split     = null;
         this._splitsMs  = [null, null]; // $C270 / $C274 of the lap
-        this._goTicks   = null;
         this._finishTicks = null;
         physics.mode = RacingCarPhysics.MODE_INTRO;
         if (pitStart) {
@@ -126,13 +128,7 @@ class RacingRaceControl {
             this.pitWork = false;
         }
         this._messages();
-        if (this._goTicks !== null) {
-            this._goTicks++;
-            // $93 ends with the DAC $C6 about 8 s after the start [H].
-            if (this._goTicks === RacingRaceControl.CHEER_TICKS) {
-                this._onSound(RacingRaceControl.SOUND_CHEER);
-            }
-        }
+        this._delayedSounds();
         if (this._finishTicks !== null) {
             this._finishTicks++;
             if (this._finishTicks === (RacingRaceControl.FINISH_DRIVE_TICKS + RacingRaceControl.BLINDS_TICKS)) {
@@ -227,7 +223,8 @@ class RacingRaceControl {
     _go() {
         this._physics.raceFlags |= RacingCarPhysics.RACE_STARTED;
         this.started  = true;
-        this._goTicks = 0;
+        // The start jingle (it chains the DAC $C6): 5 ticks after GO ($9FBC), 10 after the green light ($3E08).
+        this._later((this._pitStart ? RacingRaceControl.START_JINGLE_PIT_TICKS : RacingRaceControl.START_JINGLE_LIGHTS_TICKS), RacingRaceControl.JINGLE_START);
     }
 
     // $A034: the crew of the pit start, frame = ticks x 7 / 30 from the end of the opening.
@@ -248,7 +245,8 @@ class RacingRaceControl {
 
     // $34E8 state 4 / $B2E4: the lap time less the time past the line, against the best lap of the race and the record.
     _lap(event) {
-        const lapMs = Math.max(0, (this.lapMs - this._lineCorrection(this._course.lineCorrection)));
+        // Whole milliseconds: the time is summed by shares of ticks.
+        const lapMs = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.lineCorrection)));
         this.lapTimes.push(lapMs);
         this.lapMs = 0;
         let kind = 'lapTime';
@@ -267,6 +265,13 @@ class RacingRaceControl {
             this.finished     = true;
             this._finishTicks = 0;
         }
+        // $34E8 state 36: the jingle of the lap at the end of the first blink of its message (the second when the voice
+        // of the last lap plays first), $97 for a new record; none after the finish nor through the pit lane.
+        if (!event.throughPits && !event.finished) {
+            const jingles = this._lapJingles;
+            const command = ((kind === 'fastestLap') ? RacingRaceControl.JINGLE_RECORD : jingles[Math.min(event.lap, (jingles.length - 1))]);
+            this._later(((event.lap === (this.laps - 1)) ? RacingRaceControl.LAST_LAP_JINGLE_TICKS : RacingRaceControl.LAP_JINGLE_TICKS), command);
+        }
         // Through the pit lane the split flag is not set: the message stays hidden ($C04E = 0).
         if (!event.throughPits || event.finished) {
             this._message = {kind: kind, ms: lapMs, ticks: 0, frozen: event.finished};
@@ -275,9 +280,25 @@ class RacingRaceControl {
         }
     }
 
+    _later(ticks, command) {
+        if (command !== undefined) {
+            this._sounds.push({ticks: ticks, command: command});
+        }
+    }
+
+    _delayedSounds() {
+        for (const sound of this._sounds) {
+            sound.ticks--;
+            if (sound.ticks === 0) {
+                this._onSound(sound.command);
+            }
+        }
+        this._sounds = this._sounds.filter((sound) => (sound.ticks > 0));
+    }
+
     // $825C: the lap time at a checkpoint (less its correction) against the record's, unless a lap message shows.
     _checkpoint(checkpoint) {
-        const ms = Math.max(0, (this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
+        const ms = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
         this._splitsMs[checkpoint - 1] = ms;
         const recordMs = ((this.record === null) ? null : this.record.checkpointsMs[checkpoint - 1]);
         if ((this._message !== null) || (recordMs === null)) {
@@ -376,7 +397,10 @@ RacingRaceControl.BLINK_BIT              = 4;
 RacingRaceControl.BLINDS_OPEN_FIRST      = 3;
 RacingRaceControl.BLINDS_TICKS           = 10;
 RacingRaceControl.FINISH_DRIVE_TICKS     = 40;
-RacingRaceControl.CHEER_TICKS            = 160;
+RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
+RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
+RacingRaceControl.LAP_JINGLE_TICKS          = 7;
+RacingRaceControl.LAST_LAP_JINGLE_TICKS     = 15;
 RacingRaceControl.LINE_CORRECTION_MAX    = 50;
 RacingRaceControl.LINE_CORRECTION_FACTOR = 800;
 RacingRaceControl.SIGN_GO                = 'go';
@@ -387,4 +411,5 @@ RacingRaceControl.LIGHTS_GREEN           = 2;
 RacingRaceControl.SIGN_READY             = 'ready';
 RacingRaceControl.SOUND_BEEP_LOW         = 'A6';
 RacingRaceControl.SOUND_BEEP_HIGH        = 'A7';
-RacingRaceControl.SOUND_CHEER            = 'C6';
+RacingRaceControl.JINGLE_START           = '93';
+RacingRaceControl.JINGLE_RECORD          = '97';

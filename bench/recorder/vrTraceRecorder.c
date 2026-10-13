@@ -12,6 +12,7 @@
  *   record                                 frames are written to the trace from here on
  *   poke <hex 68K address> <hex word>      writes a word of work RAM (a car placed for a test); the next frame
  *                                          written carries "poked":true
+ *   audio <file.wav> | audio stop          records the sound output (16-bit stereo) from here to the stop
  */
 
 #include <dlfcn.h>
@@ -61,6 +62,8 @@ static const void   *g_frameData    = NULL;
 static unsigned      g_frameWidth   = 0;
 static unsigned      g_frameHeight  = 0;
 static size_t        g_framePitch   = 0;
+static FILE         *g_audioFile    = NULL;
+static uint32_t      g_audioFrames  = 0;
 
 static void (*core_init)(void);
 static void (*core_deinit)(void);
@@ -74,6 +77,7 @@ static bool (*core_load_game)(const struct retro_game_info *);
 static void (*core_unload_game)(void);
 static void (*core_run)(void);
 static void *(*core_get_memory_data)(unsigned);
+static void (*core_get_av_info)(struct retro_system_av_info *);
 static size_t (*core_get_memory_size)(unsigned);
 
 static void fail(const char *format, ...) {
@@ -141,13 +145,40 @@ static void on_video_refresh(const void *data, unsigned width, unsigned height, 
 }
 
 static void on_audio_sample(int16_t left, int16_t right) {
-    (void)left;
-    (void)right;
+    if (g_audioFile != NULL) {
+        const int16_t frame[2] = {left, right};
+        fwrite(frame, sizeof(int16_t), 2, g_audioFile);
+        g_audioFrames++;
+    }
 }
 
 static size_t on_audio_sample_batch(const int16_t *data, size_t frames) {
-    (void)data;
+    if (g_audioFile != NULL) {
+        fwrite(data, (sizeof(int16_t) * 2), frames, g_audioFile);
+        g_audioFrames += (uint32_t)frames;
+    }
     return frames;
+}
+
+/* RIFF header of 16-bit stereo PCM, written again with the sizes when the recording stops. */
+static void write_wav_header(FILE *file, uint32_t rate, uint32_t frames) {
+    const uint32_t dataBytes = (frames * 4);
+    const uint32_t header[] = {0x46464952, (36 + dataBytes), 0x45564157, 0x20746D66, 16, 0x00020001, rate, (rate * 4), 0x00100004,
+        0x61746164, dataBytes};
+    fseek(file, 0, SEEK_SET);
+    fwrite(header, sizeof(header), 1, file);
+    fseek(file, 0, SEEK_END);
+}
+
+static void stop_audio(void) {
+    if (g_audioFile == NULL) {
+        return;
+    }
+    struct retro_system_av_info info;
+    core_get_av_info(&info);
+    write_wav_header(g_audioFile, (uint32_t)(info.timing.sample_rate + 0.5), g_audioFrames);
+    fclose(g_audioFile);
+    g_audioFile = NULL;
 }
 
 static void on_input_poll(void) {
@@ -190,6 +221,7 @@ static void load_core(const char *path) {
     *(void **)&core_run                    = load_symbol(handle, "retro_run");
     *(void **)&core_get_memory_data        = load_symbol(handle, "retro_get_memory_data");
     *(void **)&core_get_memory_size        = load_symbol(handle, "retro_get_memory_size");
+    *(void **)&core_get_av_info            = load_symbol(handle, "retro_get_system_av_info");
 }
 
 static void *read_file(const char *path, size_t *size) {
@@ -349,6 +381,18 @@ int main(int argc, char **argv) {
             poked = true;
             continue;
         }
+        if ((strcmp(first, "audio") == 0) && (fields == 2)) {
+            stop_audio();
+            if (strcmp(second, "stop") != 0) {
+                g_audioFile = fopen(second, "wb");
+                if (g_audioFile == NULL) {
+                    fail("scenario line %d: cannot write %s", lineNumber, second);
+                }
+                g_audioFrames = 0;
+                write_wav_header(g_audioFile, 0, 0);
+            }
+            continue;
+        }
         if ((strcmp(first, "record") == 0) && (fields == 1)) {
             recording = true;
             continue;
@@ -379,6 +423,7 @@ int main(int argc, char **argv) {
     if (scenario != stdin) {
         fclose(scenario);
     }
+    stop_audio();
     fclose(out);
     core_unload_game();
     core_deinit();

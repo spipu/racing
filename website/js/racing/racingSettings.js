@@ -13,6 +13,7 @@ class RacingSettings extends AppSettings {
             // 'auto' follows the language: mph in English, km/h otherwise.
             {key: 'display.speed_unit',   nameCode: 'settings.display.speedUnit',      type: 'list', default: RacingSettings.SPEED_UNIT_AUTO, values: [{code: RacingSettings.SPEED_UNIT_AUTO, labelCode: 'value.speedUnit.auto'}, {code: RacingSettings.SPEED_UNIT_KMH, label: 'km/h'}, {code: RacingSettings.SPEED_UNIT_MPH, label: 'mph'}]},
             {key: 'race.laps',            nameCode: 'settings.race.laps',              type: 'list', default: RacingSettings.DEFAULT_LAPS, values: RacingSettings.LAPS_VALUES},
+            {key: 'sound.volume_music',   nameCode: 'settings.sound.volumeMusic',      type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'sound.volume_effects', nameCode: 'settings.sound.volumeEffects',    type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'multiplayer.nickname', nameCode: 'settings.multiplayer.nickname',   type: 'text', default: '', charset: RacingSettings.NICKNAME_CHARSET, maxLength: RacingSettings.NICKNAME_MAX_LENGTH},
             // Laps of the races the main hosts (phase 8).
@@ -79,6 +80,10 @@ class RacingSettings extends AppSettings {
      */
     getControlsDevice() {
         return this.get(RacingSettings.DEVICE_KEY);
+    }
+
+    getMusicVolume() {
+        return this.getPercent('sound.volume_music');
     }
 
     getEffectsVolume() {

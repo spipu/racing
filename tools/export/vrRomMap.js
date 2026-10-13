@@ -132,6 +132,24 @@ const VR_ROM_MAP = {
         0xC2: 'countdown_1',
         0xC3: 'countdown_go',
     },
+    // Jingles of the Time Attack race, FM music recorded from the emulated game (tools/export/recordJingles.js): music
+    // commands of the mailbox $C8A5 — the start ($93, then the DAC $C6 it chains), the lap done (table by laps done
+    // $8989EE, $34E8 state 36), a new record of the lap ($97, then the voice $CB), the pits ($90 / $91), the results
+    // ($8E, looping) — and the FM start beeps of the lights ($A6 / $A7, effects mailbox $C8A4).
+    jingles: {
+        start:   0x93,
+        laps:    {table: 0x8989EE, count: 10},
+        record:  0x97,
+        pitIn:   0x90,
+        pitOut:  0x91,
+        results: 0x8E,
+        beeps:   [0xA6, 0xA7],
+        // Work RAM words poked to play one: $C822 (immediate command, $F3 stops every voice), $C8A4 / $C8A5.
+        stopMailbox:  0xFFC822,
+        soundMailbox: 0xFFC8A4,
+        stopAll:      0xF3,
+        firstEffect:  0xA0,
+    },
     // Game tables (68K addresses), read by VrGameDataReader.
     gameData: {
         carParams:       0x898818, // 3 pointers (by car) to: gear table pointer + 14 words loaded into the RAM variables below

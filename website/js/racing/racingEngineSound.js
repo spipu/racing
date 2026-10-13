@@ -152,8 +152,9 @@ RacingEngineSound.TREMBLE_MASK    = 15;
 RacingEngineSound.RANDOM_SEED     = 0x1234;
 RacingEngineSound.RANDOM_FACTOR   = 41;
 RacingEngineSound.RANDOM_STEP     = 0x3619;
-// The engine about a quarter of the DAC effects (-12 dB), the tunnel copy at volume 14 against 15-16.
-RacingEngineSound.LEVEL           = 0.2;
+// The engine about a quarter of the DAC effects (-12 dB, RacingSound.DAC_GAIN), 10 % lower by ear (user request
+// 2026-10-13); the tunnel copy at volume 14 against 15-16.
+RacingEngineSound.LEVEL           = 0.09;
 RacingEngineSound.TUNNEL_LEVEL    = 1.1;
 RacingEngineSound.GLIDE_S         = 0.008;
 // Rpm shifts of the frequency word, its cap, the detune of the voice (fnum = V - detune), the tunnel copy's.

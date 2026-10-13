@@ -334,6 +334,12 @@ class RacingTranslations {
                 it: 'Unità di velocità',
                 es: 'Unidad de velocidad'
             },
+            'settings.sound.volumeMusic': {
+                fr: 'Volume de la musique',
+                en: 'Music volume',
+                it: 'Volume della musica',
+                es: 'Volumen de la música'
+            },
             'settings.sound.volumeEffects': {
                 fr: 'Volume des effets',
                 en: 'Effects volume',

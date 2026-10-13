@@ -4,8 +4,10 @@
  * skid, C0 voice "3"...) is accepted when its priority is at least the one
  * held, which lasts as long as the effect track of the last accepted command
  * (its frames at 60 Hz); the DAC has one voice, a new sample cuts the one
- * playing. The FM effects are not samples: the two start beeps are
- * synthesised, the jingles left out; the engine is RacingEngineSound.
+ * playing. The FM sounds are not samples: the jingles and the start beeps
+ * were recorded from the emulated game (jingles.json, jingles/XX.mp3); a music
+ * command ($81-$9E) replaces the music playing. The engine is
+ * RacingEngineSound.
  *
  * Global `racingSound`: the engine and its AudioContext are born once for the
  * page, the samples are loaded on the first race and kept.
@@ -15,8 +17,12 @@ class RacingSound {
         this._engine   = null;
         this._samples  = null;
         this._player   = null;
-        this._effects  = {};      // command id → {timeline: [{ms, id}], ms, priority}
+        this._musicPlayer = null;
+        this._effects  = {};      // command id → {timeline: [{ms, id, fm}], ms, priority}
+        this._jingles  = {};      // music command id → {id, loop}
+        this._music    = null;
         this._loading  = null;
+        this.laps      = [];      // music command of the lap done, by laps done ($8989EE)
         this._priority = 0;
         this._heldTo   = 0;       // ms (performance clock) the priority holds to
         this._dac      = null;
@@ -29,6 +35,7 @@ class RacingSound {
             this._engine  = new SoundEngine().installUnlockListeners();
             this._samples = new SoundSampleLoader(this._engine);
             this._player  = new SoundEffectPlayer(this._engine);
+            this._musicPlayer = new SoundEffectPlayer(this._engine, this._engine.getMusicBus());
         }
 
         return this.applyVolume();
@@ -37,6 +44,7 @@ class RacingSound {
     applyVolume() {
         if (this._engine !== null) {
             this._engine.setEffectsVolume(racingSettings.getEffectsVolume());
+            this._engine.setMusicVolume(racingSettings.getMusicVolume());
         }
 
         return this;
@@ -65,8 +73,15 @@ class RacingSound {
      * @param {string} command - sound command id of the original, in hexadecimal ('B1')
      */
     send(command) {
+        if (this._player === null) {
+            return this;
+        }
+        const jingle = this._jingles[command];
+        if (jingle !== undefined) {
+            return this._playMusic(jingle);
+        }
         const effect = this._effects[command];
-        if ((this._player === null) || (effect === undefined)) {
+        if (effect === undefined) {
             return this;
         }
         const now = performance.now();
@@ -97,20 +112,33 @@ class RacingSound {
     setPaused(paused) {
         if (this._player !== null) {
             this._player.setPaused(paused);
+            this._musicPlayer.setPaused(paused);
         }
 
         return this;
     }
 
-    // Leaving a race: every voice stops.
+    // $F3, leaving a race: every voice stops.
     stopAll() {
         this._cancelTimers();
         if (this._player !== null) {
             this._player.stopAll(false);
+            this._musicPlayer.stopAll(false);
         }
         this._dac      = null;
+        this._music    = null;
         this._priority = 0;
         this._heldTo   = 0;
+
+        return this;
+    }
+
+    // A music replaces the one playing, on the music volume; the results loop.
+    _playMusic(jingle) {
+        if (this._music !== null) {
+            this._music.stop();
+        }
+        this._music = this._musicPlayer.play(this._samples.get(jingle.id), {key: 'music', gain: RacingSound.MUSIC_GAIN, loop: jingle.loop});
 
         return this;
     }
@@ -141,16 +169,39 @@ class RacingSound {
 
             return files.get(entry.file);
         };
+        const recorded = await this._loadJingles(base);
         for (const [command, effect] of Object.entries(sounds.effects)) {
-            const synth   = RacingSound.SYNTH[command];
             const ids     = await Promise.all(effect.timeline.map((entry) => sample(entry.sample)));
-            const entries = effect.timeline.map((entry, i) => ({ms: (entry.frame * RacingSound.FRAME_MS), id: ids[i]}));
-            if (synth !== undefined) {
-                // An FM voice of its own: it does not cut the DAC.
-                entries.push({ms: 0, id: this._samples.loadFromData('synth/' + command, SoundSynth.tone(synth)), fm: true});
+            const entries = effect.timeline.map((entry, i) => ({ms: (entry.frame * RacingSound.FRAME_MS), id: ids[i], fm: false}));
+            if (recorded.has(command)) {
+                // An FM voice of its own (the start beeps): it does not cut the DAC.
+                entries.push({ms: 0, id: recorded.get(command).id, fm: true});
+                recorded.delete(command);
             }
             this._effects[command] = {timeline: entries, ms: (effect.frames * RacingSound.FRAME_MS), priority: effect.priority};
         }
+        for (const [command, jingle] of recorded) {
+            this._jingles[command] = jingle;
+        }
+    }
+
+    // The recorded FM sounds, decoded once: command id → {id, loop}.
+    async _loadJingles(base) {
+        const list    = await appBootstrap.fetchJsonAsync(base + 'jingles.json');
+        const context = this._engine.getContext();
+        const entries = await Promise.all(Object.entries(list.jingles).map(async ([command, jingle]) => {
+            const response = await fetch(appBootstrap.buildUrl(base + 'jingles/' + jingle.file));
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status + ' on ' + jingle.file);
+            }
+            const buffer = await context.decodeAudioData(await response.arrayBuffer());
+            const id     = this._samples.loadFromData('jingle/' + command, {rate: buffer.sampleRate, samples: buffer.getChannelData(0)});
+
+            return [command, {id: id, loop: jingle.loop}];
+        }));
+        this.laps = list.laps;
+
+        return new Map(entries);
     }
 
     async _loadWav(url, rate) {
@@ -173,13 +224,11 @@ RacingSound.ASSETS          = '/assets/virtual_racing/';
 RacingSound.WAV_HEADER_SIZE = 44;
 RacingSound.PCM_ZERO        = 128;
 RacingSound.FRAME_MS        = (1000 / 60);
-RacingSound.DAC_GAIN        = 0.8;
-RacingSound.FM_GAIN         = 0.6;
-// The FM start beeps ($A6 / $A7): a metallic voice (algorithm 3, carrier x 7) on C4 for 32 frames, C5 for 56 frames.
-RacingSound.BEEP_PARTIALS   = [{ratio: 7, gain: 1}, {ratio: 2, gain: 0.45}, {ratio: 12, gain: 0.35, decayMul: 0.6}, {ratio: 1, gain: 0.3}];
-RacingSound.SYNTH           = {
-    A6: {frequency: 261.7, durationMs: 533, decayMs: 260, gain: 0.55, attackMs: 1, harmonics: RacingSound.BEEP_PARTIALS},
-    A7: {frequency: 523.4, durationMs: 933, decayMs: 420, gain: 0.55, attackMs: 1, harmonics: RacingSound.BEEP_PARTIALS},
-};
+// The console mix plays a DAC effect 13.4 dB under its exported sample (crash $B0 and voice $C0 recorded from the
+// emulated game: -26.1 / -26.6 dB against -12.7 / -13.5 dB); the FM recordings come at that mix: 4 times (12 dB)
+// the gain of the samples, their peaks (-4.7 dB) still unclipped.
+RacingSound.DAC_GAIN        = 0.4;
+RacingSound.FM_GAIN         = 1.6;
+RacingSound.MUSIC_GAIN      = 1.6;
 
 const racingSound = new RacingSound();

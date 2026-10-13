@@ -41,7 +41,7 @@ class TraceRecorder {
     }
 
     run() {
-        this._checkRom();
+        this.checkRom();
         childProcess.execFileSync(path.join(RECORDER_DIR, 'build.sh'), {stdio: 'inherit'});
         fs.mkdirSync(BenchScenario.TRACE_DIR, {recursive: true});
         fs.mkdirSync(WORK_DIR, {recursive: true});
@@ -52,7 +52,7 @@ class TraceRecorder {
         }
     }
 
-    _checkRom() {
+    checkRom() {
         if (!fs.existsSync(ROM_PATH)) {
             throw new Error('missing ROM: ' + ROM_PATH);
         }
@@ -82,7 +82,7 @@ class TraceRecorder {
 
     // The Time Attack menu navigation to the car, transmission and course, then the recording.
     _setupLines(scenario) {
-        const menu = this._menuInputs(scenario);
+        const menu = this.menuInputs(scenario);
         if (this._shots) {
             menu.push('shot ' + scenario.name);
         }
@@ -90,7 +90,8 @@ class TraceRecorder {
         return [...menu, 'record'];
     }
 
-    _menuInputs(scenario) {
+    // Time Attack menu navigation of a setup ({car, transmission, course}), up to the start grid.
+    menuInputs(scenario) {
         const carIndex    = BenchScenario.CARS.indexOf(scenario.car);
         const courseIndex = BenchScenario.COURSES.indexOf(scenario.course);
         const press = (button, wait) => [PRESS_FRAMES + ' ' + button, wait + ' -'];
@@ -112,9 +113,13 @@ class TraceRecorder {
     }
 }
 
-try {
-    new TraceRecorder(process.argv.slice(2)).run();
-} catch (error) {
-    process.stderr.write(String(error.stack ?? error) + '\n');
-    process.exitCode = 1;
+if (require.main === module) {
+    try {
+        new TraceRecorder(process.argv.slice(2)).run();
+    } catch (error) {
+        process.stderr.write(String(error.stack ?? error) + '\n');
+        process.exitCode = 1;
+    }
 }
+
+module.exports = {TraceRecorder, RECORDER_PATH, RECORDER_DIR, CORE_PATH, ROM_PATH};

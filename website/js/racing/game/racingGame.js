@@ -151,7 +151,7 @@ class RacingGame {
         const course = race.courses[this._selection.course];
         const record = (((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
 
-        return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course))
+        return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course), racingSound.laps)
             .setOnSound((command) => racingSound.send(command))
             .setOnRecord((lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs))
             .setOnFinish((result) => this._guard(this._finish, result));
@@ -248,11 +248,13 @@ class RacingGame {
 
     // --- Finish ---
 
-    // The blinds are closed: the records of this device, the engine stopped ($F3), the results over the black screen.
+    // The blinds are closed: the records of this device, every voice stopped ($F3), the results over the black screen
+    // with their music.
     _finish(result) {
         if (this._engineSound !== null) {
             this._engineSound.setRunning(false);
         }
+        racingSound.stopAll().send(RacingGame.JINGLE_RESULTS);
         this._controls.setVirtualPadVisible(false);
         // The best lap was saved when it was done: the records shown are those of the race.
         this._saveRecord(null, result.raceMs, null).then((records) => {
@@ -505,5 +507,6 @@ RacingGame.START_PLACE                    = 0;
 RacingGame.PIT_START_COURSES              = ['big_forest'];
 RacingGame.CREW_WRENCH_FRAMES             = [4, 0x16];
 RacingGame.SOUND_WRENCH                   = 'BA';
+RacingGame.JINGLE_RESULTS                 = '8E';
 // Road flag bit 4 under the car: a tunnel, the engine echoes.
 RacingGame.ROAD_TUNNEL                    = 0x10;

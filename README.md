@@ -48,6 +48,7 @@ Le mode par défaut enchaîne `RacingCarPhysics` tick par tick depuis le premier
 
 ```bash
 node tools/export/exportVirtualRacing.js     # ROM USA dans .source/, voir website/assets/virtual_racing/README.md
+node tools/export/recordJingles.js           # jingles FM enregistrés depuis le jeu émulé (cœur PicoDrive et ffmpeg requis)
 ```
 
 ## Icônes
