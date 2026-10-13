@@ -1,0 +1,22 @@
+# Fast slalom: steering reversals at speed (formula)
+setup formula automatic big_forest
+30 -
+420 B
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+45 B+LEFT
+45 B+RIGHT
+120 A
+60 -

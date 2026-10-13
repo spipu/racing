@@ -1,9 +1,13 @@
 /**
- * Draw order of the coplanar faces of a model. The original paints the faces
- * of a model in their ROM order, so a face lying on an earlier one of the same
- * plane (road markings, kerbs, signs) is drawn over it; a depth-buffered
- * renderer needs it lifted instead. Layer of a face = 1 + the highest layer of
- * the earlier coplanar faces it overlaps (0 when it overlaps none).
+ * Draw order of coplanar faces. The original paints the faces of a model in
+ * their ROM order, so a face lying on an earlier one of the same plane (road
+ * markings, kerbs, signs) is drawn over it; a depth-buffered renderer needs it
+ * lifted instead. Between two models of a course the original order is not
+ * decoded: the smaller face goes over the larger one (a marking over the road
+ * of a neighbouring model; user decision 2026-10-13).
+ *
+ * Layer of a face = 1 + the highest layer of the faces it must cover (0 when it
+ * covers none).
  */
 class VrDecalLayers {
     /**
@@ -11,21 +15,77 @@ class VrDecalLayers {
      * @returns {int[]} one layer per face
      */
     compute(model) {
-        const planes = model.faces.map((face) => this._plane(face.indices.map((index) => model.vertices[index])));
-        const layers = [];
-        planes.forEach((plane, j) => {
-            let layer = 0;
-            if (plane !== null) {
-                for (let k = 0; k < j; k++) {
-                    if ((planes[k] !== null) && this._sharesPlane(planes[k], plane) && this._overlaps(plane, planes[k])) {
-                        layer = Math.max(layer, (layers[k] + 1));
-                    }
+        return this.computeScene([model])[0];
+    }
+
+    /**
+     * The models of a course, ordered within each model and across models.
+     *
+     * @param {{vertices: int[][], faces: {indices: int[]}[]}[]} models
+     * @returns {int[][]} one layer per face, by model
+     */
+    computeScene(models) {
+        const faces = [];
+        models.forEach((model, m) => {
+            model.faces.forEach((face, f) => {
+                const plane = this._plane(face.indices.map((index) => model.vertices[index]));
+                if (plane !== null) {
+                    faces.push({model: m, face: f, plane: plane, color: face.colorIndex, area: this._area(plane), box: this._box(plane.points), covers: []});
                 }
-            }
-            layers.push(layer);
+            });
         });
+        for (let a = 0; a < faces.length; a++) {
+            for (let b = (a + 1); b < faces.length; b++) {
+                this._order(faces[a], faces[b]);
+            }
+        }
+
+        const layers = models.map((model) => model.faces.map(() => 0));
+        const state  = new Map();
+        const visit  = (node) => {
+            if (state.get(node) === VrDecalLayers.DONE) {
+                return layers[node.model][node.face];
+            }
+            if (state.get(node) === VrDecalLayers.VISITING) {
+                throw new Error('coplanar faces cover each other: model ' + node.model + ' face ' + node.face);
+            }
+            state.set(node, VrDecalLayers.VISITING);
+            let layer = 0;
+            for (const lower of node.covers) {
+                layer = Math.max(layer, (visit(lower) + 1));
+            }
+            layers[node.model][node.face] = layer;
+            state.set(node, VrDecalLayers.DONE);
+
+            return layer;
+        };
+        faces.forEach(visit);
 
         return layers;
+    }
+
+    // Records which of two coplanar overlapping faces covers the other: ROM order in a model, size across models.
+    _order(first, second) {
+        if (!this._boxesMeet(first.box, second.box)) {
+            return;
+        }
+        const overlap = (this._sharesPlane(first.plane, second.plane) && this._overlaps(second.plane, first.plane));
+        if (first.model === second.model) {
+            if (overlap) {
+                second.covers.push(first);
+            }
+            return;
+        }
+        // Same colour: whichever wins, the picture is the same. Across models the test must not depend on which face
+        // comes first.
+        if ((first.color === second.color) || (!overlap && !(this._sharesPlane(second.plane, first.plane) && this._overlaps(first.plane, second.plane)))) {
+            return;
+        }
+        if (first.area < second.area) {
+            first.covers.push(second);
+            return;
+        }
+        second.covers.push(first);
     }
 
     // Newell normal: the visible side of a face is opposite to it.
@@ -44,7 +104,20 @@ class VrDecalLayers {
         const unit = normal.map((value) => (value / length));
         const axis = [0, 1, 2].reduce((best, i) => ((Math.abs(unit[i]) > Math.abs(unit[best])) ? i : best), 0);
 
-        return {normal: unit, distance: this._dot(unit, points[0]), axis, points};
+        return {normal: unit, distance: this._dot(unit, points[0]), axis, points, length};
+    }
+
+    // Twice the Newell length is the area of the polygon.
+    _area(plane) {
+        return (plane.length / 2);
+    }
+
+    _box(points) {
+        return [0, 1, 2].map((axis) => [Math.min(...points.map((p) => p[axis])), Math.max(...points.map((p) => p[axis]))]);
+    }
+
+    _boxesMeet(a, b) {
+        return a.every((range, axis) => ((range[0] <= (b[axis][1] + VrDecalLayers.ON_PLANE)) && (b[axis][0] <= (range[1] + VrDecalLayers.ON_PLANE))));
     }
 
     _sharesPlane(base, face) {
@@ -89,5 +162,7 @@ VrDecalLayers.PARALLEL = 1e-3;
 // Model units: vertex distance to the plane, and overlap below which two faces only touch.
 VrDecalLayers.ON_PLANE = 1;
 VrDecalLayers.TOUCH    = 0.5;
+VrDecalLayers.VISITING = 1;
+VrDecalLayers.DONE     = 2;
 
 module.exports = {VrDecalLayers};

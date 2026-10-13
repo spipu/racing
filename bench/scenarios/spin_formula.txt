@@ -1,0 +1,9 @@
+# Full lock held at speed both ways, then braking while turning: grip loss and spins (formula)
+setup formula automatic big_forest
+30 -
+480 B
+300 B+LEFT
+150 B
+300 B+RIGHT
+120 A+RIGHT
+90 -

@@ -11,8 +11,12 @@ class VrModelEncoder {
         this._layers = new VrDecalLayers();
     }
 
-    encode(model) {
-        const layers = this._layers.compute(model);
+    /**
+     * @param {object}     model
+     * @param {int[]|null} layers - the model's own coplanar order when null
+     */
+    encode(model, layers = null) {
+        layers = (layers ?? this._layers.compute(model));
         return {
             v: model.vertices.flat(),
             f: model.faces.map((face, index) => {
@@ -29,6 +33,23 @@ class VrModelEncoder {
                 return encoded;
             }),
         };
+    }
+
+    /**
+     * The models of a course, with the coplanar faces ordered across models too.
+     *
+     * @param {Map<string, object>} models - by identifier
+     * @returns {object} encoded models by identifier
+     */
+    encodeScene(models) {
+        const list    = [...models.values()];
+        const layers  = this._layers.computeScene(list);
+        const encoded = {};
+        [...models.keys()].forEach((id, i) => {
+            encoded[id] = this.encode(list[i], layers[i]);
+        });
+
+        return encoded;
     }
 
     /**

@@ -143,7 +143,8 @@ class RacingCarPhysics {
     }
 
     /**
-     * @param {{accelerate: boolean, brake: boolean, gearUp: boolean, gearDown: boolean, steer: int}} input - steer: +1 left, -1 right
+     * @param {{accelerate: boolean, brake: boolean, gearUp: boolean, gearDown: boolean, steer: int, steerAxis: (number|undefined)}} input
+     *        steer: +1 left, -1 right; steerAxis: analog steering from -1 (right) to +1 (left), null or absent for a digital pad
      */
     tick(input) {
         // Every variant starts with the body's own pose cleared.
@@ -157,6 +158,9 @@ class RacingCarPhysics {
         }
         this._surfaceSprays();
         this._roadInfo();
+        // The race loop ($6444) checks the heading after every variant, a carrying back included, against the road
+        // heading of this tick.
+        this._wrongWayCheck();
         this._roadSide();
         this._effects();
     }
@@ -167,7 +171,7 @@ class RacingCarPhysics {
         this._wallTimerEnd();
         this._crashRecoveryStep();
         this._timers();
-        this._steering(input.steer);
+        this._steering(input.steer, (input.steerAxis ?? null));
         this._forces();
         this._clampSpeed();
         this._gearbox(input);
@@ -179,7 +183,6 @@ class RacingCarPhysics {
         this._walls();
         this._sparks();
         this._bodyPose();
-        this._wrongWayCheck();
     }
 
     // Variant $6636 (table $659C): the car slid to the point of a section, the pad ignored ($4A0C). Carried back
@@ -341,7 +344,7 @@ class RacingCarPhysics {
         if (this.wallTimer <= 0) {
             return;
         }
-        this.wallTimer = this._countDown(this.wallTimer);
+        this.wallTimer = this._endCountDown(this.wallTimer);
         if ((this.wallTimer !== 0) || this._bridgeCrossing(RacingCarPhysics.BRIDGE_LAST_WALL)) {
             return;
         }
@@ -356,7 +359,7 @@ class RacingCarPhysics {
             return;
         }
         this.crashPose     = this._crashPoseAt(this.crashRecovery);
-        this.crashRecovery = this._countDown(this.crashRecovery);
+        this.crashRecovery = this._endCountDown(this.crashRecovery);
         if (this.crashRecovery > 0) {
             return;
         }
@@ -399,13 +402,17 @@ class RacingCarPhysics {
         }
     }
 
-    // $94FA
-    _steering(sense) {
+    // $94FA. The original pad is digital: the steering speed ramps by steps. An analog stick sets it directly to its
+    // deflection (user specification), then goes through the same dead zone, bound and smoothing.
+    _steering(sense, axis = null) {
         const table = RacingCarPhysics.STEER_STEP;
         // Change of the steering speed over a tick, for the time hooks.
         let rate = 0;
-        // Released (sense 0), the steering speed zeroed on the change stays so.
-        if (sense !== this.steerSense) {
+        if (axis !== null) {
+            this.steerSense = Math.sign(axis);
+            this.steerSpeed = Math.round(axis * RacingCarPhysics.STEER_SPEED_MAX);
+        } else if (sense !== this.steerSense) {
+            // Released (sense 0), the steering speed zeroed on the change stays so.
             this.steerSense = sense;
             this.steerSpeed = (table * sense);
             this.steer      = RacingCarPhysics._w(this.steerSpeed << 8);
@@ -439,21 +446,21 @@ class RacingCarPhysics {
         const rpm  = RacingCarPhysics._clamp(this.rpm, 0, RacingCarPhysics.RPM_MAX);
         const tq   = this._torque[rpm >> 7];
         let force  = ((tq * this._car.gears[this.gear]) >>> 5);
-        force = ((RacingCarPhysics._w(force) * this.throttle) >> 7);
+        force = ((RacingCarPhysics._w(force) * this._lastTick('throttle')) >> 7);
         if (force <= 0) {
             force = Math.min(force, RacingCarPhysics.MIN_ENGINE_FORCE);
         }
         const r = this._resistanceForce();
         this.resistance = RacingCarPhysics._w(r);
         force -= (r << 4);
-        force -= ((this.brake * RacingCarPhysics.BRAKE_FORCE) >> 7);
+        force -= ((this._lastTick('brake') * RacingCarPhysics.BRAKE_FORCE) >> 7);
         if (force < 0) {
             force *= 2;
         }
 
         this.grip = RacingCarPhysics.GRIP_FULL;
         if (force <= -brakeLimit) {
-            if ((this.skidTimer === 0) && (force <= (-2 * brakeLimit)) && (this.crashRecovery === 0) && (this.displaySpeed > RacingCarPhysics.SKID_SPEED)) {
+            if ((this.skidTimer === 0) && (force <= (-2 * brakeLimit)) && (this.crashRecovery === 0) && (this._lastTick('displaySpeed') > RacingCarPhysics.SKID_SPEED)) {
                 this.skidTimer = RacingCarPhysics.EFFECT_TICKS;
             }
             force = -brakeLimit;
@@ -479,21 +486,23 @@ class RacingCarPhysics {
 
     // The drag of the speed (scaled by C0E6), more over the speed limit, off the road, sliding or after a shock.
     _resistanceForce() {
-        const table = this._drag;
-        let r = ((table[Math.min(Math.trunc(this.displaySpeed), (table.length - 1))] * this._params.C0E6) >> 8);
+        const table        = this._drag;
+        const displaySpeed = this._lastTick('displaySpeed');
+        const offRoad      = this._lastTick('offRoadWheels');
+        let r = ((table[Math.min(Math.trunc(displaySpeed), (table.length - 1))] * this._params.C0E6) >> 8);
         if (this.speedState > 4) {
             r = ((11 * r) >> 4);
         } else if ((this.speedState !== 0) && (this.speed > this.maxSpeed)) {
             r += (r >> 1);
         }
-        if (this.offRoadWheels !== 0) {
-            let extra = (((this.displaySpeed * this.displaySpeed) >>> 4));
-            if (this.offRoadWheels <= 2) {
+        if (offRoad !== 0) {
+            let extra = (((displaySpeed * displaySpeed) >>> 4));
+            if (offRoad <= 2) {
                 extra >>= 1;
             }
             r += extra;
         }
-        if (this.sliding !== 0) {
+        if (this._lastTick('sliding') !== 0) {
             r += ((r >> 1) + (r >> 2));
         }
         if (this.crashTimer > 0) {
@@ -594,7 +603,7 @@ class RacingCarPhysics {
             y = w((y * (RacingCarPhysics.BACK_ON_TRACK_TICKS - this.backOnTrack)) >> 5);
         }
         let turn = w(y + (y >> 1));
-        if (this.sliding !== 0) {
+        if (this._lastTick('sliding') !== 0) {
             turn = w(turn + (y >> 1));
         }
         this.heading = this._angle(this.heading + this._scaled(turn));
@@ -622,7 +631,8 @@ class RacingCarPhysics {
     _yawGainUpdate() {
         const w       = RacingCarPhysics._w;
         const gainMax = this._params.C0E8;
-        let probe     = w(this.probeHeights[RacingCarPhysics.PROBE_FRONT_RIGHT] - this.probeHeights[RacingCarPhysics.PROBE_FRONT_LEFT]);
+        const heights = this._lastTick('probeHeights');
+        let probe     = w(heights[RacingCarPhysics.PROBE_FRONT_RIGHT] - heights[RacingCarPhysics.PROBE_FRONT_LEFT]);
         let rateAbs = this.yawRate;
         if (rateAbs < 0) {
             probe   = w(-probe);
@@ -666,8 +676,9 @@ class RacingCarPhysics {
     // $9818
     _slideFormula() {
         const w = RacingCarPhysics._w;
-        if ((this.backOnTrack === 0) && (this.wallTimer === 0) && (Math.abs(this.slipInput) > RacingCarPhysics.SLIP_THRESHOLD)) {
-            const q = (this.slipInput >> 7);
+        const slipInput = this._lastTick('slipInput');
+        if ((this.backOnTrack === 0) && (this.wallTimer === 0) && (Math.abs(slipInput) > RacingCarPhysics.SLIP_THRESHOLD)) {
+            const q = (slipInput >> 7);
             this.slip      = this._word(this.slip + this._scaled(w(q + (q >> 1))));
             this.shownSlip = (this.slip >> 1);
             return;
@@ -690,12 +701,14 @@ class RacingCarPhysics {
             loss = w(loss + w((RacingCarPhysics.PEDAL_MAX - this.throttle) << 3));
         }
         this.grip = RacingCarPhysics._clamp(w(this.grip - loss), RacingCarPhysics.STOCK_GRIP_MIN, RacingCarPhysics.STOCK_GRIP_MAX);
-        if ((this.backOnTrack !== 0) || (this.wallTimer !== 0) || (Math.abs(this.slipInput) <= RacingCarPhysics.SLIP_THRESHOLD)) {
-            this._slipDamp(RacingCarPhysics.STOCK_DAMP_MIN);
+        const slipInput = this._lastTick('slipInput');
+        if ((this.backOnTrack !== 0) || (this.wallTimer !== 0) || (Math.abs(slipInput) <= RacingCarPhysics.SLIP_THRESHOLD)) {
+            const base = this._slipDamp(RacingCarPhysics.STOCK_DAMP_MIN);
             this.shownSlip = w((this.slip >> 1) + this.slip);
+            this._slipRest(base);
             return;
         }
-        let push = RacingCarPhysics._divs(((this.slipInput * w((2 * RacingCarPhysics.GRIP_FULL) - this.grip)) >> 8), slipDivisor);
+        let push = RacingCarPhysics._divs(((slipInput * w((2 * RacingCarPhysics.GRIP_FULL) - this.grip)) >> 8), slipDivisor);
         if (Math.abs(this.slip) > slideLimit) {
             push >>= 1;
         }
@@ -723,13 +736,15 @@ class RacingCarPhysics {
         const loss = (w(Math.abs(this.steerSpeed) * this.brake) >> 8);
         this.grip    = Math.max(w(this.grip - loss), RacingCarPhysics.PROTOTYPE_GRIP_MIN);
         this.sliding = 0;
-        if ((this.backOnTrack !== 0) || (this.wallTimer !== 0) || (Math.abs(this.slipInput) <= RacingCarPhysics.SLIP_THRESHOLD)) {
-            this._slipDamp(RacingCarPhysics.PROTOTYPE_DAMP_MIN);
+        const slipInput = this._lastTick('slipInput');
+        if ((this.backOnTrack !== 0) || (this.wallTimer !== 0) || (Math.abs(slipInput) <= RacingCarPhysics.SLIP_THRESHOLD)) {
+            const base = this._slipDamp(RacingCarPhysics.PROTOTYPE_DAMP_MIN);
             this.shownSlip = this.slip;
+            this._slipRest(base);
             return;
         }
         const size = Math.abs(this.slip);
-        let push   = RacingCarPhysics._divs(this.slipInput, slipDivisor);
+        let push   = RacingCarPhysics._divs(slipInput, slipDivisor);
         if (size <= slideLimit) {
             this.slip      = this._word(this.slip + this._scaled((push * w((2 * RacingCarPhysics.GRIP_FULL) - this.grip)) >> 8));
             this.shownSlip = (this.slip >> 1);
@@ -755,7 +770,9 @@ class RacingCarPhysics {
         return true;
     }
 
-    // Slip damping of the Stock and the Prototype: a C0F4 share of at least the given size, never past zero.
+    // Slip damping of the Stock and the Prototype: a C0F4 share of at least the given size, never past zero. The shown
+    // slip is taken before the small slip stops (_slipRest).
+    // @returns {int} the size the share was taken of
     _slipDamp(minimum) {
         const w     = RacingCarPhysics._w;
         const share = this._params.C0F4;
@@ -766,7 +783,8 @@ class RacingCarPhysics {
         if ((this.slip < 0) !== (damp < 0)) {
             this.slip = 0;
         }
-        this._slipRest(base);
+
+        return base;
     }
 
     // A small slip that does not grow any more stops.
@@ -805,7 +823,7 @@ class RacingCarPhysics {
             this._probe();
         } else {
             this.shownHeading = this._angle(this.heading + this.shownSlip);
-            this._advance(this.shownHeading, this.speed);
+            this._advance(this._tickEndHeading(this.shownHeading), this._tickEndSpeed(this.speed));
             this._collide();
         }
         this._heights();
@@ -1138,8 +1156,29 @@ class RacingCarPhysics {
         return delta;
     }
 
-    // A tick counter, one tick less.
+    // The original moves the car over the whole tick with the heading and the speed it ends the tick with.
+    _tickEndHeading(heading) {
+        return heading;
+    }
+
+    _tickEndSpeed(speed) {
+        return speed;
+    }
+
+    // A value the original reads as the previous tick left it (pedals and speed in the forces, slip input, sliding,
+    // wheels off the road, probe heights): computed later in the tick, it is that of the tick before.
+    _lastTick(name) {
+        return this[name];
+    }
+
+    // A tick counter, one tick less: what it times runs while it is positive before the count.
     _countDown(value) {
+        return (value - 1);
+    }
+
+    // A tick counter, one tick less, whose end acts at the start of the tick that zeroes it (deflection, crash
+    // recovery).
+    _endCountDown(value) {
         return (value - 1);
     }
 

@@ -127,7 +127,7 @@ const VR_ROM_MAP = {
         rollTable:       {address: 0x93A02C, words: 512}, // car roll by height gap of the front probes ($70AA)
         pitchTable:      {address: 0x93A42C, words: 512}, // car pitch by height gap of the left probes
         crashRecovery:   {address: 0x939EEC, words: (41 * 4), chunk: 4}, // +$9C..+$A2 by recovery tick 0..40
-        shakeTable:      {address: 0x88A2D6, words: 61}, // body yaw of a shock by tick ($A350, +$6C from 0 or 30)
+        shakeTable:      {address: 0x88A2D8, words: 60}, // body yaw of a shock by tick ($A350: LEA $A2D8, +$6C from 0 or 30, up to 59)
         probeOffsets:    0x930612, // pointers by car to probePages pages of probeCount (dx, dz) byte pairs, probePageBytes apart
         probePages:      4,
         probeCount:      1024,

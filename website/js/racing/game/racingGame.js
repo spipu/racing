@@ -286,6 +286,9 @@ class RacingGame {
         }
         if (this._selection.mirror) {
             input.steer = -input.steer;
+            if (input.steerAxis !== null) {
+                input.steerAxis = -input.steerAxis;
+            }
         }
         this._physics.step(input, ticks);
     }

@@ -4,8 +4,8 @@
  * first available of gamepad > touch controls > keyboard. The keyboard is
  * offered off touch-only devices, the touch controls on them, the gamepad once
  * detected. The player's bindings come from RacingSettings (keyboard.* / pad.*).
- * The original pad is digital: a stick steers past a threshold. Gear, view and
- * pause presses count once per press.
+ * Buttons steer all or nothing like the original digital pad; a stick steers in
+ * proportion to its deflection. Gear, view and pause presses count once per press.
  */
 class RacingControls {
     /**
@@ -55,20 +55,23 @@ class RacingControls {
     }
 
     /**
-     * @returns {{accelerate: boolean, brake: boolean, steer: int, gearUp: boolean, gearDown: boolean, view: boolean, quit: boolean}}
-     *          steer: +1 left, -1 right; gearUp / gearDown / view / quit: pressed since the last read
+     * @returns {{accelerate: boolean, brake: boolean, steer: int, steerAxis: (number|null), gearUp: boolean, gearDown: boolean, view: boolean, quit: boolean}}
+     *          steer: +1 left, -1 right; steerAxis: stick deflection from -1 (right) to +1 (left), null when a button
+     *          steers or the stick is at rest; gearUp / gearDown / view / quit: pressed since the last read
      */
     read() {
         this._selectDevice();
         const held  = (action) => this._readAction(action);
         const stick = this._readSteer();
-        const left  = (held('steerLeft') || (stick <= -RacingControls.STICK_THRESHOLD));
-        const right = (held('steerRight') || (stick >= RacingControls.STICK_THRESHOLD));
+        const left  = held('steerLeft');
+        const right = held('steerRight');
+        const axis  = ((!left && !right && (stick !== 0)) ? -stick : null);
 
         return {
             accelerate: held('accelerate'),
             brake:      held('brake'),
-            steer:      (((left) ? 1 : 0) - ((right) ? 1 : 0)),
+            steer:      ((axis !== null) ? Math.sign(axis) : (((left) ? 1 : 0) - ((right) ? 1 : 0))),
+            steerAxis:  axis,
             gearUp:     this._press('gearUp', held('gearUp')),
             gearDown:   this._press('gearDown', held('gearDown')),
             view:       this._press('view', held('view')),
@@ -168,7 +171,6 @@ class RacingControls {
     }
 }
 
-RacingControls.STICK_THRESHOLD = 0.5;
 // Order in which the devices are listed to the player.
 RacingControls.DEVICES         = [RacingSettings.DEVICE_KEYBOARD, RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD];
 RacingControls.AUTO_PRIORITY   = [RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD, RacingSettings.DEVICE_KEYBOARD];

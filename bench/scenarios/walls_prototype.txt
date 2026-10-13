@@ -1,0 +1,12 @@
+# Walls hit at several speeds and angles, crash and respawn included (prototype)
+setup prototype automatic bay_bridge
+30 -
+360 B
+200 B+LEFT
+300 B
+200 B+RIGHT
+300 B
+150 B+LEFT
+60 A
+300 B+RIGHT
+120 -

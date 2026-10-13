@@ -76,7 +76,7 @@ class VirtualRacingExporter {
     _course(course) {
         const map    = VR_ROM_MAP;
         const size   = map.sceneryGridSize;
-        const models = {};
+        const models = new Map();
         const grid   = [];
         for (let cell = 0; cell < (size * size); cell++) {
             const pointer = this._rom.u32(course.sceneryGrid + (cell * VrRom.POINTER_SIZE));
@@ -86,8 +86,8 @@ class VirtualRacingExporter {
             }
             const offset = this._rom.fileFromSh2(pointer);
             const id     = VrModelEncoder.id(offset);
-            if (models[id] === undefined) {
-                models[id] = this._encoder.encode(this._reader.read(offset));
+            if (!models.has(id)) {
+                models.set(id, this._reader.read(offset));
             }
             grid.push(id);
         }
@@ -99,7 +99,7 @@ class VirtualRacingExporter {
             vertexShift: map.sceneryVertexShift,
             gridSize:    size,
             grid:        grid,
-            models:      models,
+            models:      this._encoder.encodeScene(models),
             collision:   {
                 gridSize:  map.collisionGridSize,
                 cellSize:  map.collisionCellSize,
