@@ -207,9 +207,11 @@ RacingControls.VIRTUAL_PAD_BUTTONS = {
 
 RacingControls.VIRTUAL_PAD_LAYOUT = {
     // Bottom-left quadrant, left thumb, as doom_js's move stick.
-    moveArea:   {x: 0, y: 0.5, w: 0.5, h: 0.5},
-    aimArea:    null,
-    stickHints: {move: {x: 0.170, y: 0.698}},
-    buttons:    RacingControls.VIRTUAL_PAD_BUTTONS,
-    icons:      RacingControls.VIRTUAL_PAD_ICONS
+    moveArea:    {x: 0, y: 0.5, w: 0.5, h: 0.5},
+    aimArea:     null,
+    stickHints:  {move: {x: 0.170, y: 0.698}},
+    // Larger than doom_js's sticks: a longer travel steers more finely.
+    stickRadius: 0.2,
+    buttons:     RacingControls.VIRTUAL_PAD_BUTTONS,
+    icons:       RacingControls.VIRTUAL_PAD_ICONS
 };
