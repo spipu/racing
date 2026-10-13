@@ -146,6 +146,27 @@ const VR_ROM_MAP = {
         // +16 race path (entity +$B2): {x, z, speed} words by progress, the opponents' racing line.
         pathPointsAfterLast: 3,
     },
+    // Objects placed around a course besides the scenery grid (VrCourseObjectReader): $37B6 places one of 3 animated
+    // objects of each course (start banner, checkpoint banners: x, y, z, yaw, scale, frame table pointer), then jumps
+    // to the routine of the course (table $3844): two-part objects (28 bytes: parent then child words and model
+    // pointer), lists of one model, single objects. The animations turn an angle by a counter ($C8E2) each tick.
+    courseObjects: {
+        animated: {table: 0x895A64, count: 3, entryBytes: 14, frames: 6, frameTicks: 2},
+        byCourse: {
+            big_forest: [
+                {kind: 'pair', address: 0x883924, animation: {part: 1, angle: 'roll', perTick: 3}}, // Ferris wheel ($385E)
+                {kind: 'pair', address: 0x883940, animation: {part: 1, angle: 'roll', perTick: 3, swing: 4}}, // swing boat
+            ],
+            bay_bridge: [
+                {kind: 'list', address: 0x883A4E, count: 4, model: 0x22295A24}, // barriers ($395C)
+                {kind: 'pair', address: 0x883A80, animation: {part: 1, angle: 'roll', perTick: 30}}, // windmill
+                {kind: 'single', address: 0x883A76, model: 0x222A218E}, // tower, shown with the windmill
+            ],
+            highland: [
+                {kind: 'single', address: 0x883A9C, angle: 'roll', animation: {part: 0, angle: 'yaw', perTick: 60}}, // weather vane ($3AAA)
+            ],
+        },
+    },
     sceneryGridSize:  32,
     sceneryEmptyCell: 0x2207FFFE,
     coursePalettes:   {start: 0x3A238, stride: 0x200, colors: 256},

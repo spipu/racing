@@ -211,7 +211,9 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
         const low   = Math.min(Math.floor(position), last);
         const high  = Math.min((low + 1), last);
 
-        return (table[low] + ((table[high] - table[low]) * Math.min((position - low), 1)));
+        // The spin turns a whole turn: the rows are blended the shorter way round (30456 then -31632 crosses a half
+        // turn, not zero).
+        return this._angle(table[low] + (this._angle(table[high] - table[low]) * Math.min((position - low), 1)));
     }
 
     // The lift is a length, the other columns angles blended the shorter way round.

@@ -10,17 +10,18 @@
 const fs   = require('fs');
 const path = require('path');
 
-const {VrRom}             = require('./vrRom');
-const {VrModelReader}     = require('./vrModelReader');
-const {VrModelEncoder}    = require('./vrModelEncoder');
-const {VR_ROM_MAP}        = require('./vrRomMap');
-const {VrSkyBuilder}      = require('./vrSkyBuilder');
-const {VrPngWriter}       = require('./vrPngWriter');
-const {VrCollisionReader} = require('./vrCollisionReader');
-const {VrSoundReader}     = require('./vrSoundReader');
-const {VrWavWriter}       = require('./vrWavWriter');
-const {VrGameDataReader}  = require('./vrGameDataReader');
-const {VrCarExporter}     = require('./vrCarExporter');
+const {VrRom}                = require('./vrRom');
+const {VrModelReader}        = require('./vrModelReader');
+const {VrModelEncoder}       = require('./vrModelEncoder');
+const {VR_ROM_MAP}           = require('./vrRomMap');
+const {VrSkyBuilder}         = require('./vrSkyBuilder');
+const {VrPngWriter}          = require('./vrPngWriter');
+const {VrCollisionReader}    = require('./vrCollisionReader');
+const {VrSoundReader}        = require('./vrSoundReader');
+const {VrWavWriter}          = require('./vrWavWriter');
+const {VrGameDataReader}     = require('./vrGameDataReader');
+const {VrCarExporter}        = require('./vrCarExporter');
+const {VrCourseObjectReader} = require('./vrCourseObjectReader');
 
 class VirtualRacingExporter {
     constructor(romPath) {
@@ -38,7 +39,7 @@ class VirtualRacingExporter {
         const format  = VirtualRacingExporter.FORMAT;
         const builder = new VrSkyBuilder(this._rom);
         const skies   = map.courses.map((course, i) => this._sky(builder, course, i));
-        const courses = map.courses.map((course) => this._course(course));
+        const courses = map.courses.map((course, index) => this._course(course, index));
         const sky     = skies[0];
         if (skies.some((other) => ((other.width !== sky.width) || (other.height !== sky.height)))) {
             throw new Error('the sky panoramas differ in size');
@@ -73,7 +74,7 @@ class VirtualRacingExporter {
         };
     }
 
-    _course(course) {
+    _course(course, index) {
         const map    = VR_ROM_MAP;
         const size   = map.sceneryGridSize;
         const models = new Map();
@@ -91,7 +92,9 @@ class VirtualRacingExporter {
             }
             grid.push(id);
         }
-        const collision = new VrCollisionReader(this._rom);
+        const collision    = new VrCollisionReader(this._rom);
+        const objectModels = new Map();
+        const objects      = new VrCourseObjectReader(this._rom, this._reader, map.courseObjects).read(index, course.code, objectModels);
         return {
             format:      VirtualRacingExporter.FORMAT,
             code:        course.code,
@@ -100,6 +103,9 @@ class VirtualRacingExporter {
             gridSize:    size,
             grid:        grid,
             models:      this._encoder.encodeScene(models),
+            // Car-scale models (1024 units a metre), placed and animated by the game.
+            objects:      objects,
+            objectModels: Object.fromEntries([...objectModels].map(([id, model]) => [id, this._encoder.encode(model)])),
             collision:   {
                 gridSize:  map.collisionGridSize,
                 cellSize:  map.collisionCellSize,

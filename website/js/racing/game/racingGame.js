@@ -22,6 +22,7 @@ class RacingGame {
         this._engine    = null;
         this._camera    = null;
         this._car       = null;
+        this._objects   = null;
         this._physics   = null;
         this._controls  = null;
         this._instances    = [];
@@ -70,6 +71,7 @@ class RacingGame {
             throw new Error('RacingGame - unknown car ' + this._selection.car);
         }
         this._car     = new RacingCarView(converter, cars, car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
+        this._objects = new RacingCourseObjects(converter, course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._physics = this._startPhysics(course, race, physics);
         this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions);
 
@@ -121,8 +123,9 @@ class RacingGame {
         this._skyId = skyId;
         this._buildDisplay();
         this._car.bind();
+        this._objects.bind();
         this._controls  = new RacingControls(this._screen.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));
-        const parts     = new Set(this._car.getAllInstances());
+        const parts     = new Set([...this._car.getAllInstances(), ...this._objects.getAllInstances()]);
         this._instances = loader.instances().getAll().filter((instance) => ((instance !== undefined) && !parts.has(instance)));
         this._placeCar(0);
         this._running   = true;
@@ -250,12 +253,14 @@ class RacingGame {
             this._simulate(input, ticks);
         }
         this._placeCar(ticks);
+        this._objects.animate(ticks);
 
         const engine = this._engine;
         engine.setCamera(this._camera);
         engine.lightsCalculatePosition();
         engine.drawInit();
         this._draw(this._instances);
+        this._draw(this._objects.getInstances());
         // The original has no depth buffer and paints the cockpit last: it stays over the road it dips into. In its own
         // depth layer, the cockpit gets a near plane close enough for the roof right above the eye.
         const cockpit = this._camera.isCockpitShown();
@@ -349,7 +354,7 @@ RacingGame.ANGLE_UNITS                    = 65536;
 RacingGame.TICK_MS                        = 50;
 RacingGame.VIRTUAL_WIDTH                  = 1920;
 RacingGame.VIRTUAL_HEIGHT                 = 1080;
-RacingGame.NEAR                           = 0.1;
+RacingGame.NEAR                           = 0.5;
 RacingGame.FAR                            = 2000;
 RacingGame.COCKPIT_NEAR                   = 0.01;
 RacingGame.COCKPIT_FAR                    = 10;

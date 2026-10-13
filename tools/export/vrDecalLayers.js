@@ -2,17 +2,30 @@
  * Draw order of coplanar faces. The original paints the faces of a model in
  * their ROM order, so a face lying on an earlier one of the same plane (road
  * markings, kerbs, signs) is drawn over it; a depth-buffered renderer needs it
- * lifted instead. Between two models of a course the original order is not
+ * lifted instead. A smaller face lying entirely within a later one goes over
+ * it all the same: painted over, it would never show (arrow tips on the signs
+ * of Bay Bridge). Between two models of a course the original order is not
  * decoded: the smaller face goes over the larger one (a marking over the road
  * of a neighbouring model; user decision 2026-10-13).
  *
- * Layer of a face = 1 + the highest layer of the faces it must cover (0 when it
- * covers none).
+ * A face is lifted towards its visible side by the lift of the faces it covers
+ * plus what it takes to stand one step in front of them: faces whose vertices,
+ * rounded to whole units, leave them a little off the same plane get the lift
+ * that puts the covering one in front. Lifts are in model units, 0 when a face
+ * covers none.
  */
 class VrDecalLayers {
     /**
+     * @param {number} unitsPerMetre - of the model vertices
+     * @param {number} stepMetres    - distance a covering face stands in front of the covered one
+     */
+    constructor(unitsPerMetre, stepMetres) {
+        this._step = (stepMetres * unitsPerMetre);
+    }
+
+    /**
      * @param {{vertices: int[][], faces: {indices: int[]}[]}} model
-     * @returns {int[]} one layer per face
+     * @returns {number[]} one lift per face
      */
     compute(model) {
         return this.computeScene([model])[0];
@@ -22,7 +35,7 @@ class VrDecalLayers {
      * The models of a course, ordered within each model and across models.
      *
      * @param {{vertices: int[][], faces: {indices: int[]}[]}[]} models
-     * @returns {int[][]} one layer per face, by model
+     * @returns {number[][]} one lift per face, by model
      */
     computeScene(models) {
         const faces = [];
@@ -40,28 +53,28 @@ class VrDecalLayers {
             }
         }
 
-        const layers = models.map((model) => model.faces.map(() => 0));
-        const state  = new Map();
-        const visit  = (node) => {
+        const lifts = models.map((model) => model.faces.map(() => 0));
+        const state = new Map();
+        const visit = (node) => {
             if (state.get(node) === VrDecalLayers.DONE) {
-                return layers[node.model][node.face];
+                return lifts[node.model][node.face];
             }
             if (state.get(node) === VrDecalLayers.VISITING) {
                 throw new Error('coplanar faces cover each other: model ' + node.model + ' face ' + node.face);
             }
             state.set(node, VrDecalLayers.VISITING);
-            let layer = 0;
+            let lift = 0;
             for (const lower of node.covers) {
-                layer = Math.max(layer, (visit(lower) + 1));
+                lift = Math.max(lift, (this._sameSide(node, lower) ? visit(lower) : 0) + this._step - this._ahead(node, lower));
             }
-            layers[node.model][node.face] = layer;
+            lifts[node.model][node.face] = lift;
             state.set(node, VrDecalLayers.DONE);
 
-            return layer;
+            return lift;
         };
         faces.forEach(visit);
 
-        return layers;
+        return lifts;
     }
 
     // Records which of two coplanar overlapping faces covers the other: ROM order in a model, size across models.
@@ -71,9 +84,16 @@ class VrDecalLayers {
         }
         const overlap = (this._sharesPlane(first.plane, second.plane) && this._overlaps(second.plane, first.plane));
         if (first.model === second.model) {
-            if (overlap) {
-                second.covers.push(first);
+            if (!overlap) {
+                return;
             }
+            // A face lying entirely within a later one would never show if the later one were painted over it: the
+            // original shows it (arrow tips on the signs of Bay Bridge), so it goes over.
+            if ((first.color !== second.color) && (first.area < (second.area * VrDecalLayers.SMALLER)) && this._inside(first.plane, second.plane)) {
+                first.covers.push(second);
+                return;
+            }
+            second.covers.push(first);
             return;
         }
         // Same colour: whichever wins, the picture is the same. Across models the test must not depend on which face
@@ -86,6 +106,19 @@ class VrDecalLayers {
             return;
         }
         second.covers.push(first);
+    }
+
+    // How far the upper face already stands in front of the lower one's plane, towards its visible side (its nearest
+    // corner).
+    _ahead(upper, lower) {
+        const side = (this._sameSide(upper, lower) ? -1 : 1);
+
+        return Math.min(...upper.plane.points.map((point) => (side * (this._dot(lower.plane.normal, point) - lower.plane.distance))));
+    }
+
+    // Lifted the same way: the lift of the lower face counts towards the upper one.
+    _sameSide(upper, lower) {
+        return (this._dot(upper.plane.normal, lower.plane.normal) > 0);
     }
 
     // Newell normal: the visible side of a face is opposite to it.
@@ -128,6 +161,30 @@ class VrDecalLayers {
         return face.points.every((point) => (Math.abs(this._dot(base.normal, point) - base.distance) < VrDecalLayers.ON_PLANE));
     }
 
+    // Every corner of the inner face within the outer convex face (projected along the outer face's dominant axis).
+    _inside(inner, outer) {
+        const keep = [0, 1, 2].filter((i) => (i !== outer.axis));
+        const ring = outer.points.map((p) => [p[keep[0]], p[keep[1]]]);
+        let sign   = 0;
+        for (const point of inner.points) {
+            const q = [point[keep[0]], point[keep[1]]];
+            for (let i = 0; i < ring.length; i++) {
+                const a     = ring[i];
+                const b     = ring[(i + 1) % ring.length];
+                const cross = (((b[0] - a[0]) * (q[1] - a[1])) - ((b[1] - a[1]) * (q[0] - a[0])));
+                if (Math.abs(cross) <= VrDecalLayers.TOUCH) {
+                    continue;
+                }
+                if ((sign !== 0) && (Math.sign(cross) !== sign)) {
+                    return false;
+                }
+                sign = Math.sign(cross);
+            }
+        }
+
+        return true;
+    }
+
     // Separating axis test of the two convex polygons, projected along the dominant axis of the upper face.
     _overlaps(face, base) {
         const keep = [0, 1, 2].filter((i) => (i !== face.axis));
@@ -158,10 +215,13 @@ class VrDecalLayers {
     }
 }
 
-VrDecalLayers.PARALLEL = 1e-3;
-// Model units: vertex distance to the plane, and overlap below which two faces only touch.
-VrDecalLayers.ON_PLANE = 1;
+VrDecalLayers.PARALLEL = 0.01;
+// Model units: vertex distance to the plane (whole-unit roundings leave coplanar faces up to 2 units apart), and
+// overlap below which two faces only touch.
+VrDecalLayers.ON_PLANE = 2.5;
 VrDecalLayers.TOUCH    = 0.5;
+// A face within a later one goes over it when clearly smaller (the same face twice keeps the ROM order).
+VrDecalLayers.SMALLER  = 0.95;
 VrDecalLayers.VISITING = 1;
 VrDecalLayers.DONE     = 2;
 

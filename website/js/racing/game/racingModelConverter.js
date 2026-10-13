@@ -33,7 +33,7 @@ class RacingModelConverter {
         };
         for (const face of model.f) {
             const color     = this._palette.getRgb(face.c);
-            const indices   = ((face.l === undefined) ? face.i : this._lift(model, face, points, ((face.l * RacingModelConverter.LAYER_LIFT) / scale), [sx, scale, scale]));
+            const indices   = ((face.l === undefined) ? face.i : this._lift(model, face, points, face.l, [sx, scale, scale]));
             const triangles = ((indices.length === 4) ? [[indices[0], indices[1], indices[2]], [indices[0], indices[2], indices[3]]] : [indices]);
             for (const [a, b, c] of triangles) {
                 add(a, b, c, color, reverse);
@@ -47,7 +47,7 @@ class RacingModelConverter {
     }
 
     /**
-     * A face drawn over an earlier coplanar one (exported layer) gets its own
+     * A face drawn over coplanar ones (exported lift, model units) gets its own
      * vertices, moved towards its visible side: opposite to its Newell normal.
      *
      * @returns {int[]} indices of the new points
@@ -72,5 +72,3 @@ class RacingModelConverter {
 
 // Winding of a front face in the ROM, once y is turned up, compared with the engine's (clockwise on screen).
 RacingModelConverter.ROM_FRONT_REVERSED = true;
-// Metres between two layers of coplanar faces.
-RacingModelConverter.LAYER_LIFT = 0.02;
