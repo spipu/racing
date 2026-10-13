@@ -151,17 +151,22 @@ class RacingCarPhysics {
         this.bodyPitch = 0;
         this.bodyYaw   = 0;
         this.bodyRoll  = 0;
-        if ((this.mode === RacingCarPhysics.MODE_RESPAWN) || (this.mode === RacingCarPhysics.MODE_CRASH)) {
+        // The variant is chosen once a tick: a carrying back or a crash met during a tick starts with the next one.
+        const mode = this._lastTick('mode');
+        if ((mode === RacingCarPhysics.MODE_RESPAWN) || (mode === RacingCarPhysics.MODE_CRASH)) {
             this._respawnTick();
         } else {
             this._driveTick(input);
         }
         this._surfaceSprays();
-        this._roadInfo();
-        // The race loop ($6444) checks the heading after every variant, a carrying back included, against the road
-        // heading of this tick.
-        this._wrongWayCheck();
-        this._roadSide();
+        // The road under the car is read once a tick, after the variant: within a tick, it is that of the tick before.
+        if (this._atTickEnd()) {
+            this._roadInfo();
+            // The race loop ($6444) checks the heading after every variant, a carrying back included, against the road
+            // heading of this tick.
+            this._wrongWayCheck();
+            this._roadSide();
+        }
         this._effects();
     }
 
@@ -312,6 +317,10 @@ class RacingCarPhysics {
             this.shake     += this._scaled(1);
             return;
         }
+        // The shock bits set during a tick are read at the start of the next one.
+        if (!this._atTickStart()) {
+            return;
+        }
         if ((this.flags & RacingCarPhysics.FLAG_SHOCK_HARD) !== 0) {
             this.flags &= ~RacingCarPhysics.FLAG_SHOCK_HARD;
             this.shake      = RacingCarPhysics.SHOCK_TICKS;
@@ -416,7 +425,9 @@ class RacingCarPhysics {
             this.steerSense = sense;
             this.steerSpeed = (table * sense);
             this.steer      = RacingCarPhysics._w(this.steerSpeed << 8);
-        } else if (sense !== 0) {
+            this._steerBase = this.steer;
+            this._steerChanged();
+        } else if ((sense !== 0) && !this._steerChangedThisTick()) {
             let step = (table * sense);
             // The sign test of EOR.W: same signs, a zero slip counting as positive.
             if ((this._carIndex !== RacingCarPhysics.CAR_FORMULA) && ((this.slip < 0) === (step < 0))) {
@@ -434,7 +445,8 @@ class RacingCarPhysics {
         }
         // The steering goes halfway to the steering speed reached at the end of the tick.
         const ahead  = RacingCarPhysics._clamp(this._tickEnd(speed, rate), -RacingCarPhysics.STEER_SPEED_MAX, RacingCarPhysics.STEER_SPEED_MAX);
-        const target = this._halfway(this.steer, (ahead << 8));
+        this._steerAim = (ahead << 8);
+        const target = this._halfway(this.steer, this._steerAim);
         this.steerLoad = RacingCarPhysics._clamp((this.steerLoad + (Math.abs(RacingCarPhysics._w(target - this.steer)) >> 8)), 0, RacingCarPhysics.STEER_LOAD_MAX);
         this.steer     = ((Math.abs(RacingCarPhysics._w(target)) < table) ? 0 : RacingCarPhysics._w(target));
     }
@@ -585,7 +597,7 @@ class RacingCarPhysics {
     // $9688: turn rate from the steering and the speed, pull towards the road heading, yaw gain.
     _yaw() {
         const w  = RacingCarPhysics._w;
-        let rate = (Math.floor(this.steer) >> 4);
+        let rate = (Math.floor(this._tickEndSteer(this.steer)) >> 4);
         rate     = w(rate + RacingCarPhysics._divs((rate * w(RacingCarPhysics.YAW_SPEED - this.speed)), RacingCarPhysics.YAW_SPEED));
         this.yawRate = rate;
         let y = rate;
@@ -594,7 +606,7 @@ class RacingCarPhysics {
             y = w(w((sin * rate) >> 6) + rate);
         }
         y = w((y * this.displaySpeed) >> 10);
-        let gain = this.yawGain;
+        let gain = this._lastTick('yawGain');
         if (this.acceleration < 0) {
             gain = w(gain - (2 * this.acceleration));
         }
@@ -798,7 +810,7 @@ class RacingCarPhysics {
 
     // $7E7A: no probe on the road for 80 ticks: the car is stopped and carried back.
     _offTrack() {
-        if ((this.probeFlags & RacingCarPhysics.CODE_ROAD) !== 0) {
+        if ((this._lastTick('probeFlags') & RacingCarPhysics.CODE_ROAD) !== 0) {
             this.offTrackTicks = 0;
             return;
         }
@@ -822,9 +834,11 @@ class RacingCarPhysics {
             }
             this._probe();
         } else {
+            const fromX = this.x;
+            const fromZ = this.z;
             this.shownHeading = this._angle(this.heading + this.shownSlip);
-            this._advance(this._tickEndHeading(this.shownHeading), this._tickEndSpeed(this.speed));
-            this._collide();
+            this._advance(this._angle(this._tickEndAngle(this.heading, 'heading') + this._tickEndShownSlip()), this._tickEndSpeed(this.speed));
+            this._collide(fromX, fromZ);
         }
         this._heights();
     }
@@ -840,13 +854,13 @@ class RacingCarPhysics {
         let divisor  = (RacingCarPhysics._divs((spread << 4), w(this.speed + 1)) >> 1);
         if (divisor <= 0) {
             divisor = 1;
-        } else if ((this.probeFlags & RacingCarPhysics.CODE_WALL) !== 0) {
+        } else if ((this._lastTick('probeFlags') & RacingCarPhysics.CODE_WALL) !== 0) {
             divisor = 2;
         }
         const aim = this._angleTo(target);
         this.shownHeading = this._angle(this.shownHeading + this._shareOf(w(aim - this.shownHeading), divisor));
         this.heading      = this.shownHeading;
-        const angle = w(-this.shownHeading);
+        const angle = w(-this._tickEndAngle(this.shownHeading, 'heading'));
         this.x = this._word(this.x + this._scaled(w((this._sinOf(angle) * this.speed) >> 8) >> 4));
         this.z = this._word(this.z + this._scaled(w((this._cosOf(angle) * this.speed) >> 8) >> 4));
     }
@@ -899,7 +913,7 @@ class RacingCarPhysics {
             this.shownHeading = this._angle(this.shownHeading + this._halfShare(w(road - this.shownHeading)));
             this.wallHeading  = this._angle(this.wallHeading + this._halfShare(w(road - this.wallHeading)));
         }
-        this._advance(this.wallHeading, RacingCarPhysics.DEFLECT_SPEED);
+        this._advance(this._tickEndAngle(this.wallHeading, 'wallHeading'), RacingCarPhysics.DEFLECT_SPEED);
     }
 
     // A tick of moving along a heading.
@@ -910,7 +924,10 @@ class RacingCarPhysics {
     }
 
     // $7700: a probe in a wall sends the car back, then forward again by quarters while the probes allow it.
-    _collide() {
+    // @param {number} fromX - x before the move of this step (the time hooks hold the car back on a wall met before
+    //                        the end of a tick)
+    // @param {number} fromZ
+    _collide(fromX, fromZ) {
         this._probe();
         if ((this.wallTimer > 0) || ((this.probeFlags & RacingCarPhysics.CODE_WALL) === 0)) {
             this._keepPrevious();
@@ -1025,6 +1042,10 @@ class RacingCarPhysics {
 
     // $7CD8: grass spins, wall deflections, frontal crashes, carrying back.
     _walls() {
+        // The original tests the walls at the end of each tick.
+        if (!this._atTickEnd()) {
+            return;
+        }
         const common = this.probeCodes.reduce((all, code) => (all & code));
         if ((common & RacingCarPhysics.CODE_ROAD) !== 0) {
             return;
@@ -1156,17 +1177,45 @@ class RacingCarPhysics {
         return delta;
     }
 
+    // A change of side sets the steering speed for its whole tick: the ramp starts with the next one.
+    _steerChanged() {
+    }
+
+    _steerChangedThisTick() {
+        return false;
+    }
+
+    // Whether this step starts an original tick: the shock bits are read there.
+    _atTickStart() {
+        return true;
+    }
+
+    // Whether this step ends an original tick: the walls are tested there.
+    _atTickEnd() {
+        return true;
+    }
+
     // The original moves the car over the whole tick with the heading and the speed it ends the tick with.
-    _tickEndHeading(heading) {
-        return heading;
+    // @param {string} name - the field the angle was read from (the time hooks know its value at the start of the step)
+    _tickEndAngle(angle, name) {
+        return angle;
     }
 
     _tickEndSpeed(speed) {
         return speed;
     }
 
+    _tickEndShownSlip() {
+        return this.shownSlip;
+    }
+
+    _tickEndSteer(steer) {
+        return steer;
+    }
+
     // A value the original reads as the previous tick left it (pedals and speed in the forces, slip input, sliding,
-    // wheels off the road, probe heights): computed later in the tick, it is that of the tick before.
+    // wheels off the road, yaw gain, probe heights and flags before the move, variant): computed later in the tick, it
+    // is that of the tick before.
     _lastTick(name) {
         return this[name];
     }

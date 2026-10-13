@@ -4,7 +4,7 @@
  *
  *   node bench/comparePhysics.js [scenario...] [--ticks n]
  *   node bench/comparePhysics.js [scenario...] --continuous [--rate n]
- *   node bench/comparePhysics.js [scenario...] --resync h [--rate n]
+ *   node bench/comparePhysics.js [scenario...] --resync h [--rate n | --step s]
  *   node bench/comparePhysics.js scenario --watch field,field --show from-to
  *
  * Without a scenario, every one but the camera references (NOT_PHYSICS).
@@ -17,11 +17,15 @@
  * back to the trace: it reports how far each field drifts from the original, and the distance between the cars.
  *
  * --resync runs the variable step physics from every traced tick in turn (set back to the trace), h original ticks at n
- * steps a tick, and measures where it ends against the trace: position, heading, speed. Walls, spins and carryings
- * back are covered, a divergence being cut short by the next start.
+ * steps a tick, and measures where it ends against the exact physics run from the same state (the trace does not hold
+ * the polygons kept under the probes, which both runs rebuild alike): position, heading, speed. Walls, spins and
+ * carryings back are covered, a divergence being cut short by the next start. --step s runs steps of s ticks instead
+ * (0.139 for 144 frames a second), across the tick boundaries as the game's frames do; each step takes the input of
+ * the tick it starts in.
  *
  * --watch / --show print, for each tick of the range, the input and the traced and computed values of the fields
- * (computed before being set back to the trace), a differing value marked with '!'.
+ * (computed before being set back to the trace), a differing value marked with '!'; with --resync, for the run from
+ * the first tick of the range: traced / exact physics / variable step at 1 / at n steps a tick.
  */
 const fs   = require('fs');
 const path = require('path');
@@ -156,9 +160,10 @@ class PhysicsComparator {
         this._rate       = this._option(args, '--rate', 1);
         this._continuous = args.includes('--continuous');
         this._resync     = ((args.includes('--resync')) ? this._option(args, '--resync', 1) : 0);
+        this._step       = Number(this._text(args, '--step', '0'));
         this._watch      = this._text(args, '--watch', '').split(',').filter((name) => (name !== ''));
         this._show       = this._text(args, '--show', '0-0').split('-').map(Number);
-        this._names   = args.filter((arg, i) => (!arg.startsWith('--') && !['--ticks', '--rate', '--watch', '--show', '--resync'].includes(args[i - 1])));
+        this._names   = args.filter((arg, i) => (!arg.startsWith('--') && !['--ticks', '--rate', '--watch', '--show', '--resync', '--step'].includes(args[i - 1])));
         this._ctx     = vm.createContext({console, Math});
         for (const file of SOURCES) {
             vm.runInContext(fs.readFileSync(path.join(WEBSITE_DIR, file), 'utf8'), this._ctx, {filename: file});
@@ -268,31 +273,31 @@ class PhysicsComparator {
 
     // The variable step physics run h ticks from each traced tick: gaps at the end of the run.
     _resynced(name, car, gearbox, courseCode, course, ticks) {
-        const Physics = vm.runInContext('RacingCarContinuousPhysics', this._ctx);
-        const field   = (n) => FIELDS.find((f) => (f[0] === n));
+        const Physics   = vm.runInContext('RacingCarContinuousPhysics', this._ctx);
+        const Reference = vm.runInContext('RacingCarPhysics', this._ctx);
         const gaps    = {path: [], heading: [], speed: []};
         let worst     = {path: 0, at: 0};
         let worstTurn = {heading: 0, at: 0};
         for (let t = 0; (t + this._resync) < ticks.length; t++) {
-            const physics = new Physics(this._physics, car, (gearbox === 'manual'), course);
-            this._load(physics, ticks[t].frame);
-            physics.settle();
-            this._load(physics, ticks[t].frame);
+            const physics   = new Physics(this._physics, car, (gearbox === 'manual'), course);
+            const reference = new Reference(this._physics, car, (gearbox === 'manual'), course);
+            for (const run of [physics, reference]) {
+                this._load(run, ticks[t].frame);
+                run.settle();
+                this._load(run, ticks[t].frame);
+            }
             // The input of a tick drives the whole tick, as the original reads the pad before computing it; a press
             // acts on its first step.
             for (let k = 1; k <= this._resync; k++) {
-                const input = this._input(ticks[t + k]);
-                for (let r = 0; r < this._rate; r++) {
-                    physics.step(((r === 0) ? input : {...input, gearUp: false, gearDown: false}), (1 / this._rate));
-                }
+                reference.tick(this._input(ticks[t + k]));
             }
+            this._runSteps(physics, ticks, t);
             if ((this._watch.length > 0) && (t === this._show[0])) {
                 this._traceRun(Physics, car, gearbox, course, ticks, t);
             }
-            const end     = ticks[t + this._resync].frame;
-            const path    = (Math.hypot((physics.x - this._read(end, field('x'))), (physics.z - this._read(end, field('z')))) / UNITS_PER_METRE);
-            const turn    = (((physics.heading - this._read(end, field('heading'))) % 65536) + 98304) % 65536 - 32768;
-            const traced  = this._read(end, field('speed'));
+            const path    = (Math.hypot((physics.x - reference.x), (physics.z - reference.z)) / UNITS_PER_METRE);
+            const turn    = (((physics.heading - reference.heading) % 65536) + 98304) % 65536 - 32768;
+            const traced  = reference.speed;
             gaps.path.push(path);
             gaps.heading.push(Math.abs((turn * 360) / 65536));
             gaps.speed.push(Math.abs(physics.speed - traced) / Math.max(traced, DRIFT_SPEED_FLOOR));
@@ -318,16 +323,43 @@ class PhysicsComparator {
         return 0;
     }
 
+    // The variable step physics over the h ticks after t: n steps a tick, or steps of s ticks across the boundaries.
+    _runSteps(physics, ticks, t) {
+        if (this._step <= 0) {
+            for (let k = 1; k <= this._resync; k++) {
+                const input = this._input(ticks[t + k]);
+                for (let r = 0; r < this._rate; r++) {
+                    physics.step(((r === 0) ? input : {...input, gearUp: false, gearDown: false}), (1 / this._rate));
+                }
+            }
+            return;
+        }
+        let time    = 0;
+        let pressed = 0;
+        while (time < (this._resync - 1e-9)) {
+            const k     = Math.min((Math.floor(time + 1e-9) + 1), this._resync);
+            const input = this._input(ticks[t + k]);
+            const dt    = Math.min(this._step, (this._resync - time));
+            physics.step(((k !== pressed) ? input : {...input, gearUp: false, gearDown: false}), dt);
+            pressed = k;
+            time   += dt;
+        }
+    }
+
     // The watched fields of a run from the traced tick t, at 1 and at n steps a tick, next to the trace.
     _traceRun(Physics, car, gearbox, course, ticks, t) {
-        const runs = [1, this._rate].map((rate) => {
-            const physics = new Physics(this._physics, car, (gearbox === 'manual'), course);
+        const Reference = vm.runInContext('RacingCarPhysics', this._ctx);
+        const runs = [0, 1, this._rate].map((rate) => {
+            const physics = new (((rate === 0) ? Reference : Physics))(this._physics, car, (gearbox === 'manual'), course);
             this._load(physics, ticks[t].frame);
             physics.settle();
             this._load(physics, ticks[t].frame);
             const rows = [];
             for (let k = 1; k <= this._resync; k++) {
                 const input = this._input(ticks[t + k]);
+                if (rate === 0) {
+                    physics.tick(input);
+                }
                 for (let r = 0; r < rate; r++) {
                     physics.step(((r === 0) ? input : {...input, gearUp: false, gearDown: false}), (1 / rate));
                     if ((rate > 1) && (k === 1)) {
@@ -341,7 +373,7 @@ class PhysicsComparator {
         for (let k = 1; k <= this._resync; k++) {
             const traced = this._watch.map((name) => this._read(ticks[t + k].frame, FIELDS.find((f) => (f[0] === name))));
             process.stdout.write('  +' + k + ' (' + ticks[t + k].buttons + ') ' + this._watch.map((name, i) => name + ' ' + traced[i] + ' / '
-                + Math.round(runs[0][k - 1][i]) + ' / ' + Math.round(runs[1][k - 1][i])).join(', ') + '\n');
+                + runs.map((rows) => Math.round(rows[k - 1][i])).join(' / ')).join(', ') + '\n');
         }
     }
 

@@ -15,11 +15,17 @@
 class RacingCarContinuousPhysics extends RacingCarPhysics {
     constructor(...args) {
         super(...args);
-        this._t         = 1;
-        this._clock     = 0;
-        this._tickIndex = null;
-        this._tickStart = {};
-        this._stepStart = {heading: 0, speed: 0};
+        this._t          = 1;
+        this._clock      = 0;
+        this._tickIndex  = null;
+        this._tickStart  = {};
+        this._stepStart  = {heading: 0, shownHeading: 0, wallHeading: 0, speed: 0, slip: 0};
+        this._steerBase  = 0;
+        this._steerAim   = 0;
+        this._steerTick  = null;
+        this._heldX      = 0;
+        this._heldZ      = 0;
+        this._tickBegins = true;
     }
 
     /**
@@ -30,10 +36,12 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
         let left  = ticks;
         let press = input;
         while (left > 0) {
-            this._t = Math.min(left, RacingCarContinuousPhysics.MAX_STEP);
+            // A step never straddles two original ticks: their start and end rules fall on the boundary.
+            const boundary = (Math.floor(this._clock + RacingCarContinuousPhysics.EPSILON) + 1);
+            this._t = Math.min(left, RacingCarContinuousPhysics.MAX_STEP, (boundary - this._clock));
             left   -= this._t;
             this._keepTickStart();
-            this._stepStart = {heading: this._angle(this.heading + this.shownSlip), speed: this.speed};
+            this._stepStart = {heading: this.heading, shownHeading: this.shownHeading, wallHeading: this.wallHeading, speed: this.speed, slip: this.slip};
             this.tick(press);
             this._clock += this._t;
             // A press acts once.
@@ -46,22 +54,90 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
     // The values an original tick reads from the tick before, kept as they were when this tick began.
     _keepTickStart() {
         const index = Math.floor(this._clock + RacingCarContinuousPhysics.EPSILON);
-        if (index === this._tickIndex) {
+        this._tickBegins = (index !== this._tickIndex);
+        if (!this._tickBegins) {
             return;
         }
         this._tickIndex = index;
+        this._steerBase = this.steer;
+        this._heldX     = 0;
+        this._heldZ     = 0;
         for (const name of RacingCarContinuousPhysics.LAST_TICK_FIELDS) {
             this._tickStart[name] = ((Array.isArray(this[name])) ? this[name].slice() : this[name]);
         }
     }
 
+    _steerChanged() {
+        this._steerTick = this._tickIndex;
+    }
+
+    _steerChangedThisTick() {
+        return (this._steerTick === this._tickIndex);
+    }
+
+    _atTickStart() {
+        return this._tickBegins;
+    }
+
+    _atTickEnd() {
+        const end = (this._clock + this._t);
+
+        return (Math.floor(end + RacingCarContinuousPhysics.EPSILON) > Math.floor(this._clock + RacingCarContinuousPhysics.EPSILON));
+    }
+
+    // Inside a tick a wall only holds the car back, the move kept aside; at the end of the tick the car is where the
+    // original puts it after the whole move, and the original test runs from the start of the tick (prevX / prevZ).
+    _collide(fromX, fromZ) {
+        if (!this._atTickEnd()) {
+            this._probe();
+            if ((this.wallTimer <= 0) && ((this.probeFlags & RacingCarPhysics.CODE_WALL) !== 0)) {
+                this._heldX += (this.x - fromX);
+                this._heldZ += (this.z - fromZ);
+                this.x = fromX;
+                this.z = fromZ;
+                this._probe();
+            }
+            return;
+        }
+        this.x     += this._heldX;
+        this.z     += this._heldZ;
+        this._heldX = 0;
+        this._heldZ = 0;
+        super._collide(fromX, fromZ);
+    }
+
     // Extrapolated at the pace of this step to the end of the tick it is part of.
-    _tickEndHeading(heading) {
-        return this._angle(heading + (this._angle(heading - this._stepStart.heading) * this._tickRemainder()));
+    // A jump (an angle set, not turned: end of a deflection) is no pace to extrapolate.
+    _tickEndAngle(angle, name) {
+        const turn = this._angle(this[name] - this._stepStart[name]);
+        if (Math.abs(turn) > (RacingCarContinuousPhysics.MAX_TURN * this._t)) {
+            return angle;
+        }
+
+        return this._angle(angle + (turn * this._tickRemainder()));
     }
 
     _tickEndSpeed(speed) {
         return (speed + ((speed - this._stepStart.speed) * this._tickRemainder()));
+    }
+
+    // The slip is extrapolated, then shown as this step shows it: a change of the shown share (sliding or damped)
+    // is not taken for a pace.
+    _tickEndShownSlip() {
+        if (this.slip === 0) {
+            return this.shownSlip;
+        }
+        const slip = (this.slip + ((this.slip - this._stepStart.slip) * this._tickRemainder()));
+
+        return ((slip * this.shownSlip) / this.slip);
+    }
+
+    // The original's one averaging of the tick: from the steering the tick began with (or restarted from, on a change
+    // of side) halfway to the aim of the tick.
+    _tickEndSteer() {
+        const end = RacingCarPhysics._w((this._steerBase + this._steerAim) >> 1);
+
+        return ((Math.abs(end) < RacingCarPhysics.STEER_STEP) ? 0 : end);
     }
 
     // Share of the step's tick left after the step, over the step's length.
@@ -95,8 +171,11 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
         return ((left <= ((1 - this._t) + RacingCarContinuousPhysics.EPSILON)) ? 0 : left);
     }
 
+    // No more 16-bit words, but shares of a tick summed back to a whole value come back to it (9.333 x 3 is 28).
     _word(value) {
-        return value;
+        const whole = Math.round(value);
+
+        return ((Math.abs(value - whole) < RacingCarContinuousPhysics.EPSILON) ? whole : value);
     }
 
     _angle(value) {
@@ -148,16 +227,14 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
             return (value + (((column === RacingCarContinuousPhysics.CRASH_LIFT) ? gap : this._angle(gap)) * share));
         });
     }
-
-    _quarter(value) {
-        return (value / 4);
-    }
 }
 
 // At most one original tick per physics step: a long frame is cut, so walls and probes are not skipped.
 RacingCarContinuousPhysics.MAX_STEP   = 1;
+// Turn of a tick past which a change of angle is a jump (a spin turns about 3300 a tick at most).
+RacingCarContinuousPhysics.MAX_TURN   = 8192;
 // Read by a tick as the tick before left them (RacingCarPhysics._lastTick).
-RacingCarContinuousPhysics.LAST_TICK_FIELDS = ['throttle', 'brake', 'displaySpeed', 'offRoadWheels', 'sliding', 'probeHeights', 'slipInput'];
+RacingCarContinuousPhysics.LAST_TICK_FIELDS = ['mode', 'throttle', 'brake', 'displaySpeed', 'offRoadWheels', 'sliding', 'probeHeights', 'probeFlags', 'slipInput', 'yawGain'];
 // Below it a share of a tick is a rounding error.
 RacingCarContinuousPhysics.EPSILON    = 1e-6;
 // Column of the crash table holding the lift, a length.
