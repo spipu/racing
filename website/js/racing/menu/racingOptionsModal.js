@@ -36,13 +36,13 @@ class RacingOptionsModal extends AppMenuSettingsModal {
     _buildRoot() {
         const list = this._addList();
         this._addTopic(list, 'options.display', 'display.');
+        this._addTopic(list, 'options.race', 'race.');
         this._addTopic(list, 'options.sound', 'sound.');
         if (!this._inGame) {
             this._addTopic(list, 'options.multiplayer', 'multiplayer.');
         }
         this._nav.addItemIn(list, appTranslator.get('options.controls'), () => this._pushPage('options.controls', () => this._buildControls()));
         this._nav.addItemIn(list, appTranslator.get('options.reset'), () => this._confirmReset());
-        this._nav.addItemIn(list, appTranslator.get('options.clearBestTimes'), () => this._confirmClearBestTimes());
         this._nav.selectFirst();
     }
 
@@ -118,15 +118,6 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         }, null, appTranslator.get('menu.back'));
     }
 
-    // Wipes every best time after a confirmation; the settings stay.
-    _confirmClearBestTimes() {
-        this._confirm(appTranslator.get('options.clearBestTimesConfirm'), () => {
-            racingBestTimes.clearAll().catch((error) => {
-                new AppMenuModal(this._display).showError(appTranslator.get('options.clearBestTimesFailed'), error.message);
-            });
-        }, null, appTranslator.get('menu.back'));
-    }
-
     // The current binding of every action, device by device, then About.
     _buildHelp() {
         this._addBindings(appTranslator.get('device.keyboard'), 'keyboard.');
@@ -141,6 +132,7 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 
     _applySettings() {
         racingSettings.applyToTranslator(appTranslator);
+        racingSound.applyVolume();
     }
 
     _rebuildsPage(definition) {

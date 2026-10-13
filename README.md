@@ -32,7 +32,7 @@ node bench/recordTraces.js              # tous les scénarios
 node bench/recordTraces.js wall         # un scénario
 ```
 
-Chaque scénario rejoue la navigation Time Attack (voiture, boîte, circuit), puis ses commandes ; la trace garde, image par image depuis le départ, l'état de la voiture du joueur et les variables globales du jeu.
+Chaque scénario rejoue la navigation Time Attack (voiture, boîte, circuit), puis ses commandes ; la trace garde, image par image depuis le départ, l'état de la voiture du joueur et les variables globales du jeu. Une ligne `poke <adresse> <mot>` écrit dans la RAM du jeu (la voiture placée devant les stands ou la ligne d'arrivée, des dégâts) ; la comparaison repart alors de l'état tracé.
 
 ## Comparaison de la physique
 

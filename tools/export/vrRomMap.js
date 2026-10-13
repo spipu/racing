@@ -6,6 +6,7 @@ const VR_ROM_MAP = {
     // shadow: the only model of the bank lying flat at height 0, colour 4.
     // cockpit: interior view models, in the order of the player's render descriptors $FF6124 + n x $14 (n = 0..3);
     // the first one is the cockpit shell, the steering wheel with the driver's arms follows at $FF6174.
+    // pitHidesShadow: the pit work hides the shadow with the wheels ($3CEC: the Formula only, $C8C8 = 0).
     // cockpitWheels: whether the cockpit view draws the front wheels (descriptors $FF6128 / $FF613C: flag 1 for the
     // Formula, 0 for the others, read in emulation).
     cars: [
@@ -17,6 +18,7 @@ const VR_ROM_MAP = {
             shadow: 0x2806A8,
             cockpit: [0x281BA6, 0x2824AE, 0x2826E4, 0x281664],
             cockpitWheels: true,
+            pitHidesShadow: true,
         },
         {
             code: 'stock',
@@ -26,6 +28,7 @@ const VR_ROM_MAP = {
             shadow: 0x284364,
             cockpit: [0x285524, 0x284FAA, 0x28506C, 0x28512E],
             cockpitWheels: false,
+            pitHidesShadow: false,
         },
         {
             code: 'prototype',
@@ -35,6 +38,7 @@ const VR_ROM_MAP = {
             shadow: 0x28750E,
             cockpit: [0x288738, 0x28819A, 0x28825C, 0x28831E],
             cockpitWheels: false,
+            pitHidesShadow: false,
         },
     ],
     opponentBank:  {start: 0x289CC8, end: 0x28C43C},
@@ -70,7 +74,25 @@ const VR_ROM_MAP = {
         wheelOffsets:    0xC734,
         steeringOffset:  0xC740,
         viewTransitions: 0xC744,
+        // Damaged bodies on Acropolis and Highland ($2A86): one crash, two crashes and more; damaged cockpit shell.
+        damagedModels:   [0xC748, 0xC74C],
+        damagedCockpit:  0xC750,
         offsetScale:     4,
+    },
+    // Pit stops and mechanics (68K addresses; checked in emulation on Big Forest, Acropolis and Highland).
+    // mechanics: 4 SH2 pointers ($3CCE) to frame tables of 16 bytes (body, tool, removed wheel, new wheel: SH2 model
+    // pointers, 0 = none), frame = ticks x 7 / 30 up to the last one. They stand at the pit box of the course
+    // (mechanicBases: {x, y, z} by course, $3C7E) plus offsets by car (mechanicOffsets: 4 x {dx, dz}: x + dx, z - dz).
+    // pitBoxes: {x, z} of the 4 boxes of each course ($A868); approachX: x offset of the automatic approach ($A8C8).
+    pit: {
+        mechanics:       0x895B7E,
+        mechanicCount:   4,
+        mechanicFrames:  28,
+        mechanicRecord:  16,
+        mechanicBases:   {address: 0x883C2A, words: 3},
+        mechanicOffsets: {address: 0x883C4E, words: 8},
+        pitBoxes:        {address: 0x88A868, words: 8},
+        approachX:       0x88A8C8,
     },
     courses: [
         {code: 'big_forest', name: 'Big Forest', sceneryGrid: 0x15C000, sky: {map: 0x100000, tiles: 0x103B8E}, collision: [{map: 0x94C000, base: 0x970000}]},
@@ -95,10 +117,13 @@ const VR_ROM_MAP = {
     // Sounds: Z80 driver (DAC sample table), sound effect scripts ($A0-$D2, 68K pointers), the 32X PWM sample.
     soundDriver:     0x31688,
     dacSampleCount:  49,
-    soundEffects:    {table: 0x39150, first: 0xA0, last: 0xD2, scriptMaxLength: 64, scriptEnd: 0xF2, dacCommand: [0xFF, 0x07]},
+    soundEffects:    {table: 0x39150, first: 0xA0, last: 0xD2, scriptMaxLength: 64, scriptEnd: 0xF2, dacCommand: [0xFF, 0x07], priorities: 0x32B30},
     pwmSample:       {offset: 0x260000, frames: 56207, rate: 22000},
     // Race sound effects whose trigger was read in the 68K code.
     soundEffectRoles: {
+        0x90: 'pit_in',
+        0x91: 'pit_out',
+        0xB0: 'crash',
         0xB1: 'skid',
         0xB2: 'spin',
         0xB4: 'tyre_squeal',
@@ -145,6 +170,10 @@ const VR_ROM_MAP = {
         // In the block: +8 crash sections ($C708, 2 bytes per progress: race then pit lane), +12 pit lane path ($C70C),
         // +16 race path (entity +$B2): {x, z, speed} words by progress, the opponents' racing line.
         pathPointsAfterLast: 3,
+        // Time taken off a lap at the line ($B2E4: (K + +$E2) x 800 / +$06 ms, at most 50) and at the checkpoints
+        // ($B386: K of checkpoint 1 then 2), by course.
+        lineCorrection:        0x88B2D8,
+        checkpointCorrections: 0x88B36E,
     },
     // Objects placed around a course besides the scenery grid (VrCourseObjectReader): $37B6 places one of 3 animated
     // objects of each course (start banner, checkpoint banners: x, y, z, yaw, scale, frame table pointer), then jumps

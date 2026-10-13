@@ -69,6 +69,8 @@ class VrGameDataReader {
             crashSections: Array.from(this._rom.getBytes(pointer(VrGameDataReader.CRASH_FIELD), (points * 2))),
             pitPath:       this._chunks(this._rom.words(pointer(VrGameDataReader.PIT_PATH_FIELD), (points * VrGameDataReader.PATH_WORDS), true), VrGameDataReader.PATH_WORDS),
             racePath:      this._chunks(this._rom.words(pointer(VrGameDataReader.RACE_PATH_FIELD), (points * VrGameDataReader.PATH_WORDS), true), VrGameDataReader.PATH_WORDS),
+            lineCorrection:        this._rom.words(this._rom.fileFrom68k(map.lineCorrection + (course * 2)), 1, true)[0],
+            checkpointCorrections: this._rom.words(this._rom.fileFrom68k(map.checkpointCorrections + (course * 4)), 2, true),
         };
     }
 

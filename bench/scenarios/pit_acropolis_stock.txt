@@ -1,0 +1,13 @@
+# Placed before the band across the pit lane (pokes), with damage: driven to the box, repaired, back to the driver
+setup stock automatic acropolis
+500 -
+poke FF9030 EA70
+poke FF9034 F128
+poke FF9032 03B3
+poke FF903C 0000
+poke FF9040 0000
+poke FF9004 0000
+poke FF9006 0000
+poke FF908A 0002
+420 -
+900 B

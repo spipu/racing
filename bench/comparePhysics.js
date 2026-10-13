@@ -133,12 +133,24 @@ const FIELDS = [
     ['offTrackTicks',  'FFC000', 0x2A, 2],
     ['respawnTicks',   'FFC000', 0x2C, 2],
     ['mode',           'FFC000', 0x7A, 2],
+    ['damage',         'FF9000', 0x8A, 2],
+    ['pitTicks',       'FF9000', 0xB0, 2, 'pit'],
+    ['pitState',       'FFC000', 0x5C, 2],
+    ['pitCrewFrame',   'FFC000', 0x26, 2, 'pit'],
+    ['lap',            'FF9000', 0x2C, 2],
+    ['lapLine',        'FF9000', 0x2E, 2],
+    ['lapProgress',    'FF9000', 0x28, 2],
+    ['prevProgress',   'FF9000', 0x26, 2],
+    ['roadAlong',      'FF9000', 0xE2, 2],
+    ['raceFlags',      'FFC300', 0x0E, 1],
     ['throttleGate',   'FFC000', 0xAC, 2],
     ['offRoadWheels',  'FFC300', 0x1A, 1],
     ['sliding',        'FFC300', 0x1B, 1],
 ];
 // Fields set from the trace but not compared (driven by systems not ported).
-const INPUT_ONLY = ['maxSpeed', 'speedState'];
+const INPUT_ONLY = ['maxSpeed', 'speedState', 'raceFlags'];
+// Variant of the pit stop ($C07A).
+const MODE_PIT   = 4;
 // Bits of the pad copy $C300.
 const PAD_LEFT       = 2;
 const PAD_RIGHT      = 3;
@@ -217,6 +229,7 @@ class PhysicsComparator {
             index:        BenchScenario.COURSES.indexOf(courseCode),
             collision:    new Collision(this._asset('courses/' + courseCode + '.json').collision),
             ...this._race.courses[courseCode],
+            pit:          Physics.coursePit(this._race, courseCode),
         };
         if (this._continuous) {
             return this._drift(name, car, gearbox, courseCode, course, ticks);
@@ -230,13 +243,20 @@ class PhysicsComparator {
         this._load(physics, ticks[0].frame);
         const mismatches = new Map();
         for (let t = 1; t < ticks.length; t++) {
+            // A car placed by the scenario (poke): the run starts again from the traced state.
+            if (ticks[t].poked || ticks[t - 1].poked) {
+                this._load(physics, ticks[t].frame);
+                physics.settle();
+                this._load(physics, ticks[t].frame);
+                continue;
+            }
             physics.tick(this._input(ticks[t]));
             if ((t >= this._show[0]) && (t <= this._show[1])) {
                 this._printWatch(physics, ticks[t], t);
             }
             for (const field of FIELDS) {
                 const expected = this._read(ticks[t].frame, field);
-                if (!INPUT_ONLY.includes(field[0]) && (this._get(physics, field[0]) !== expected)) {
+                if (!INPUT_ONLY.includes(field[0]) && this._compared(field, physics, ticks, t) && (this._get(physics, field[0]) !== expected)) {
                     const entry = mismatches.get(field[0]) ?? {count: 0, first: []};
                     mismatches.set(field[0], entry);
                     entry.count++;
@@ -258,6 +278,17 @@ class PhysicsComparator {
             }
         }
         return mismatches.size;
+    }
+
+    // The pit fields are the race start's too (the crew of the Big Forest start, RacingRaceControl): compared during
+    // a pit stop and while its crew leaves.
+    _compared(field, physics, ticks, t) {
+        if (field[4] !== 'pit') {
+            return true;
+        }
+        const state = FIELDS.find((f) => (f[0] === 'pitState'));
+
+        return ((this._read(ticks[t].frame, state) !== 0) || (this._read(ticks[t - 1].frame, state) !== 0) || (physics.pitCrewAway > 0));
     }
 
     _printWatch(physics, tick, t) {
@@ -397,10 +428,14 @@ class PhysicsComparator {
     // speed as a relative gap to the range of the traced speeds of the tick and its neighbours.
     _drift(name, car, gearbox, courseCode, course, ticks) {
         const Physics = vm.runInContext('RacingCarContinuousPhysics', this._ctx);
-        const physics = new Physics(this._physics, car, (gearbox === 'manual'), course);
-        this._load(physics, ticks[0].frame);
-        physics.settle();
-        this._load(physics, ticks[0].frame);
+        const start   = (frame) => {
+            const run = new Physics(this._physics, car, (gearbox === 'manual'), course);
+            this._load(run, frame);
+            run.settle();
+            this._load(run, frame);
+            return run;
+        };
+        let physics = start(ticks[0].frame);
         const field = (n) => FIELDS.find((f) => (f[0] === n));
         const traced = ticks.map((tick) => [this._read(tick.frame, field('x')), this._read(tick.frame, field('z'))]);
         let event   = null;
@@ -410,6 +445,12 @@ class PhysicsComparator {
         let previous = {accelerate: false, brake: false, steer: 0, gearUp: false, gearDown: false};
         for (let t = 1; t < ticks.length; t++) {
             const input = this._input(ticks[t]);
+            // A car placed by the scenario (poke): the run starts again from the traced state.
+            if (ticks[t].poked || ticks[t - 1].poked) {
+                physics  = start(ticks[t].frame);
+                previous = input;
+                continue;
+            }
             for (let r = 0; r < this._rate; r++) {
                 physics.step(((r === (this._rate - 1)) ? input : {...previous, gearUp: false, gearDown: false}), (1 / this._rate));
             }
@@ -456,7 +497,11 @@ class PhysicsComparator {
     _eventAt(frame) {
         const value = (name) => this._read(frame, FIELDS.find((field) => (field[0] === name)));
 
-        return (((value('probeFlags') & 1) !== 0) || (value('wallTimer') !== 0) || (value('backOnTrack') !== 0) || (value('mode') !== 0) || (value('crashRecovery') !== 0));
+        // A pit stop drives the car by its own rules: measured too.
+        const mode = value('mode');
+
+        return (((value('probeFlags') & 1) !== 0) || (value('wallTimer') !== 0) || (value('backOnTrack') !== 0) || ((mode !== 0) && (mode !== MODE_PIT))
+            || (value('crashRecovery') !== 0));
     }
 
     _asset(file) {
@@ -489,10 +534,11 @@ class PhysicsComparator {
             }
             if ((current === null) || (counter !== current.counter)) {
                 const since = ((current === null) ? index : (current.start + 1));
-                current = {counter, frame, start: index, buttons: frame.buttons, presses: this._presses(frames, since, index)};
+                current = {counter, frame, start: index, buttons: frame.buttons, presses: this._presses(frames, since, index), poked: false};
                 ticks.push(current);
             }
-            current.frame = frame;
+            current.frame  = frame;
+            current.poked ||= (frame.poked === true);
         }
         return ticks;
     }

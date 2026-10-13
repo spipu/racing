@@ -278,3 +278,80 @@
     letter-spacing: 0;
     line-height: 1;
 }
+
+/* --- Results of a race: one row per lap, then the total --- */
+.racing-results-table {
+    margin-bottom: 1em;
+}
+
+.racing-results-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1em;
+    align-items: baseline;
+    color: #24306E;
+    font-size: 1.1em;
+    letter-spacing: 0.06em;
+    line-height: 1.6;
+}
+
+.racing-results-strong {
+    font-weight: bold;
+}
+
+.racing-results-label {
+    text-align: right;
+}
+
+.racing-results-time {
+    font-variant-numeric: tabular-nums;
+    color: #1B2F9E;
+}
+
+.racing-results-mark {
+    color: #C41818;
+    font-style: italic;
+}
+
+/* --- Best laps: a column per car, the reset cross at the end of the row --- */
+.racing-best-laps-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 7em) 2.4em;
+    align-items: center;
+    column-gap: 0.6em;
+}
+
+.racing-best-laps-header {
+    padding: 0 0.6em 0.4em;
+    color: #1B2F9E;
+    font-weight: bold;
+    font-style: italic;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.racing-best-laps-time {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.racing-best-laps-reset {
+    justify-self: end;
+}
+
+/* The course name stays on one line ("Acropolis — miroir"). */
+.racing-best-laps-course {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* A row is not an entry: no pointer, highlighted while its cross is. */
+.racing-best-laps-line {
+    cursor: default;
+}
+
+.racing-best-laps-line:has(.app-menu-button-focus) {
+    background: #FFFFFF;
+    border-color: #E8C400;
+}

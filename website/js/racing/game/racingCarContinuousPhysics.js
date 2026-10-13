@@ -190,6 +190,10 @@ class RacingCarContinuousPhysics extends RacingCarPhysics {
         return (value + ((target - value) * (1 - Math.pow(0.5, this._t))));
     }
 
+    _shiftShare(gap, shift) {
+        return (gap * (1 - Math.pow((1 - Math.pow(2, -shift)), this._t)));
+    }
+
     _halfShare(gap) {
         return (gap * (1 - Math.pow(0.5, this._t)));
     }

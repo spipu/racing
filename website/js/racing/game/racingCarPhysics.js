@@ -28,7 +28,10 @@ class RacingCarPhysics {
 
         this.displaySpeed = 0;      // +$04, km/h of the HUD
         this.speed        = 0;      // +$06
-        this.maxSpeed     = (manual ? data.maxSpeed.manual : data.maxSpeed.automatic)[0]; // +$0A, solo
+        this._maxSpeeds   = (manual ? data.maxSpeed.manual : data.maxSpeed.automatic); // by damage
+        this.maxSpeed     = this._maxSpeeds[0]; // +$0A, solo
+        this.damage       = 0;      // +$8A, frontal crashes on the courses with damage ($C826)
+        this.damaging     = RacingCarPhysics.DAMAGE_COURSES.includes(course.index);
         this.acceleration = 0;      // +$0C
         this.throttle     = -51;    // +$0E
         this.brake        = 0;      // +$10
@@ -108,6 +111,32 @@ class RacingCarPhysics {
         this.probeFlags   = 0;      // +$55: the codes ORed
         this.offTrackTicks = 0;     // $C02A
         this.mode         = RacingCarPhysics.MODE_DRIVE; // $C07A
+        // Pit stop: state $C05C[+$AE] (0 free, 1 driven to the box, 2 at work, 3 leaving), ticks of the work +$B0,
+        // frame of the mechanics $C026 (-1: away), ticks before they go $C8AE; the race closes the pits once finished
+        // ($C30E bit 5; bit 0 too, unused in Time Attack). Time Attack sets +$AC to 2 every tick: no limit of stops.
+        this.pitState     = RacingCarPhysics.PIT_FREE;
+        this.pitTicks     = 0;
+        this.pitCrewFrame = -1;
+        this.pitCrewAway  = 0;
+        this._pitArrival  = false;
+        this.raceFlags    = 0;      // $C30E, set by the race: bit 4 started, bit 5 finished (bits 5 and 0 close the pits)
+        // Laps ($7F50): laps done +$2C, line crossings +$2E, best progress of the lap +$28, progress of the tick
+        // before +$26, laps of the race $C310; distance past the section point along the road +$E2 ($764E).
+        this.laps         = RacingCarPhysics.RACE_LAPS;
+        this.lap          = 0;
+        this.lapLine      = 0;
+        this.lapProgress  = 0;
+        this.prevProgress = 0;
+        this.roadAlong    = 0;
+        // Events of the race raised by the tick ({type: 'lap'|'checkpoint', ...}), taken by the race.
+        this.events       = [];
+        // Sound commands of the original raised by the tick ('B1' skid...), taken by the game: the effects mailbox
+        // $C8A4 (one a tick, the last written wins), the last command sent $C8A6 and the ticks before the slide
+        // squeal may start again $C8A2; the pit jingles go through $C8A5.
+        this.sounds       = [];
+        this.lastSound    = null;
+        this.squealTicks  = 0;
+        this._mailbox     = null;
         this.respawnTicks = 0;      // $C02C
         this.respawnStep  = [0, 0, 0]; // +$4E, +$50, +$52: x, z, heading per tick
         // Probe results kept between ticks, as the entity keeps its polygon pointers.
@@ -147,27 +176,54 @@ class RacingCarPhysics {
      *        steer: +1 left, -1 right; steerAxis: analog steering from -1 (right) to +1 (left), null or absent for a digital pad
      */
     tick(input) {
-        // Every variant starts with the body's own pose cleared.
-        this.bodyPitch = 0;
-        this.bodyYaw   = 0;
-        this.bodyRoll  = 0;
         // The variant is chosen once a tick: a carrying back or a crash met during a tick starts with the next one.
         const mode = this._lastTick('mode');
-        if ((mode === RacingCarPhysics.MODE_RESPAWN) || (mode === RacingCarPhysics.MODE_CRASH)) {
+        // Every variant but the pit stop's starts with the body's own pose cleared: its probes are placed by the
+        // body yaw the pit drive left.
+        if (mode !== RacingCarPhysics.MODE_PIT) {
+            this.bodyPitch = 0;
+            this.bodyYaw   = 0;
+            this.bodyRoll  = 0;
+        }
+        if (mode === RacingCarPhysics.MODE_PIT) {
+            this._pitTick(input);
+        } else if ((mode === RacingCarPhysics.MODE_RESPAWN) || (mode === RacingCarPhysics.MODE_CRASH)) {
             this._respawnTick();
+        } else if (mode === RacingCarPhysics.MODE_INTRO) {
+            this._introTick();
+        } else if (mode === RacingCarPhysics.MODE_GRID) {
+            this._gridTick(input);
+        } else if (mode === RacingCarPhysics.MODE_FINISH) {
+            this._finishTick();
         } else {
+            this._slideSqueal();
             this._driveTick(input);
         }
-        this._surfaceSprays();
+        if (mode !== RacingCarPhysics.MODE_PIT) {
+            this._surfaceSprays();
+        }
         // The road under the car is read once a tick, after the variant: within a tick, it is that of the tick before.
         if (this._atTickEnd()) {
             this._roadInfo();
+            if (mode !== RacingCarPhysics.MODE_PIT) {
+                this._lapLine();
+            }
+            if ((mode !== RacingCarPhysics.MODE_PIT) && (mode !== RacingCarPhysics.MODE_GRID) && (mode !== RacingCarPhysics.MODE_FINISH)) {
+                this._pitEntry();
+            }
             // The race loop ($6444) checks the heading after every variant, a carrying back included, against the road
             // heading of this tick.
             this._wrongWayCheck();
-            this._roadSide();
+            this._lapFlags();
+            this._raceEnd();
+            this._sendSound();
+            if (mode !== RacingCarPhysics.MODE_PIT) {
+                this._roadSide();
+            }
         }
-        this._effects();
+        if (mode !== RacingCarPhysics.MODE_PIT) {
+            this._effects();
+        }
     }
 
     // Variant $5AB6, the car driven.
@@ -228,6 +284,315 @@ class RacingCarPhysics {
         }
     }
 
+    // Variant $6A3A (mode 16): the opening of the race, the car standing still and the pad ignored.
+    _introTick() {
+        const idle = RacingCarPhysics.IDLE_INPUT;
+        this._crashRecoveryStep();
+        this._timers();
+        this._slide(idle);
+        this._offTrack();
+        this._position();
+        this._walls();
+        this._bodyPose();
+    }
+
+    // Variant $69D0 (mode 12): waiting for the start on the grid, the engine revving to the throttle ($A8F8); the
+    // start bit of the race ($C30E bit 4) lets the car go from the next tick.
+    _gridTick(input) {
+        const idle = RacingCarPhysics.IDLE_INPUT;
+        this._shock();
+        this._wallTimerEnd();
+        this._crashRecoveryStep();
+        this._timers();
+        this._slide(idle);
+        this._offTrack();
+        this._position();
+        this._walls();
+        this._sparks();
+        this._bodyPose();
+        this._pedals(input);
+        this._idleRpm();
+        if ((this.raceFlags & RacingCarPhysics.RACE_STARTED) !== 0) {
+            this.mode = RacingCarPhysics.MODE_DRIVE;
+        }
+    }
+
+    // Variant $6B04 (mode 24): after the finish the car drives itself, throttle held, automatic gearbox, on the
+    // racing line of the getting back ($A470, +$92 = 2 each tick).
+    _finishTick() {
+        this.backOnTrack = RacingCarPhysics.FINISH_AUTOPILOT;
+        const manual = this._manual;
+        this._manual = false;
+        this._driveTick(RacingCarPhysics.FINISH_INPUT);
+        this._manual = manual;
+    }
+
+    // $85C4: the tyres squeal while the car slides (|+$94| > $20), again 32 ticks after the squeal was sent; the
+    // squeal sent last is cut ($C8) once the slide is under $10.
+    _slideSqueal() {
+        if (this.squealTicks > 0) {
+            this.squealTicks = this._countDown(this.squealTicks);
+            if (this.squealTicks === 0) {
+                this.lastSound = null;
+            }
+        }
+        const slide = Math.abs(this.slip);
+        if (slide <= RacingCarPhysics.SQUEAL_END) {
+            if (this.lastSound === RacingCarPhysics.SOUND_SQUEAL) {
+                this._sound(RacingCarPhysics.SOUND_SQUEAL_CUT);
+            }
+        } else if ((slide > RacingCarPhysics.SQUEAL_START) && (this.lastSound !== RacingCarPhysics.SOUND_SQUEAL) && (this.squealTicks === 0)) {
+            this._sound(RacingCarPhysics.SOUND_SQUEAL);
+            this.squealTicks = RacingCarPhysics.SQUEAL_TICKS;
+        }
+    }
+
+    // Into the effects mailbox ($C8A4): the last one of the tick is sent.
+    _sound(command) {
+        this._mailbox = command;
+    }
+
+    // $20D6: the mailbox is sent at the end of the tick, nothing once the race is over ($C30E bit 5).
+    _sendSound() {
+        if (this._mailbox === null) {
+            return;
+        }
+        if ((this.raceFlags & RacingCarPhysics.RACE_FINISHED) === 0) {
+            this.sounds.push(this._mailbox);
+            this.lastSound = this._mailbox;
+        }
+        this._mailbox = null;
+    }
+
+    // $7F50: the line crossed backwards takes a crossing back; forwards, a lap is done when the crossings come back to
+    // it: the lap message ($C305 = 4), the split ($4000) unless through the pit lane, the finish after the last lap,
+    // the last lap call ($BE). Otherwise $8004: a new best progress of the lap on a checkpoint polygon ($C319 bit 7)
+    // shows the split.
+    _lapLine() {
+        const gap = (this.progress - this.prevProgress);
+        if (gap > RacingCarPhysics.LINE_GAP) {
+            this.lapLine--;
+            return;
+        }
+        if (gap >= -RacingCarPhysics.LINE_GAP) {
+            if ((this.lap === this.lapLine) && (this.progress > this.lapProgress)) {
+                this.lapProgress = this.progress;
+                if ((this.centerSurface & RacingCarPhysics.SURFACE_CHECKPOINT) !== 0) {
+                    this.flags |= RacingCarPhysics.FLAG_SPLIT;
+                }
+            }
+            return;
+        }
+        this.lapLine++;
+        if ((this.lap + 1) !== this.lapLine) {
+            return;
+        }
+        this.lap++;
+        this.lapProgress = 0;
+        const throughPits = (this.section > RacingCarPhysics.LINE_LAST_SECTION);
+        if (!throughPits) {
+            this.flags |= RacingCarPhysics.FLAG_SPLIT;
+        }
+        const finished = (this.lap > (this.laps - 1));
+        this.events.push({type: 'lap', lap: this.lap, finished: finished, throughPits: throughPits});
+        if (finished) {
+            // Time Attack ($C80E bit 5) keeps the split of the last lap.
+            this.raceFlags |= RacingCarPhysics.RACE_FINISHED;
+            this.flags     |= RacingCarPhysics.FLAG_SPLIT;
+        } else if ((this.lap === (this.laps - 1)) && (this.section < RacingCarPhysics.LINE_FINAL_CALL_SECTION)) {
+            this._sound(RacingCarPhysics.SOUND_FINAL_LAP);
+        }
+    }
+
+    // $6BEA: once finished, the timers stop and the car drives itself from the next tick.
+    _raceEnd() {
+        if (((this.raceFlags & RacingCarPhysics.RACE_FINISHED) === 0) || ((this.raceFlags & RacingCarPhysics.RACE_STARTED) === 0)) {
+            return;
+        }
+        this.raceFlags &= ~RacingCarPhysics.RACE_STARTED;
+        this.mode       = RacingCarPhysics.MODE_FINISH;
+    }
+
+    // Variant $6ACC (table $68A8, mode 4): the pit stop, the car driven by the pit state ($A8E0).
+    _pitTick(input) {
+        this._shock();
+        this._wallTimerEnd();
+        this._crashRecoveryStep();
+        this._timers();
+        this._pedals(input);
+        this._probe();
+        this._heights();
+        if (this._atTickEnd()) {
+            this._roadSide();
+        }
+        this._bodyPose();
+        this._pitStep();
+        // $9B54 before the gearbox and the slide: their timers show from the next tick.
+        this._effects();
+        this._gearbox(input);
+        this._slide(input);
+    }
+
+    // $825C: the race loop takes the split flag of the tick (+$02 bit 14: a line crossed, a pit stop left) and, after a
+    // pit stop, its flag (bit 9) with it.
+    _lapFlags() {
+        if ((this.flags & RacingCarPhysics.FLAG_SPLIT) === 0) {
+            return;
+        }
+        this.flags &= ~RacingCarPhysics.FLAG_SPLIT;
+        if ((this.flags & RacingCarPhysics.FLAG_PIT) !== 0) {
+            this.flags &= ~RacingCarPhysics.FLAG_PIT;
+            return;
+        }
+        // $8280: the split of a checkpoint (bits 6-7 of $C319: $80 the first, $C0 the second).
+        const checkpoint = (this.centerSurface & RacingCarPhysics.SURFACE_CHECKPOINTS);
+        if (checkpoint === RacingCarPhysics.SURFACE_CHECKPOINT) {
+            this.events.push({type: 'checkpoint', checkpoint: 1});
+        } else if (checkpoint === RacingCarPhysics.SURFACE_CHECKPOINTS) {
+            this.events.push({type: 'checkpoint', checkpoint: 2});
+        }
+    }
+
+    // $AC3E: the mechanics leave 60 ticks after the stop; the band across the pit lane (surface $0D) starts a stop,
+    // unless the race closed the pits, the car is already in one or goes the wrong way.
+    _pitEntry() {
+        if (this.pitCrewAway > 0) {
+            this.pitCrewAway = this._countDown(this.pitCrewAway);
+            if (this.pitCrewAway === 0) {
+                this.pitCrewFrame = -1;
+            }
+        }
+        if (((this.centerSurface & RacingCarPhysics.SURFACE_CLASS) !== RacingCarPhysics.SURFACE_PIT) || ((this.raceFlags & RacingCarPhysics.RACE_PITS_CLOSED) !== 0) || (this.pitState !== RacingCarPhysics.PIT_FREE)
+            || (this.wrongWay !== 0)) {
+            return;
+        }
+        this.pitState = RacingCarPhysics.PIT_DRIVEN;
+        this.mode     = RacingCarPhysics.MODE_PIT;
+        this.flags   |= RacingCarPhysics.FLAG_PIT;
+        this.sounds.push(RacingCarPhysics.SOUND_PIT_IN);
+    }
+
+    // $A8E0: the states of the stop.
+    _pitStep() {
+        switch (this.pitState) {
+            case RacingCarPhysics.PIT_DRIVEN:
+                this._pitApproach();
+                break;
+            case RacingCarPhysics.PIT_WORK:
+                this._pitWork();
+                break;
+            case RacingCarPhysics.PIT_LEAVING:
+                this._pitLeave();
+                break;
+            default:
+                break;
+        }
+    }
+
+    // $A972: driven to the box (the pad ignored), slower near it; on it, the car stops for 120 ticks.
+    _pitApproach() {
+        const w   = RacingCarPhysics._w;
+        const pit = this._course.pit;
+        const [boxX, boxZ] = pit.box;
+        this.pitCrewFrame = 0;
+        const gap = w(boxZ - this.z);
+        if (gap < RacingCarPhysics.PIT_ARRIVAL) {
+            this.x = boxX;
+            this.z = boxZ;
+            for (const name of ['heading', 'shownHeading', 'steer', 'yawRate', 'speed', 'displaySpeed', 'gear', 'backOnTrack', 'crashTimer', 'crashRecovery']) {
+                this[name] = 0;
+            }
+            this.respawnTicks = 0;
+            this.pitState     = RacingCarPhysics.PIT_WORK;
+            this.pitTicks     = RacingCarPhysics.PIT_WORK_TICKS;
+            this._forces();
+            // The forces of the whole tick of the arrival; the work counts from the next tick.
+            this._pitArrival = !this._atTickEnd();
+            return;
+        }
+        let aim   = [boxX, boxZ];
+        let speed = RacingCarPhysics.PIT_SLOW_KMH;
+        if (gap > RacingCarPhysics.PIT_FAR) {
+            aim   = [(boxX + pit.approachX), (boxZ - RacingCarPhysics.PIT_AIM_FAR)];
+            speed = Math.min(((gap >> 4) + RacingCarPhysics.PIT_FAST_BASE), RacingCarPhysics.PIT_FAST_KMH);
+        } else if (gap > RacingCarPhysics.PIT_MIDDLE) {
+            aim   = [(boxX + pit.approachX), (boxZ - RacingCarPhysics.PIT_AIM_FAR)];
+            speed = (((gap >> 4) * 2) + RacingCarPhysics.PIT_MIDDLE_BASE);
+        } else if (gap > RacingCarPhysics.PIT_NEAR) {
+            aim   = [boxX, (boxZ - RacingCarPhysics.PIT_AIM_NEAR)];
+            speed = (((gap >> 4) * 3) + RacingCarPhysics.PIT_NEAR_BASE);
+        }
+        const heading = this._angleTo(aim);
+        const turn    = RacingCarPhysics._clamp(w(heading - this.heading), -RacingCarPhysics.PIT_TURN, RacingCarPhysics.PIT_TURN);
+        this.heading = this._angle(this.heading + this._scaled(turn));
+        // The heading of the whole tick snaps straight: a share of a tick has not turned it yet.
+        if (this._atTickEnd() && (Math.abs(this.heading) < RacingCarPhysics.PIT_STRAIGHT)) {
+            this.heading = 0;
+        }
+        this.steer        = turn;
+        this.yawRate      = turn;
+        this.bodyYaw      = w(-(turn * 2));
+        this.shownHeading = this._angle(this.shownHeading + this._shiftShare(w(heading - this.shownHeading), 2));
+        // km/h into speed units: x 1000 x 256 / 3600 / 20.
+        const target = Math.trunc(Math.trunc((speed * RacingCarPhysics.PIT_METRES_PER_KM * 256) / RacingCarPhysics.PIT_SECONDS_PER_HOUR) / RacingCarPhysics.PIT_SPEED_DIVISOR);
+        this.speed += this._scaled(RacingCarPhysics._clamp((target - this.speed), RacingCarPhysics.PIT_BRAKE, RacingCarPhysics.PIT_ACCELERATE));
+        this._clampSpeed();
+        // $6FDE moves the car over the whole tick with the speed and the heading it ends the tick with.
+        this._advance(this._tickEndAngle(this.shownHeading, 'shownHeading'), this._tickEndSpeed(this.speed));
+        this._forces();
+    }
+
+    // $AB88: the work, 120 ticks; the damage is repaired at frame 20 of the mechanics.
+    _pitWork() {
+        if (this._pitArrival) {
+            this._forces();
+            this._pitArrival = !this._atTickEnd();
+            return;
+        }
+        this.pitCrewFrame = RacingCarPhysics.crewFrame(RacingCarPhysics.PIT_WORK_TICKS - this.pitTicks);
+        if ((this.pitCrewFrame >= RacingCarPhysics.PIT_REPAIR_FRAME) && (this.damage !== 0)) {
+            this.setDamage(0);
+        }
+        this.pitTicks = this._countDown(this.pitTicks);
+        if (this.pitTicks <= 0) {
+            this.pitTicks = 0;
+            this.pitState = RacingCarPhysics.PIT_LEAVING;
+        }
+        this._idleRpm();
+    }
+
+    // $ABCE: back to the driver, from the box; the mechanics leave 60 ticks later.
+    _pitLeave() {
+        this.flags      |= RacingCarPhysics.FLAG_SPLIT;
+        this.pitState    = RacingCarPhysics.PIT_FREE;
+        this.pitCrewAway = RacingCarPhysics.PIT_CREW_STAY;
+        this.mode        = RacingCarPhysics.MODE_DRIVE;
+        this.sounds.push(RacingCarPhysics.SOUND_PIT_OUT);
+    }
+
+    // $A8F8, car stopped: the engine revs towards the throttle (x 64), by $400 up or $300 down a tick.
+    _idleRpm() {
+        const step = RacingCarPhysics._clamp(((this.throttle << 6) - this.rpm), -RacingCarPhysics.IDLE_RPM_DOWN, RacingCarPhysics.IDLE_RPM_UP);
+        this.rpm       = RacingCarPhysics._clamp((this.rpm + this._scaled(step)), 0, RacingCarPhysics.IDLE_RPM_MAX);
+        this.smoothRpm = this.rpm;
+    }
+
+    /**
+     * The pit of the player's place on a course (race.json pit): its box and the x offset of the approach.
+     *
+     * @returns {{box: int[], approachX: int}}
+     */
+    static coursePit(race, course) {
+        return {box: race.pit.pitBoxes[course][0], approachX: race.pit.approachX[course]};
+    }
+
+    /**
+     * $3BBB >> 16: frame of the mechanics after the given ticks of their work (7 frames in 30 ticks), the last held.
+     */
+    static crewFrame(ticks) {
+        return Math.min(Math.floor((Math.max(0, ticks) * RacingCarPhysics.CREW_FRAME_RATE) / RacingCarPhysics.CREW_FRAME_ONE), RacingCarPhysics.CREW_LAST_FRAME);
+    }
+
     // $A434: the Formula and the Prototype strike sparks on a surface byte 4 above 89 km/h (sound $B7), fast ones
     // from 200 km/h.
     _sparks() {
@@ -237,6 +602,7 @@ class RacingCarPhysics {
         }
         this.sparksTimer = RacingCarPhysics.EFFECT_TICKS;
         this.sparksFast  = ((this.displaySpeed >= RacingCarPhysics.SPARKS_FAST_SPEED) ? 1 : 0);
+        this._sound(RacingCarPhysics.SOUND_SPARKS);
     }
 
     // $7C4E: the rear wheels on grass or sand throw it for 15 ticks (sound $D2).
@@ -249,6 +615,10 @@ class RacingCarPhysics {
         const start = (name, code, bit) => {
             if ((this[name] === 0) && ((code & bit) !== 0)) {
                 this[name] = RacingCarPhysics.EFFECT_TICKS;
+                // Only into an empty mailbox.
+                if (this._mailbox === null) {
+                    this._sound(RacingCarPhysics.SOUND_GRASS);
+                }
             }
         };
         start('grassLeftTimer', left, RacingCarPhysics.CODE_GRASS);
@@ -476,6 +846,7 @@ class RacingCarPhysics {
         if (force <= -brakeLimit) {
             if ((this.skidTimer === 0) && (force <= (-2 * brakeLimit)) && (this.crashRecovery === 0) && (this._lastTick('displaySpeed') > RacingCarPhysics.SKID_SPEED)) {
                 this.skidTimer = RacingCarPhysics.EFFECT_TICKS;
+                this._sound(RacingCarPhysics.SOUND_SKID);
             }
             force = -brakeLimit;
         } else if (force > tractionLimit) {
@@ -486,6 +857,7 @@ class RacingCarPhysics {
             }
             if ((this.gear === 0) && (this.spinTimer === 0)) {
                 this.spinTimer = RacingCarPhysics.EFFECT_TICKS;
+                this._sound(RacingCarPhysics.SOUND_WHEELSPIN);
             }
         }
         force = ((RacingCarPhysics._w(force >> 1) * this.grip) >> 7);
@@ -504,6 +876,10 @@ class RacingCarPhysics {
         const displaySpeed = this._lastTick('displaySpeed');
         const offRoad      = this._lastTick('offRoadWheels');
         let r = ((table[Math.min(Math.trunc(displaySpeed), (table.length - 1))] * this._params.C0E6) >> 8);
+        if (this.damaging) {
+            // $9474: the damage adds a sixteenth of drag a crash.
+            r = RacingCarPhysics._w(((RacingCarPhysics.DAMAGE_DRAG_BASE + this.damage) * r) >> 4);
+        }
         if (this.speedState > 4) {
             r = ((11 * r) >> 4);
         } else if ((this.speedState !== 0) && (this.speed > this.maxSpeed)) {
@@ -571,6 +947,7 @@ class RacingCarPhysics {
         this.gear++;
         if ((this.rpm >= RacingCarPhysics.SQUEAL_RPM) && (this.gear < RacingCarPhysics.SQUEAL_GEARS) && (this.spinTimer === 0)) {
             this.spinTimer = RacingCarPhysics.EFFECT_TICKS;
+            this._sound(RacingCarPhysics.SOUND_WHEELSPIN);
         }
     }
 
@@ -781,6 +1158,7 @@ class RacingCarPhysics {
             return false;
         }
         this.flags |= ((this.slip < 0) ? RacingCarPhysics.FLAG_SHOCK_HARD : RacingCarPhysics.FLAG_SHOCK);
+        this._sound(RacingCarPhysics.SOUND_SPIN);
         return true;
     }
 
@@ -1057,8 +1435,10 @@ class RacingCarPhysics {
             const limit = this._params.C8D2; // slip spinning the car on the grass
             if (limit <= this.slip) {
                 this.flags |= RacingCarPhysics.FLAG_SHOCK;
+                this._sound(RacingCarPhysics.SOUND_SPIN);
             } else if (-limit >= this.slip) {
                 this.flags |= RacingCarPhysics.FLAG_SHOCK_HARD;
+                this._sound(RacingCarPhysics.SOUND_SPIN);
             }
         }
         const codes      = this.probeCodes;
@@ -1072,6 +1452,7 @@ class RacingCarPhysics {
         if ((this.probeFlags & RacingCarPhysics.CODE_WALL) === 0) {
             return;
         }
+        this._sound(RacingCarPhysics.SOUND_WALL);
         const angle = RacingCarPhysics._absWord(RacingCarPhysics._w(this.shownHeading - this.roadHeading));
         if ((this.displaySpeed > RacingCarPhysics.CRASH_SPEED) && (angle > RacingCarPhysics.CRASH_ANGLE)) {
             if (this.crashRecovery !== 0) {
@@ -1082,6 +1463,7 @@ class RacingCarPhysics {
                 return;
             }
             this._frontalCrash();
+            this._sound(RacingCarPhysics.SOUND_CRASH);
             return;
         }
         if ((this._onBayBridge() && (this.section === RacingCarPhysics.BRIDGE_TUNNEL_SECTION)) || frontWalls || (angle > RacingCarPhysics.WALL_MAX_ANGLE)) {
@@ -1100,6 +1482,20 @@ class RacingCarPhysics {
         this.crashTimer    = RacingCarPhysics.BACK_ON_TRACK_TICKS;
         this.mode          = RacingCarPhysics.MODE_CRASH;
         this._respawnSetup((this._course.crashSections[crash] ?? this.section), RacingCarPhysics.BACK_ON_TRACK_TICKS);
+        // $7DEE: one more damage, the speed limit of the damage ($A1FC).
+        if (this.damaging && (this.damage < RacingCarPhysics.DAMAGE_MAX)) {
+            this.setDamage(this.damage + 1);
+        }
+    }
+
+    /**
+     * $A1FC: the damage and its speed limit (a pit stop repairs to 0).
+     */
+    setDamage(damage) {
+        this.damage   = damage;
+        this.maxSpeed = this._maxSpeeds[damage];
+
+        return this;
     }
 
     // Slid along the wall, away from the side of the road point, by an angle from the gap to the road heading.
@@ -1141,8 +1537,9 @@ class RacingCarPhysics {
         if (polygon === null) {
             return;
         }
-        this.section     = polygon[RacingCourseCollision.SECTION];
-        this.progress    = (this._course.sectionBytes[this.section] ?? this.progress);
+        this.section      = polygon[RacingCourseCollision.SECTION];
+        this.prevProgress = this.progress;
+        this.progress     = (this._course.sectionBytes[this.section] ?? this.progress);
         this.roadHeading = RacingCarPhysics._w(polygon[RacingCourseCollision.DIRECTION] << 8);
         this.roadFlags   = polygon[RacingCourseCollision.FLAGS];
         this.layer       = (this.roadFlags & RacingCarPhysics.ROAD_LAYER);
@@ -1159,9 +1556,10 @@ class RacingCarPhysics {
         const w   = RacingCarPhysics._w;
         const cos = this._cosOf(this.roadHeading);
         const sin = this._sinOf(this.roadHeading);
-        const ax  = (w(this.roadPoint[0] - this.x) * cos);
-        const az  = (w(this.roadPoint[1] - this.z) * sin);
-        this.roadOffset = w(-((ax + az) >> 8));
+        const dx  = w(this.roadPoint[0] - this.x);
+        const dz  = w(this.roadPoint[1] - this.z);
+        this.roadOffset = w(-(((dx * cos) + (dz * sin)) >> 8));
+        this.roadAlong  = w(((dx * sin) - (dz * cos)) >> 8);
     }
 
     // A tilt table by height gap (its first 512 doubled gaps), signed as the gap.
@@ -1258,6 +1656,11 @@ class RacingCarPhysics {
         return RacingCarPhysics._w((value + target) >> 1);
     }
 
+    // The gap shifted right, the move of a tick that takes this power-of-two share of it.
+    _shiftShare(gap, shift) {
+        return (gap >> shift);
+    }
+
     // Half the gap, the move of a tick that halves it.
     _halfShare(gap) {
         return (gap >> 1);
@@ -1318,6 +1721,10 @@ RacingCarPhysics.CAR_FORMULA      = 0;
 RacingCarPhysics.CAR_STOCK        = 1;
 RacingCarPhysics.CAR_PROTOTYPE    = 2;
 RacingCarPhysics.COURSE_BAY_BRIDGE = 1;
+// $D19C: Acropolis and Highland damage the cars ($C826), up to 15 crashes; drag x (16 + damage) / 16.
+RacingCarPhysics.DAMAGE_COURSES   = [2, 3];
+RacingCarPhysics.DAMAGE_MAX       = 15;
+RacingCarPhysics.DAMAGE_DRAG_BASE = 16;
 // Angles in 1/65536 turn.
 RacingCarPhysics.TURN_MASK          = 0xFFFF;
 RacingCarPhysics.QUARTER_TURN       = 0x4000;
@@ -1387,6 +1794,10 @@ RacingCarPhysics.STOCK_SKID_STEP  = 4;
 RacingCarPhysics.PROTOTYPE_GRIP_MIN = 0x7F;
 RacingCarPhysics.PROTOTYPE_DAMP_MIN = 0x100;
 RacingCarPhysics.MODE_DRIVE       = 0;
+RacingCarPhysics.MODE_PIT         = 4;
+RacingCarPhysics.MODE_GRID        = 12;
+RacingCarPhysics.MODE_INTRO       = 16;
+RacingCarPhysics.MODE_FINISH      = 24;
 RacingCarPhysics.MODE_RESPAWN     = 8;
 RacingCarPhysics.MODE_CRASH       = 0x1C;
 RacingCarPhysics.SPARKS_SPEED     = 0x59;
@@ -1398,6 +1809,9 @@ RacingCarPhysics.SPARKS_FAST_FRAMES = [0, 1, 1, 2, 3, 3, 4, 5, 5, 6, 7, 7, 8, 9,
 RacingCarPhysics.SPRAY_SPEED      = 20;
 RacingCarPhysics.SPRAY_FAST_SPEED = 0x78;
 RacingCarPhysics.FLAG_SHOCK       = 0x1000;
+RacingCarPhysics.FLAG_PIT         = 0x0200;
+// +$02 bit 14: a split to show (a line crossed, a checkpoint, a pit stop left), taken by $825C.
+RacingCarPhysics.FLAG_SPLIT       = 0x4000;
 RacingCarPhysics.FLAG_SHOCK_HARD  = 0x2000;
 RacingCarPhysics.SHOCK_TICKS      = 30;
 // Wheel probes (+$56..+$59); the heights are kept for the 3 first.
@@ -1437,3 +1851,73 @@ RacingCarPhysics.ATAN_HIGH_END    = 0xD8F;
 RacingCarPhysics.ATAN_SLOPE_END   = 0x517C;
 RacingCarPhysics.ATAN_SLOPE_BASE  = 0xF4;
 RacingCarPhysics.ATAN_MAX         = 0xFE;
+// Pit stop ($AC3E, $A972, $AB88, $ABCE): surface class $0D of the band across the pit lane; the approach aims at the
+// box, or before it (64 / 128 units, x offset of the course) at 32 km/h near it, faster up to 200 km/h away; the heading
+// turns $140 a tick at most and snaps to 0 under $100; the speed goes to its aim by -80 / +47 a tick. Arrived under 2
+// units; 120 ticks of work, repaired at frame 20; the mechanics stay 60 ticks after the stop.
+// States of a pit stop ($C05C): free, driven to the box, at work, leaving.
+RacingCarPhysics.PIT_FREE             = 0;
+RacingCarPhysics.PIT_DRIVEN           = 1;
+RacingCarPhysics.PIT_WORK             = 2;
+RacingCarPhysics.PIT_LEAVING          = 3;
+RacingCarPhysics.SURFACE_CLASS        = 0x3F;
+RacingCarPhysics.RACE_PITS_CLOSED     = 0x21;
+RacingCarPhysics.SURFACE_PIT          = 0x0D;
+RacingCarPhysics.PIT_ARRIVAL          = 2;
+RacingCarPhysics.PIT_NEAR             = 0x80;
+RacingCarPhysics.PIT_MIDDLE           = 0x180;
+RacingCarPhysics.PIT_FAR              = 0x400;
+RacingCarPhysics.PIT_AIM_NEAR         = 0x40;
+RacingCarPhysics.PIT_AIM_FAR          = 0x80;
+RacingCarPhysics.PIT_SLOW_KMH         = 0x20;
+RacingCarPhysics.PIT_NEAR_BASE        = 8;
+RacingCarPhysics.PIT_MIDDLE_BASE      = 0x20;
+RacingCarPhysics.PIT_FAST_BASE        = 0x64;
+RacingCarPhysics.PIT_FAST_KMH         = 0xC8;
+RacingCarPhysics.PIT_TURN             = 0x140;
+RacingCarPhysics.PIT_STRAIGHT         = 0x100;
+RacingCarPhysics.PIT_METRES_PER_KM    = 1000;
+RacingCarPhysics.PIT_SECONDS_PER_HOUR = 3600;
+RacingCarPhysics.PIT_SPEED_DIVISOR    = 20;
+RacingCarPhysics.PIT_BRAKE            = -80;
+RacingCarPhysics.PIT_ACCELERATE       = 47;
+RacingCarPhysics.PIT_WORK_TICKS       = 120;
+RacingCarPhysics.PIT_REPAIR_FRAME     = 20;
+RacingCarPhysics.PIT_CREW_STAY        = 60;
+RacingCarPhysics.IDLE_RPM_UP          = 0x400;
+RacingCarPhysics.IDLE_RPM_DOWN        = 0x300;
+RacingCarPhysics.IDLE_RPM_MAX         = 0x3E80;
+RacingCarPhysics.CREW_FRAME_RATE      = 0x3BBB;
+RacingCarPhysics.CREW_FRAME_ONE       = 0x10000;
+RacingCarPhysics.CREW_LAST_FRAME      = 27;
+RacingCarPhysics.SOUND_PIT_IN         = '90';
+RacingCarPhysics.SOUND_PIT_OUT        = '91';
+// The race ($C30E): bit 4 started (the timers run), bit 5 finished; laps of the race by default ($C310, set by the game).
+RacingCarPhysics.RACE_STARTED            = 0x10;
+RacingCarPhysics.RACE_FINISHED           = 0x20;
+RacingCarPhysics.RACE_LAPS               = 5;
+// $7F50: a progress jump past 100 is the line; the split of a lap needs a section of the track (not the pit lane);
+// the last lap call under section 100. Checkpoints: bits 6-7 of the surface byte ($80, $C0).
+RacingCarPhysics.LINE_GAP                = 100;
+RacingCarPhysics.LINE_LAST_SECTION       = 3;
+RacingCarPhysics.LINE_FINAL_CALL_SECTION = 100;
+RacingCarPhysics.SURFACE_CHECKPOINT      = 0x80;
+RacingCarPhysics.SURFACE_CHECKPOINTS     = 0xC0;
+// Waiting on the grid and in the opening the pad is ignored; after the finish the throttle is held ($C970).
+RacingCarPhysics.IDLE_INPUT              = {accelerate: false, brake: false, gearUp: false, gearDown: false, steer: 0};
+RacingCarPhysics.FINISH_INPUT            = {accelerate: true, brake: false, gearUp: false, gearDown: false, steer: 0};
+RacingCarPhysics.FINISH_AUTOPILOT        = 2;
+// Sound commands ($C8A4): slide squeal $BD (|+$94| > $20, again after 32 ticks) cut by $C8 (|+$94| <= $10).
+RacingCarPhysics.SOUND_CRASH             = 'B0';
+RacingCarPhysics.SOUND_SKID              = 'B1';
+RacingCarPhysics.SOUND_SPIN              = 'B2';
+RacingCarPhysics.SOUND_WHEELSPIN         = 'B4';
+RacingCarPhysics.SOUND_WALL              = 'B5';
+RacingCarPhysics.SOUND_SPARKS            = 'B7';
+RacingCarPhysics.SOUND_SQUEAL            = 'BD';
+RacingCarPhysics.SOUND_FINAL_LAP         = 'BE';
+RacingCarPhysics.SOUND_SQUEAL_CUT        = 'C8';
+RacingCarPhysics.SOUND_GRASS             = 'D2';
+RacingCarPhysics.SQUEAL_START            = 0x20;
+RacingCarPhysics.SQUEAL_END              = 0x10;
+RacingCarPhysics.SQUEAL_TICKS            = 32;

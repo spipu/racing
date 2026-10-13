@@ -14,7 +14,9 @@
  * effect models of the common bank play at the car's render slots ($3F86,
  * cars.json effectOffsets): tyre smoke, grass and sand behind each rear wheel
  * (the left ones mirrored), sparks under the tail, exhaust flames; the Stock
- * moves its smoke towards the side it slides to.
+ * moves its smoke towards the side it slides to. On the courses with damage,
+ * a crash bends the body ($2A86: one crash, two and more) and the cockpit
+ * shell; during the pit work the mechanics take the wheels off ($3CEC).
  */
 class RacingCarView {
     /**
@@ -38,16 +40,19 @@ class RacingCarView {
         this._wheelTurn = 0;
         this._frames    = null;
         this._shadowOn  = true;
+        this._damage    = 0;
+        this._wheelsOff = false;
+        this._shadowOff = car.pitHidesShadow;
         this._body      = new Matrix();
         this._axis      = new Matrix();
         this._rotation  = [0, 0, 0];
 
         const model  = (code, mirrored) => converter.toObjectData(cars.models[code], scale, mirrored);
         const offset = (units) => [(units[0] * scale * this._side), (units[1] * scale), (units[2] * scale)];
-        this._outside.push(this._addPart(model(car.body, mirror), [0, 0, 0], null));
-        car.wheels.forEach((wheel, i) => {
-            this._outside.push(this._addPart(model(wheel.model, mirror), offset(wheel.offset), ((i < 2) ? 'front' : 'spin')));
-        });
+        this._bodies = [car.body, ...car.damaged].map((code) => this._addPart(model(code, mirror), [0, 0, 0], null));
+        this._outside.push(this._bodies[0]);
+        this._wheels = car.wheels.map((wheel, i) => this._addPart(model(wheel.model, mirror), offset(wheel.offset), ((i < 2) ? 'front' : 'spin')));
+        this._outside.push(...this._wheels);
         this._shadow = this._addPart(RacingCarView._screened(model(car.shadow, mirror)), [0, RacingCarView.SHADOW_LIFT, 0], null);
         this._outside.push(this._shadow);
 
@@ -73,9 +78,12 @@ class RacingCarView {
         addEffect('sand', RacingCarView.RIGHT, RacingCarView.RIGHT, cars.effects.dirt, false);
 
         const [shell, left, right] = car.cockpit;
-        this._cockpit.push(this._addPart(model(shell, mirror), [0, 0, 0], null));
+        this._shells = [shell, car.damagedCockpit].map((code) => this._addPart(model(code, mirror), [0, 0, 0], null));
+        this._cockpit.push(this._shells[0]);
+        this._cockpitWheels = [];
         if (car.cockpitWheels) {
-            [left, right].forEach((code, i) => this._cockpit.push(this._addPart(model(code, mirror), offset(car.wheels[i].offset), 'front')));
+            this._cockpitWheels = [left, right].map((code, i) => this._addPart(model(code, mirror), offset(car.wheels[i].offset), 'front'));
+            this._cockpit.push(...this._cockpitWheels);
         }
         this._cockpit.push(this._addPart(model(cars.steeringWheel, mirror), offset(car.steeringWheelOffset), 'steer'));
     }
@@ -84,8 +92,8 @@ class RacingCarView {
      * Instances are created by the loader: the parts are bound once it has loaded them.
      */
     bind() {
-        const outside = [...this._outside, ...this._effects.map((effect) => effect.part)];
-        for (const part of [...outside, ...this._cockpit]) {
+        const outside = [...this._bodies, ...this._wheels, this._shadow, ...this._effects.map((effect) => effect.part)];
+        for (const part of [...outside, ...this._shells, ...this._cockpit]) {
             part.instance = loader.instances().get(part.instanceId);
         }
         // Not the cockpit: within the bias of the eye, its parts would all share the near plane depth.
@@ -101,6 +109,18 @@ class RacingCarView {
      */
     setCockpit(cockpit) {
         this._inCockpit = cockpit;
+
+        return this;
+    }
+
+    /**
+     * @param {int}     damage    - frontal crashes (+$8A): the body bent after one, more after two; the cockpit shell
+     * @param {boolean} wheelsOff - the mechanics hold the wheels (pit work frames 7 to 18): front wheels, rear axle
+     *                              and, for the Formula, the shadow are hidden outside, the front wheels inside
+     */
+    setDamage(damage, wheelsOff) {
+        this._damage    = damage;
+        this._wheelsOff = wheelsOff;
 
         return this;
     }
@@ -197,15 +217,18 @@ class RacingCarView {
      * @returns {Instance[]} the parts of both views
      */
     getAllInstances() {
-        return [...this._outside, ...this._cockpit, ...this._effects.map((effect) => effect.part)].map((part) => part.instance);
+        return [...this._bodies, ...this._wheels, this._shadow, ...this._shells, ...this._cockpit, ...this._effects.map((effect) => effect.part)]
+            .map((part) => part.instance);
     }
 
     // The parts of the current view, the shadow unless hidden, the effects at their current frame outside.
     _showParts() {
         this._shown.length = 0;
+        const body  = this._bodies[Math.min(this._damage, (this._bodies.length - 1))];
+        const shell = this._shells[(this._damage === 0) ? 0 : 1];
         for (const part of (this._inCockpit ? this._cockpit : this._outside)) {
-            if ((part !== this._shadow) || this._shadowOn) {
-                this._shown.push(part);
+            if (this._isShown(part)) {
+                this._shown.push((part === this._bodies[0]) ? body : ((part === this._shells[0]) ? shell : part));
             }
         }
         if (!this._inCockpit && (this._frames !== null)) {
@@ -220,6 +243,14 @@ class RacingCarView {
         for (const part of this._shown) {
             this._instances.push(part.instance);
         }
+    }
+
+    _isShown(part) {
+        if (part === this._shadow) {
+            return (this._shadowOn && !(this._wheelsOff && this._shadowOff));
+        }
+
+        return (!this._wheelsOff || (!this._wheels.includes(part) && !this._cockpitWheels.includes(part)));
     }
 
     // A wheel rolls, then steers; the steering wheel turns on its column.

@@ -17,13 +17,13 @@ only (see `LICENSE.md`).
 |---|---|
 | `catalog.json` | Codes and names of the courses and cars, in the order of the original menus; `sky` = size of the sky panoramas and their row on the horizon |
 | `palettes.json` | 256-colour palette of each course, and the 64 colours of each car copied over indices 32-95 |
-| `cars.json` | Every model of the three car banks, the opponents' low-detail bank and the common bank; per car: body, cockpit models and whether the cockpit view shows its front wheels (`cockpitWheels`), steering wheel with the driver's arms (shared), render slot offsets of the effects (`effectOffsets`) |
+| `cars.json` | Every model of the three car banks, the opponents' low-detail bank and the common bank; per car: body, cockpit models and whether the cockpit view shows its front wheels (`cockpitWheels`), steering wheel with the driver's arms (shared), render slot offsets of the effects (`effectOffsets`), damaged bodies (`damaged`: one crash, two and more) and cockpit shell (`damagedCockpit`), whether the pit work hides the shadow (`pitHidesShadow`) |
 | `courses/<course>.json` | Scenery and road of a course: 32 × 32 grid of model ids (`null` = empty cell) and the models |
 | `skies/<course>.png` | Sky panorama of a course (Mega Drive plane B): 128 × 36 cells of 8 × 8 pixels = 1024 × 288, wrapping around 360 degrees; transparent where the VDP shows colour 0 |
-| `sounds.json`, `sounds/dac_XX.wav` | The 49 Z80 DAC samples (unsigned 8-bit mono; rate computed from the Z80 loop timing, not measured) and, per sound effect id `$A0-$D2`, the samples its script plays (`type: fm` = synthesised, not exported) |
+| `sounds.json`, `sounds/dac_XX.wav` | The 49 Z80 DAC samples (unsigned 8-bit mono; rate computed from the Z80 loop timing, not measured) and, per sound effect id `$A0-$D2`, the samples its script plays and when (`timeline`, frames at 60 Hz), the life of its track (`frames`) and its priority in the sound driver (`type: fm` = synthesised, not exported) |
 | `sounds/pwm_jingle.wav` | The only 32X PWM sample (stereo, 22 kHz), played on game mode transitions |
 | `physics.json` | Tables of the player car physics: gear ratios and shift points, torque curves, sine quarter wave, crash recovery; per car: parameters (named after the RAM variables they are loaded into), gears, drag tables and maximum speeds by gearbox, wheel probe offsets, hitbox, camera view transitions (playback order) |
-| `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`) and per-course section tables |
+| `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`), per-course section tables and lap time corrections at the line and the checkpoints, the pit (`pit`: the 4 mechanics' animation frames of 4 models, where they stand by course and car, the pit boxes) and the mechanics' models (`pitModels`, car scale) |
 
 ## Model format
 

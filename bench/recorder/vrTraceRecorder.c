@@ -10,6 +10,8 @@
  *   <frame count> <buttons>                buttons held, joined by '+' (A B C X Y Z START MODE UP DOWN LEFT RIGHT), '-' for none
  *   shot <name>                            writes <shots_dir>/<name>.ppm of the last frame
  *   record                                 frames are written to the trace from here on
+ *   poke <hex 68K address> <hex word>      writes a word of work RAM (a car placed for a test); the next frame
+ *                                          written carries "poked":true
  */
 
 #include <dlfcn.h>
@@ -239,8 +241,8 @@ static uint8_t read_ram_byte(const uint8_t *ram, uint32_t address) {
     return ram[offset ^ 1];
 }
 
-static void write_frame(FILE *out, long frame, const char *buttons, const uint8_t *ram, const RamBlock *blocks, int blockCount) {
-    fprintf(out, "{\"frame\":%ld,\"buttons\":\"%s\",\"blocks\":{", frame, buttons);
+static void write_frame(FILE *out, long frame, const char *buttons, bool poked, const uint8_t *ram, const RamBlock *blocks, int blockCount) {
+    fprintf(out, "{\"frame\":%ld,\"buttons\":\"%s\",%s\"blocks\":{", frame, buttons, (poked ? "\"poked\":true," : ""));
     for (int b = 0; b < blockCount; b++) {
         fprintf(out, "%s\"%06X\":\"", ((b > 0) ? "," : ""), blocks[b].address);
         for (uint32_t i = 0; i < blocks[b].size; i++) {
@@ -298,7 +300,7 @@ int main(int argc, char **argv) {
     if (!core_load_game(&game)) {
         fail("core refused the ROM");
     }
-    const uint8_t *ram = (const uint8_t *)core_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
+    uint8_t *ram = (uint8_t *)core_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
     if ((ram == NULL) || (core_get_memory_size(RETRO_MEMORY_SYSTEM_RAM) < WORK_RAM_SIZE)) {
         fail("core does not expose 68K work RAM");
     }
@@ -314,6 +316,7 @@ int main(int argc, char **argv) {
     long     frame      = 0;
     int      lineNumber = 0;
     bool     recording  = false;
+    bool     poked      = false;
     char     line[MAX_LINE];
     while (fgets(line, sizeof(line), scenario) != NULL) {
         lineNumber++;
@@ -337,6 +340,15 @@ int main(int argc, char **argv) {
             blockCount++;
             continue;
         }
+        if ((strcmp(first, "poke") == 0) && (fields == 3)) {
+            /* 68K word at a work RAM address; byte n of the 68K is at index n ^ 1. */
+            uint32_t address = (((uint32_t)strtoul(second, NULL, 16)) & WORK_RAM_MASK);
+            uint32_t value   = (uint32_t)strtoul(third, NULL, 16);
+            ram[address ^ 1]         = (uint8_t)(value >> 8);
+            ram[(address + 1) ^ 1]   = (uint8_t)(value & 0xFF);
+            poked = true;
+            continue;
+        }
         if ((strcmp(first, "record") == 0) && (fields == 1)) {
             recording = true;
             continue;
@@ -357,7 +369,8 @@ int main(int argc, char **argv) {
         for (long i = 0; i < count; i++) {
             core_run();
             if (recording) {
-                write_frame(out, frame, second, ram, blocks, blockCount);
+                write_frame(out, frame, second, poked, ram, blocks, blockCount);
+                poked = false;
             }
             frame++;
         }

@@ -1,0 +1,14 @@
+# Placed behind the start line on the track (pokes), full throttle across it: a lap done
+setup formula automatic bay_bridge
+500 -
+poke FF9030 F32A
+poke FF9034 FC18
+poke FF9032 1DE6
+poke FF903C 0000
+poke FF9040 0000
+poke FF9004 0000
+poke FF9006 0000
+60 -
+poke FF902E 0000
+30 -
+370 B

@@ -10,6 +10,7 @@ class RacingMenuNavigator {
         this._mainMenuScreen = new MainMenuScreen(this, this._display);
         this._courseScreen   = new CourseScreen(this, this._display);
         this._carScreen      = new CarScreen(this, this._display);
+        this._bestLapsScreen = new BestLapsScreen(this, this._display);
         this._currentScreen  = null;
         this._gearbox        = RacingMenuNavigator.GEARBOX_AUTOMATIC;
     }
@@ -30,6 +31,7 @@ class RacingMenuNavigator {
         Promise.all([catalog, storage])
             .then(([catalogError, storageReady]) => {
                 racingSettings.applyToTranslator(appTranslator);
+                racingSound.boot();
                 this.showMainMenu();
                 if (catalogError !== null) {
                     new AppMenuModal(this._display).showError(appTranslator.get('menu.catalogUnavailable'), catalogError.message);
@@ -46,6 +48,10 @@ class RacingMenuNavigator {
 
     showMainMenu() {
         this._switchTo(this._mainMenuScreen);
+    }
+
+    openBestLaps() {
+        this._switchTo(this._bestLapsScreen);
     }
 
     openCourses() {
@@ -78,6 +84,12 @@ class RacingMenuNavigator {
         this._display.init();
         this.openCars(selection);
         new AppMenuModal(this._display).showError(appTranslator.get('race.failed'), error.message);
+    }
+
+    // Back from a finished race to the choice of the course.
+    endRaceToCourses() {
+        this._display.init();
+        this.openCourses();
     }
 
     // Back from a race: the main menu.

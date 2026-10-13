@@ -10,9 +10,304 @@
     height: 100%;
     pointer-events: none;
     container-type: size;
+    overflow: hidden;
     font-family: system-ui, sans-serif;
+    color: #FFF;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.9);
 }
 
+/* --- Corner blocks --- */
+.racing-hud-block {
+    position: absolute;
+    padding: 1.2cqh 1.6cqh;
+    border-radius: 1.2cqh;
+    background-color: rgba(0, 0, 0, 0.32);
+}
+
+.racing-hud-label {
+    font-size: 2.1cqh;
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9FD3FF;
+}
+
+.racing-hud-tach {
+    top: 2.5cqh;
+    left: 2.5cqh;
+    width: 24cqh;
+    padding: 0.8cqh;
+}
+
+.racing-hud-tach-label {
+    margin-top: 0.4cqh;
+    text-align: right;
+    font-size: 2.4cqh;
+}
+
+.racing-hud-dial {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.racing-hud-dial-arc {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.6;
+}
+
+.racing-hud-dial-red {
+    fill: none;
+    stroke: #E02828;
+    stroke-width: 3.2;
+}
+
+.racing-hud-dial-tick {
+    stroke: #FFF;
+    stroke-width: 1.4;
+}
+
+.racing-hud-dial-tick-red {
+    stroke: #FF5050;
+}
+
+.racing-hud-dial-label {
+    fill: #FFF;
+    font-size: 9px;
+    font-weight: 700;
+    text-anchor: middle;
+}
+
+.racing-hud-needle {
+    stroke: #FFD21E;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+}
+
+.racing-hud-times {
+    top: 2.5cqh;
+    right: 2.5cqh;
+    min-width: 25cqh;
+    text-align: right;
+}
+
+.racing-hud-time {
+    font-size: 4.2cqh;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+    margin-bottom: 0.6cqh;
+}
+
+.racing-hud-record {
+    color: #FFD21E;
+}
+
+.racing-hud-status {
+    left: 2.5cqh;
+    bottom: 2.5cqh;
+    display: grid;
+    grid-template-columns: auto auto auto;
+    align-items: baseline;
+    column-gap: 1cqh;
+}
+
+/* Label, value and unit of each row in the columns of the block: the values end on the same edge. */
+.racing-hud-row {
+    display: contents;
+}
+
+.racing-hud-row > .racing-hud-value {
+    justify-self: end;
+    /* Room for 3 digits (300 km/h): the block keeps its size whatever the speed. */
+    min-width: 3ch;
+    text-align: right;
+}
+
+.racing-hud-value {
+    font-size: 5cqh;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.racing-hud-speed {
+    color: #FFD21E;
+}
+
+.racing-hud-unit {
+    font-size: 2.4cqh;
+    font-weight: 700;
+}
+
+.racing-hud-gear {
+    color: #FF5050;
+}
+
+.racing-hud-course {
+    right: 2.5cqh;
+    bottom: 2.5cqh;
+    font-size: 3cqh;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #FFD21E;
+}
+
+/* --- Centre: start, notices, lap message, split --- */
+.racing-hud-centre {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5cqh;
+    text-align: center;
+}
+
+.racing-hud-sign {
+    font-size: 8cqh;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.06em;
+    color: #FFD21E;
+    -webkit-text-stroke: 0.25cqh #1B2F9E;
+}
+
+.racing-hud-count {
+    font-size: 16cqh;
+    color: #FFF;
+}
+
+.racing-hud-lights {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1cqh;
+    padding: 1.5cqh 2.5cqh;
+    border-radius: 1.2cqh;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+.racing-hud-ready {
+    font-size: 4cqh;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.15em;
+    color: #FFD21E;
+}
+
+.racing-hud-lamps {
+    display: flex;
+    gap: 1.4cqh;
+}
+
+.racing-hud-lamp {
+    width: 4.5cqh;
+    height: 4.5cqh;
+    border-radius: 50%;
+    background-color: #333;
+    box-shadow: inset 0 0 0 0.3cqh #111;
+}
+
+.racing-hud-lamp-red {
+    background-color: #FF2A2A;
+    box-shadow: 0 0 2cqh #FF2A2A;
+}
+
+.racing-hud-lamp-green {
+    background-color: #2AFF5A;
+    box-shadow: 0 0 2cqh #2AFF5A;
+}
+
+.racing-hud-notice {
+    font-size: 6cqh;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    color: #FFD21E;
+}
+
+.racing-hud-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.racing-hud-message-label {
+    font-size: 3.6cqh;
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.racing-hud-message-bestLap {
+    color: #FF5050;
+}
+
+.racing-hud-message-fastestLap {
+    color: #FFD21E;
+}
+
+.racing-hud-message-time {
+    font-size: 7cqh;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+
+.racing-hud-split {
+    font-size: 7cqh;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+}
+
+.racing-hud-slower {
+    color: #FF5050;
+}
+
+.racing-hud-faster {
+    color: #FFD21E;
+}
+
+/* PIT START, under the car as the original shows it */
+.racing-hud-pit-start {
+    position: absolute;
+    left: 50%;
+    bottom: 22%;
+    transform: translateX(-50%);
+    font-size: 5cqh;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #FFD21E;
+}
+
+/* --- Blinds of the opening and of the finish: black slats closing from their middle --- */
+.racing-hud-blinds {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Closed: no seam between the slats. */
+.racing-hud-blinds-closed {
+    background-color: #000;
+}
+
+.racing-hud-slat {
+    flex: 1;
+    background-color: #000;
+    transform-origin: center;
+}
+
+/* --- Frame rate --- */
 .racing-hud-fps {
     position: absolute;
     bottom: 1em;
@@ -28,4 +323,11 @@
     font-size: 0.8em;
     font-weight: 700;
     color: #CCC;
+}
+
+/* "/5" after the lap, as large as the lap number, which lines up with the other numbers. */
+.racing-hud-laps {
+    font-size: 5cqh;
+    font-weight: 800;
+    margin-left: -1cqh;
 }

@@ -36,13 +36,32 @@ class CarScreen extends AbstractRacingMenuScreen {
         gearboxEl = AppMenuDom.addText(gearbox, 'app-menu-item-value', this._gearboxLabel());
 
         for (const car of racingCatalog.getCars()) {
-            this._addListItem(listEl, car.name, () => {
+            const item = this._addListItem(listEl, car.name, () => {
                 this._navigator.startRace({...this._choice, car: car.code, gearbox: this._navigator.getGearbox()});
             });
+            this._showBestTimes(item, car.code);
         }
         this._addBackButton(panel);
 
         this._nav.selectIndex(CarScreen.FIRST_CAR_ITEM);
+    }
+
+    // The best lap and race of this device, once read; nothing without a record or a storage.
+    _showBestTimes(item, car) {
+        if (!racingBestTimes.isReady()) {
+            return;
+        }
+        racingBestTimes.get(this._choice.course, this._choice.mirror, car).then((times) => {
+            if ((times.lapMs === null) && (times.raceMs === null)) {
+                return;
+            }
+            this._addListItemInfos(item, appTranslator.get('car.bestTimes', {
+                lap:  RacingTime.format(times.lapMs),
+                race: RacingTime.format(times.raceMs)
+            }));
+        }).catch((error) => {
+            console.warn('CarScreen - best times unavailable: ' + error.message);
+        });
     }
 
     _gearboxLabel() {

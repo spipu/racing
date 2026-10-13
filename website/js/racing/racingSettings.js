@@ -12,8 +12,11 @@ class RacingSettings extends AppSettings {
             {key: 'display.show_fps',     nameCode: 'settings.display.showFps',        type: 'bool', default: false},
             // 'auto' follows the language: mph in English, km/h otherwise.
             {key: 'display.speed_unit',   nameCode: 'settings.display.speedUnit',      type: 'list', default: RacingSettings.SPEED_UNIT_AUTO, values: [{code: RacingSettings.SPEED_UNIT_AUTO, labelCode: 'value.speedUnit.auto'}, {code: RacingSettings.SPEED_UNIT_KMH, label: 'km/h'}, {code: RacingSettings.SPEED_UNIT_MPH, label: 'mph'}]},
+            {key: 'race.laps',            nameCode: 'settings.race.laps',              type: 'list', default: RacingSettings.DEFAULT_LAPS, values: RacingSettings.LAPS_VALUES},
             {key: 'sound.volume_effects', nameCode: 'settings.sound.volumeEffects',    type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'multiplayer.nickname', nameCode: 'settings.multiplayer.nickname',   type: 'text', default: '', charset: RacingSettings.NICKNAME_CHARSET, maxLength: RacingSettings.NICKNAME_MAX_LENGTH},
+            // Laps of the races the main hosts (phase 8).
+            {key: 'multiplayer.laps',     nameCode: 'settings.multiplayer.laps',       type: 'list', default: RacingSettings.DEFAULT_LAPS, values: RacingSettings.LAPS_VALUES},
             // The Controls page offers the devices available only; a device not available counts as the automatic choice.
             {key: 'controls.device',      nameCode: 'settings.controls.device',        type: 'list', default: RacingSettings.DEVICE_AUTO, values: [{code: RacingSettings.DEVICE_AUTO, labelCode: 'device.automatic'}, {code: RacingSettings.DEVICE_KEYBOARD, labelCode: 'device.keyboard'}, {code: RacingSettings.DEVICE_GAMEPAD, labelCode: 'device.gamepadAny'}, {code: RacingSettings.DEVICE_VIRTUAL_PAD, labelCode: 'device.virtualPad'}]},
             // One physical key per action (Escape stays the fixed key leaving the race).
@@ -85,6 +88,15 @@ class RacingSettings extends AppSettings {
     getNickname() {
         return this.get('multiplayer.nickname');
     }
+
+    getSoloLaps() {
+        return parseInt(this.get('race.laps'), 10);
+    }
+
+    // Set by the main for every player.
+    getMultiplayerLaps() {
+        return parseInt(this.get('multiplayer.laps'), 10);
+    }
 }
 
 RacingSettings.SPEED_UNIT_AUTO     = 'auto';
@@ -99,5 +111,8 @@ RacingSettings.DEVICE_KEY          = 'controls.device';
 RacingSettings.VOLUME_VALUES       = AppSettings.percentValues([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
 RacingSettings.NICKNAME_CHARSET    = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -';
 RacingSettings.NICKNAME_MAX_LENGTH = 16;
+// Laps of a race: the original offers 5 to 20 in Time Attack, longer races added (user request 2026-10-13).
+RacingSettings.LAPS_VALUES         = ['5', '10', '15', '20', '30', '50'].map((code) => ({code: code, label: code}));
+RacingSettings.DEFAULT_LAPS        = '5';
 
 const racingSettings = new RacingSettings();

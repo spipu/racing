@@ -1,0 +1,13 @@
+# Placed before the band across the pit lane (pokes), with damage: driven to the box, repaired, back to the driver
+setup prototype automatic highland
+500 -
+poke FF9030 E900
+poke FF9034 0100
+poke FF9032 0AF0
+poke FF903C 0000
+poke FF9040 0000
+poke FF9004 0000
+poke FF9006 0000
+poke FF908A 0000
+420 -
+900 B

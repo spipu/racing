@@ -33,12 +33,22 @@ class VrCarExporter {
                 shadow:              id(car.shadow),
                 cockpit:             car.cockpit.map((offset) => id(offset)),
                 cockpitWheels:       car.cockpitWheels,
+                pitHidesShadow:      car.pitHidesShadow,
                 wheels:              this._wheels(car, scene),
                 steeringWheelOffset: this._offsets(scene, map.carScene.steeringOffset, 1)[0],
+                damaged:             map.carScene.damagedModels.map((variable) => this._bankModel(car, scene.value(variable))),
+                damagedCockpit:      this._bankModel(car, scene.value(map.carScene.damagedCockpit)),
                 effectOffsets:       this._effectOffsets(index),
                 bank:                this._bank(car.bank),
             };
         });
+        for (const car of cars) {
+            for (const model of [...car.damaged, car.damagedCockpit]) {
+                if (this._models[model] === undefined) {
+                    throw new Error(car.code + ': damaged model ' + model + ' outside the car bank');
+                }
+            }
+        }
         return {
             format:        format,
             vertexShift:   map.carVertexShift,

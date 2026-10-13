@@ -14,6 +14,48 @@ class RacingTranslations {
                 it: 'Menu principale',
                 es: 'Menú principal'
             },
+            'menu.bestLaps': {
+                fr: 'Meilleurs tours',
+                en: 'Best laps',
+                it: 'Giri migliori',
+                es: 'Mejores vueltas'
+            },
+            'records.resetAll': {
+                fr: 'Tout réinitialiser',
+                en: 'Reset all',
+                it: 'Reimposta tutto',
+                es: 'Restablecer todo'
+            },
+            'records.resetAllConfirm': {
+                fr: 'Effacer tous les meilleurs temps enregistrés ?',
+                en: 'Clear every saved best time?',
+                it: 'Cancellare tutti i migliori tempi salvati?',
+                es: '¿Borrar todos los mejores tiempos guardados?'
+            },
+            'records.resetCourse': {
+                fr: 'Réinitialiser ce circuit',
+                en: 'Reset this course',
+                it: 'Reimposta questo circuito',
+                es: 'Restablecer este circuito'
+            },
+            'records.resetCourseConfirm': {
+                fr: 'Effacer les meilleurs temps\nde {course} ?',
+                en: 'Clear the best times\nof {course}?',
+                it: 'Cancellare i migliori tempi\ndi {course}?',
+                es: '¿Borrar los mejores tiempos\nde {course}?'
+            },
+            'records.course': {
+                fr: 'Circuit',
+                en: 'Course',
+                it: 'Circuito',
+                es: 'Circuito'
+            },
+            'records.failed': {
+                fr: 'Impossible de lire ou d’effacer les meilleurs temps.',
+                en: 'The best times could not be read or cleared.',
+                it: 'Impossibile leggere o cancellare i tempi migliori.',
+                es: 'No se pudieron leer ni borrar los mejores tiempos.'
+            },
             'menu.newRace': {
                 fr: 'Nouvelle course',
                 en: 'New race',
@@ -87,6 +129,12 @@ class RacingTranslations {
                 it: 'Visualizzazione',
                 es: 'Pantalla'
             },
+            'options.race': {
+                fr: 'Course',
+                en: 'Race',
+                it: 'Gara',
+                es: 'Carrera'
+            },
             'options.sound': {
                 fr: 'Son',
                 en: 'Sound',
@@ -141,12 +189,6 @@ class RacingTranslations {
                 it: 'Comandi touch',
                 es: 'Controles táctiles'
             },
-            'options.clearBestTimesFailed': {
-                fr: 'Impossible d’effacer les meilleurs temps.',
-                en: 'The best times could not be cleared.',
-                it: 'Impossibile cancellare i tempi migliori.',
-                es: 'No se pudieron borrar los mejores tiempos.'
-            },
             'options.controls': {
                 fr: 'Contrôles',
                 en: 'Controls',
@@ -165,18 +207,6 @@ class RacingTranslations {
                 it: 'Eliminare tutte le impostazioni salvate?',
                 es: '¿Eliminar todos los ajustes guardados?'
             },
-            'options.clearBestTimes': {
-                fr: 'Effacer les meilleurs temps',
-                en: 'Clear the best times',
-                it: 'Cancella i migliori tempi',
-                es: 'Borrar los mejores tiempos'
-            },
-            'options.clearBestTimesConfirm': {
-                fr: 'Effacer tous les meilleurs temps enregistrés ?',
-                en: 'Clear every saved best time?',
-                it: 'Cancellare tutti i migliori tempi salvati?',
-                es: '¿Borrar todos los mejores tiempos guardados?'
-            },
             // --- Settings ---
             'settings.display.language': {
                 fr: 'Langue',
@@ -189,6 +219,96 @@ class RacingTranslations {
                 en: 'Rendering engine',
                 it: 'Motore di rendering',
                 es: 'Motor de renderizado'
+            },
+            'hud.lapTime': {
+                fr: 'Temps du tour',
+                en: 'Lap time',
+                it: 'Tempo sul giro',
+                es: 'Tiempo de vuelta'
+            },
+            'hud.fastestLap': {
+                fr: 'Record du tour',
+                en: 'Fastest lap',
+                it: 'Giro record',
+                es: 'Vuelta récord'
+            },
+            'hud.laps': {
+                fr: 'Tour',
+                en: 'Lap',
+                it: 'Giro',
+                es: 'Vuelta'
+            },
+            'hud.speed': {
+                fr: 'Vitesse',
+                en: 'Speed',
+                it: 'Velocità',
+                es: 'Velocidad'
+            },
+            'hud.gear': {
+                fr: 'Rapport',
+                en: 'Gear',
+                it: 'Marcia',
+                es: 'Marcha'
+            },
+            'hud.rpm': {
+                fr: 'x1000 tr/min',
+                en: 'x1000 rpm',
+                it: 'x1000 giri',
+                es: 'x1000 rpm'
+            },
+            'hud.ready': {
+                fr: 'Prêt',
+                en: 'Ready',
+                it: 'Pronti',
+                es: 'Listos'
+            },
+            'hud.reverse': {
+                fr: 'Contresens',
+                en: 'Reverse',
+                it: 'Contromano',
+                es: 'Sentido contrario'
+            },
+            'hud.pitWork': {
+                fr: 'Arrêt aux stands',
+                en: 'Pit work',
+                it: 'Pit stop',
+                es: 'Parada en boxes'
+            },
+            'hud.start.pitStart': {
+                fr: 'Départ des stands',
+                en: 'Pit start',
+                it: 'Partenza dai box',
+                es: 'Salida desde boxes'
+            },
+            'hud.start.go': {
+                fr: 'GO!',
+                en: 'GO!',
+                it: 'GO!',
+                es: 'GO!'
+            },
+            'hud.message.lapTime': {
+                fr: 'Temps du tour',
+                en: 'Lap time',
+                it: 'Tempo sul giro',
+                es: 'Tiempo de vuelta'
+            },
+            'hud.message.bestLap': {
+                fr: 'Meilleur tour',
+                en: 'Best lap',
+                it: 'Giro migliore',
+                es: 'Mejor vuelta'
+            },
+            'hud.message.fastestLap': {
+                fr: 'Record du tour !',
+                en: 'Fastest lap!',
+                it: 'Giro record!',
+                es: '¡Vuelta récord!'
+            },
+            'hud.automatic': {
+                fr: '(A)',
+                en: '(A)',
+                it: '(A)',
+                es: '(A)'
             },
             'hud.fps': {
                 fr: '{value} fps',
@@ -213,6 +333,18 @@ class RacingTranslations {
                 en: 'Effects volume',
                 it: 'Volume degli effetti',
                 es: 'Volumen de los efectos'
+            },
+            'settings.race.laps': {
+                fr: 'Nombre de tours',
+                en: 'Number of laps',
+                it: 'Numero di giri',
+                es: 'Número de vueltas'
+            },
+            'settings.multiplayer.laps': {
+                fr: 'Nombre de tours',
+                en: 'Number of laps',
+                it: 'Numero di giri',
+                es: 'Número de vueltas'
             },
             'settings.multiplayer.nickname': {
                 fr: 'Surnom',
@@ -342,6 +474,54 @@ class RacingTranslations {
                 en: 'Leave the race',
                 it: 'Esci dalla gara',
                 es: 'Salir de la carrera'
+            },
+            'race.results.title': {
+                fr: '{course} — {car} — Arrivée',
+                en: '{course} — {car} — Finish',
+                it: '{course} — {car} — Arrivo',
+                es: '{course} — {car} — Llegada'
+            },
+            'race.results.lap': {
+                fr: 'Tour {lap}',
+                en: 'Lap {lap}',
+                it: 'Giro {lap}',
+                es: 'Vuelta {lap}'
+            },
+            'race.results.total': {
+                fr: 'Temps total',
+                en: 'Total time',
+                it: 'Tempo totale',
+                es: 'Tiempo total'
+            },
+            'race.results.bestLap': {
+                fr: 'Meilleur tour',
+                en: 'Fastest lap',
+                it: 'Giro più veloce',
+                es: 'Vuelta más rápida'
+            },
+            'race.results.record': {
+                fr: 'Nouveau record !',
+                en: 'New record!',
+                it: 'Nuovo record!',
+                es: '¡Nuevo récord!'
+            },
+            'race.results.restart': {
+                fr: 'Recommencer',
+                en: 'Restart',
+                it: 'Ricomincia',
+                es: 'Reiniciar'
+            },
+            'race.results.courses': {
+                fr: 'Changer de circuit',
+                en: 'Change the course',
+                it: 'Cambia circuito',
+                es: 'Cambiar de circuito'
+            },
+            'car.bestTimes': {
+                fr: 'Tour {lap} · Course {race}',
+                en: 'Lap {lap} · Race {race}',
+                it: 'Giro {lap} · Gara {race}',
+                es: 'Vuelta {lap} · Carrera {race}'
             },
             // --- Help ---
             'help.pauseKey': {

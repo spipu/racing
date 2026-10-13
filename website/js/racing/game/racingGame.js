@@ -5,7 +5,11 @@
  * (RacingCarContinuousPhysics) and renders it every display frame through
  * the camera views of the original (RacingCamera). Escape, or the pause button
  * of the gamepad or of the touch controls, opens the pause menu over the frozen
- * race (RacingPauseModal), as doom_js does.
+ * race (RacingPauseModal), as doom_js does. The Time Attack race of the
+ * original runs around the car (RacingRaceControl: start, laps, times, finish),
+ * with the pit crew (RacingPitCrew), the sound effects (racingSound) and the
+ * engine note (RacingEngineSound); after the finish, the results
+ * (RacingResultsModal).
  *
  * The physics runs on the unmirrored course: a mirrored race flips the scene
  * along x and the steering.
@@ -25,6 +29,12 @@ class RacingGame {
         this._objects   = null;
         this._physics   = null;
         this._controls  = null;
+        this._crew      = null;
+        this._race      = null;
+        this._engineSound    = null;
+        this._crewFrame      = -1;
+        this._results        = null;
+        this._resultsDisplay = null;
         this._instances    = [];
         this._running      = false;
         this._paused       = false;
@@ -46,13 +56,18 @@ class RacingGame {
         const base = RacingGame.ASSETS;
         const sky  = (base + 'skies/' + this._selection.course + '.png');
         // The sky is checked here: the texture loader has no error path, a missing image would hang the race.
-        const [course, cars, palettes, race, physics] = await Promise.all([
+        const selection = this._selection;
+        // The record of this device, none before a first lap (no record of the original: user decision).
+        const stored = (racingBestTimes.isReady() ? racingBestTimes.get(selection.course, selection.mirror, selection.car).catch(() => null) : Promise.resolve(null));
+        const [course, cars, palettes, race, physics, , best] = await Promise.all([
             appBootstrap.fetchJsonAsync(base + 'courses/' + this._selection.course + '.json'),
             appBootstrap.fetchJsonAsync(base + 'cars.json'),
             appBootstrap.fetchJsonAsync(base + 'palettes.json'),
             appBootstrap.fetchJsonAsync(base + 'race.json'),
             appBootstrap.fetchJsonAsync(base + 'physics.json'),
-            appBootstrap.fetchAsync(sky)
+            appBootstrap.fetchAsync(sky),
+            stored,
+            racingSound.loadAsync()
         ]);
         const palette   = new RacingPalette(palettes, this._selection.course, this._selection.car);
         const converter = new RacingModelConverter(palette);
@@ -72,7 +87,9 @@ class RacingGame {
         }
         this._car     = new RacingCarView(converter, cars, car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._objects = new RacingCourseObjects(converter, course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
+        this._crew    = new RacingPitCrew(converter, race, this._selection.course, this._selection.car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._physics = this._startPhysics(course, race, physics);
+        this._race    = this._startRace(race, best);
         this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions);
 
         const skyId = loader.textures().load(sky);
@@ -98,6 +115,14 @@ class RacingGame {
         if (this._pauseModal !== null) {
             this._closePause();
         }
+        if (this._results !== null) {
+            this._closeResults();
+        }
+        if (this._engineSound !== null) {
+            this._engineSound.destroy();
+            this._engineSound = null;
+        }
+        racingSound.stopAll();
         new ScreenWakeLock().release();
         document.removeEventListener('keydown', this._onKey);
         if (this._screen !== null) {
@@ -113,10 +138,23 @@ class RacingGame {
             index:     index,
             collision: new RacingCourseCollision(course.collision),
             ...race.courses[this._selection.course],
+            pit:       RacingCarPhysics.coursePit(race, this._selection.course),
         });
         const [x, height, z, heading] = race.startGrids[this._selection.car].race[index][RacingGame.START_PLACE];
+        result.laps = racingSettings.getSoloLaps();
 
         return result.place(x, height, z, heading);
+    }
+
+    // The race of the original around the car, against the record of this device (null before any lap).
+    _startRace(race, best) {
+        const course = race.courses[this._selection.course];
+        const record = (((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
+
+        return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course))
+            .setOnSound((command) => racingSound.send(command))
+            .setOnRecord((lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs))
+            .setOnFinish((result) => this._guard(this._finish, result));
     }
 
     _begin(skyId) {
@@ -124,8 +162,12 @@ class RacingGame {
         this._buildDisplay();
         this._car.bind();
         this._objects.bind();
+        this._crew.bind();
+        if (racingSound.getEngine() !== null) {
+            this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
+        }
         this._controls  = new RacingControls(this._screen.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));
-        const parts     = new Set([...this._car.getAllInstances(), ...this._objects.getAllInstances()]);
+        const parts     = new Set([...this._car.getAllInstances(), ...this._objects.getAllInstances(), ...this._crew.getAllInstances()]);
         this._instances = loader.instances().getAll().filter((instance) => ((instance !== undefined) && !parts.has(instance)));
         this._placeCar(0);
         this._running   = true;
@@ -145,14 +187,19 @@ class RacingGame {
             .setBackground(...racingCatalog.getCourse(this._selection.course).skyColor)
             .setLightAmbient(RacingGame.AMBIENT)
             .setSky(this._sky(this._skyId));
-        this._screen.bindHud(new RacingHud(this._engine));
+        const course = racingCatalog.getCourse(this._selection.course).name;
+        this._screen.bindHud(new RacingHud(this._engine).bindRace(this._race, this._physics, {
+            car:    this._selection.car,
+            course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
+            manual: (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL)
+        }));
     }
 
     // --- Pause menu ---
 
     // From the root of the pause only: the stacked options handle Escape as one step back.
     _togglePause() {
-        if (!this._running) {
+        if (!this._running || (this._results !== null)) {
             return;
         }
         if (!this._paused) {
@@ -168,6 +215,7 @@ class RacingGame {
     _enterPause() {
         this._paused = true;
         this._controls.setVirtualPadVisible(false);
+        this._setSoundRunning(false);
         this._pauseDisplay = new AppMenuDisplay('screen').init(true);
         this._pauseModal   = new RacingPauseModal(this._pauseDisplay)
             .setOnResume(() => this._leavePause())
@@ -187,6 +235,70 @@ class RacingGame {
         }
         this._engine.resetDeltaClock();
         this._controls.applySettings().setVirtualPadVisible(true);
+        this._setSoundRunning(true);
+    }
+
+    // The pause silences every voice ($8507), the engine with them.
+    _setSoundRunning(running) {
+        racingSound.setPaused(!running);
+        if (this._engineSound !== null) {
+            this._engineSound.setRunning(running);
+        }
+    }
+
+    // --- Finish ---
+
+    // The blinds are closed: the records of this device, the engine stopped ($F3), the results over the black screen.
+    _finish(result) {
+        if (this._engineSound !== null) {
+            this._engineSound.setRunning(false);
+        }
+        this._controls.setVirtualPadVisible(false);
+        // The best lap was saved when it was done: the records shown are those of the race.
+        this._saveRecord(null, result.raceMs, null).then((records) => {
+            if (!this._running) {
+                return;
+            }
+            this._resultsDisplay = new AppMenuDisplay('screen').init(true);
+            this._results = new RacingResultsModal(this._resultsDisplay)
+                .setOnRestart(() => this._restart())
+                .setOnCourses(() => {
+                    this._teardown();
+                    this._navigator.endRaceToCourses();
+                })
+                .setOnQuit(() => this.quit())
+                .show(this._resultsTitle(), result, {newLap: result.newRecord, newRace: records.newRace});
+        });
+    }
+
+    // Into the best times of this device: a lap as soon as it beats the record, the race time at the finish.
+    _saveRecord(lapMs, raceMs, checkpointsMs) {
+        const selection = this._selection;
+        if (!racingBestTimes.isReady()) {
+            return Promise.resolve({newLap: false, newRace: false});
+        }
+
+        return racingBestTimes.record(selection.course, selection.mirror, selection.car, lapMs, raceMs, checkpointsMs).catch((error) => {
+            console.warn('RacingGame - best times not saved: ' + error.message);
+            return {newLap: false, newRace: false};
+        });
+    }
+
+    _closeResults() {
+        this._results.close();
+        this._resultsDisplay.destroy();
+        this._results        = null;
+        this._resultsDisplay = null;
+    }
+
+    _resultsTitle() {
+        const course = racingCatalog.getCourse(this._selection.course).name;
+        const car    = racingCatalog.getCars().find((entry) => (entry.code === this._selection.car)).name;
+
+        return appTranslator.get('race.results.title', {
+            course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
+            car:    car
+        });
     }
 
     _closePause() {
@@ -248,12 +360,17 @@ class RacingGame {
         if (input.quit) {
             this._togglePause();
         }
-        const ticks = ((this._paused) ? 0 : (this._engine.getDeltaTime() / RacingGame.TICK_MS));
-        if (!this._paused) {
+        // Frozen under the pause and under the results.
+        const frozen = (this._paused || (this._results !== null));
+        const ticks  = ((frozen) ? 0 : (this._engine.getDeltaTime() / RacingGame.TICK_MS));
+        if (!frozen) {
             this._simulate(input, ticks);
+            this._race.update(ticks);
+            this._sounds(ticks);
         }
         this._placeCar(ticks);
         this._objects.animate(ticks);
+        this._crew.setFrame(this._physics.pitCrewFrame);
 
         const engine = this._engine;
         engine.setCamera(this._camera);
@@ -261,6 +378,7 @@ class RacingGame {
         engine.drawInit();
         this._draw(this._instances);
         this._draw(this._objects.getInstances());
+        this._draw(this._crew.getInstances());
         // The original has no depth buffer and paints the cockpit last: it stays over the road it dips into. In its own
         // depth layer, the cockpit gets a near plane close enough for the roof right above the eye.
         const cockpit = this._camera.isCockpitShown();
@@ -275,6 +393,23 @@ class RacingGame {
         this._screen.update();
 
         requestAnimationFrame(this._onFrame);
+    }
+
+    // The commands of the tick, the mechanics' wrench at frames 4 and 22 ($3D28 / $3D34), the engine note.
+    _sounds(ticks) {
+        const physics = this._physics;
+        for (const command of physics.sounds) {
+            racingSound.send(command);
+        }
+        physics.sounds.length = 0;
+        const frame = physics.pitCrewFrame;
+        if ((frame !== this._crewFrame) && RacingGame.CREW_WRENCH_FRAMES.includes(frame)) {
+            racingSound.send(RacingGame.SOUND_WRENCH);
+        }
+        this._crewFrame = frame;
+        if (this._engineSound !== null) {
+            this._engineSound.update(ticks, physics.rpm, ((physics.roadFlags & RacingGame.ROAD_TUNNEL) !== 0));
+        }
     }
 
     _draw(instances) {
@@ -321,7 +456,9 @@ class RacingGame {
         const pitch = RacingGame._degrees(physics.pitch);
         const roll  = (RacingGame._degrees(physics.roll) * side);
         const pose  = this._bodyPose(physics, side);
+        const crew = physics.pitCrewFrame;
         this._car.setCockpit(this._camera.isCockpitShown())
+            .setDamage(physics.damage, ((crew >= RacingPitCrew.WHEELS_OFF_FIRST) && (crew < RacingPitCrew.WHEELS_OFF_END)))
             .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
             .place(position, yaw, pitch, roll, pose);
@@ -364,3 +501,9 @@ RacingGame.METRES_PER_ENTITY_UNIT         = (RacingGame.SCENERY_UNITS_PER_ENTITY
 RacingGame.METRES_PER_HEIGHT_UNIT         = (1 / (RacingGame.HEIGHT_UNITS_PER_SCENERY_UNIT * RacingGame.SCENERY_UNITS_PER_METRE));
 // The player starts on the first place of the grid.
 RacingGame.START_PLACE                    = 0;
+// Big Forest starts in the pit box, with the mechanics ($6AB4).
+RacingGame.PIT_START_COURSES              = ['big_forest'];
+RacingGame.CREW_WRENCH_FRAMES             = [4, 0x16];
+RacingGame.SOUND_WRENCH                   = 'BA';
+// Road flag bit 4 under the car: a tunnel, the engine echoes.
+RacingGame.ROAD_TUNNEL                    = 0x10;

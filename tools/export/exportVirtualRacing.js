@@ -22,6 +22,7 @@ const {VrWavWriter}          = require('./vrWavWriter');
 const {VrGameDataReader}     = require('./vrGameDataReader');
 const {VrCarExporter}        = require('./vrCarExporter');
 const {VrCourseObjectReader} = require('./vrCourseObjectReader');
+const {VrPitReader}          = require('./vrPitReader');
 
 class VirtualRacingExporter {
     constructor(romPath) {
@@ -133,10 +134,15 @@ class VirtualRacingExporter {
             ...physics,
             cars:   this._byCode(map.cars, physics.cars),
         });
+        const pitModels = new Map();
+        const pit       = new VrPitReader(this._rom, this._reader, map).read(pitModels);
         this._json('race.json', {
             format:     VirtualRacingExporter.FORMAT,
             startGrids: this._byCode(map.cars, race.startGrids.map((groups) => Object.fromEntries(map.gameData.startGridGroups.map((group, g) => [group, groups[g]])))),
             courses:    this._byCode(map.courses, race.courses),
+            // The mechanics and the pit boxes; car-scale models (1024 units a metre).
+            pit:        pit,
+            pitModels:  Object.fromEntries([...pitModels].map(([id, model]) => [id, this._encoder.encode(model)])),
         });
     }
 
@@ -156,8 +162,11 @@ class VirtualRacingExporter {
         const effects = {};
         for (const script of reader.readEffectScripts(map.soundEffects)) {
             effects[VrModelEncoder.hex(script.id, VirtualRacingExporter.SOUND_ID_DIGITS)] = {
-                role:    (map.soundEffectRoles[script.id] ?? null),
-                samples: script.samples,
+                role:     (map.soundEffectRoles[script.id] ?? null),
+                samples:  script.samples,
+                timeline: script.timeline,
+                frames:   script.frames,
+                priority: script.priority,
                 type:    ((script.samples.length > 0) ? 'dac' : 'fm'),
             };
         }
