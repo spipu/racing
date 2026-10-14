@@ -308,6 +308,11 @@
 }
 
 /* --- Frame rate --- */
+/* The results over the race: the frame counter stays. */
+.racing-hud-hidden > :not(.racing-hud-fps) {
+    display: none;
+}
+
 .racing-hud-fps {
     position: absolute;
     bottom: 1em;

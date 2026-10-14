@@ -9,7 +9,7 @@
  * original runs around the car (RacingRaceControl: start, laps, times, finish),
  * with the pit crew (RacingPitCrew), the sound effects (racingSound) and the
  * engine note (RacingEngineSound); after the finish, the results
- * (RacingResultsModal).
+ * (RacingResultsModal) over the race that goes on, the car driving itself.
  *
  * The physics runs on the unmirrored course: a mirrored race flips the scene
  * along x and the steering.
@@ -32,6 +32,7 @@ class RacingGame {
         this._crew      = null;
         this._race      = null;
         this._engineSound    = null;
+        this._hud            = null;
         this._results        = null;
         this._resultsDisplay = null;
         this._instances    = [];
@@ -188,11 +189,12 @@ class RacingGame {
             .setLightAmbient(RacingGame.AMBIENT)
             .setSky(this._sky(this._skyId));
         const course = racingCatalog.getCourse(this._selection.course).name;
-        this._screen.bindHud(new RacingHud(this._engine).bindRace(this._race, this._physics, {
+        this._hud = new RacingHud(this._engine).bindRace(this._race, this._physics, {
             car:    this._selection.car,
             course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
             manual: (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL)
-        }));
+        });
+        this._screen.bindHud(this._hud);
     }
 
     // --- Pause menu ---
@@ -248,14 +250,15 @@ class RacingGame {
 
     // --- Finish ---
 
-    // The blinds are closed: the records of this device, every voice stopped ($F3), the results over the black screen
-    // with their music.
+    // The records of this device, the results over the race that goes on (user decision: the original closes the
+    // blinds and stops every voice, $F3): their music over the engine, lowered; no HUD, no touch controls.
     _finish(result) {
         if (this._engineSound !== null) {
-            this._engineSound.setRunning(false);
+            this._engineSound.setLevelShare(RacingGame.RESULTS_ENGINE_SHARE);
         }
         racingSound.stopAll().send(RacingGame.JINGLE_RESULTS);
         this._controls.setVirtualPadVisible(false);
+        this._hud.setVisible(false);
         // The best lap was saved when it was done: the records shown are those of the race.
         this._saveRecord(null, result.raceMs, null).then((records) => {
             if (!this._running) {
@@ -362,8 +365,8 @@ class RacingGame {
         if (input.quit) {
             this._togglePause();
         }
-        // Frozen under the pause and under the results.
-        const frozen = (this._paused || (this._results !== null));
+        // Frozen under the pause; the race goes on under the results.
+        const frozen = this._paused;
         const ticks  = ((frozen) ? 0 : (this._engine.getDeltaTime() / RacingGame.TICK_MS));
         if (!frozen) {
             this._simulate(input, ticks);
@@ -501,5 +504,6 @@ RacingGame.START_PLACE                    = 0;
 // Big Forest starts in the pit box, with the mechanics ($6AB4).
 RacingGame.PIT_START_COURSES              = ['big_forest'];
 RacingGame.JINGLE_RESULTS                 = '8E';
+RacingGame.RESULTS_ENGINE_SHARE           = 0.5;
 // Road flag bit 4 under the car: a tunnel, the engine echoes.
 RacingGame.ROAD_TUNNEL                    = 0x10;

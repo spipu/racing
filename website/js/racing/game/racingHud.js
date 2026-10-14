@@ -47,6 +47,7 @@ class RacingHud extends AbstractHud {
         super.init(container);
         const root = this._add(container, 'racing-hud');
         const els  = this._els;
+        els.root   = root;
 
         els.tach   = this._add(root, 'racing-hud-block racing-hud-tach');
         this._buildTach(els.tach);
@@ -95,6 +96,16 @@ class RacingHud extends AbstractHud {
 
         els.fps      = this._add(root, 'racing-hud-fps');
         els.fpsValue = this._add(els.fps, 'racing-hud-fps-value');
+    }
+
+    /**
+     * Hides the HUD (the results over the race), the frame counter aside.
+     * @param {boolean} visible
+     */
+    setVisible(visible) {
+        this._els.root.classList.toggle('racing-hud-hidden', !visible);
+
+        return this;
     }
 
     update() {

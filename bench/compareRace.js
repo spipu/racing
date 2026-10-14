@@ -8,7 +8,8 @@
  * Without a scenario, every one traced from the race loading ("from load"). Each tick, the exact physics is loaded
  * with the traced state of the tick before, runs the tick, then the race control runs it: what the player sees and
  * hears is compared with the trace — start signs, READY lights, pit crew frame, lap message, split, REVERSE, PIT WORK,
- * blinds, sounds of the race, the value of the split — and the lap times at the finish. The original shows its times
+ * blinds (up to the finish: the game keeps them open, user decision), sounds of the race, the value of the split — and
+ * the lap times at the finish. The original shows its times
  * through a table of thousandths by frame ($89980C), the game true milliseconds (user decision): the original's times
  * are taken back to true milliseconds from its chrono in frames and the correction it took off. The fields the race control sets in the physics (mode,
  * started flag, start crew) keep the game's values from tick to tick: they are compared.
@@ -180,6 +181,10 @@ class RaceComparator {
             const traced   = this._traced(frames, ticks, t, pitStart);
             const computed = this._computed(physics, control, sounds, pitStart);
             sounds.length  = 0;
+            // After the line, the game keeps the blinds open under its results (user decision).
+            if (control.finished) {
+                delete traced.blinds;
+            }
             if ((tracedFinish === null) && (this._byte(ticks[t].frame, 'FFC000', 0x7D) === FINISH_RESULTS)) {
                 tracedFinish = t;
             }

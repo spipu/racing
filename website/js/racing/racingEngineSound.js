@@ -4,7 +4,8 @@
  * every 60 Hz frame $232E turns the raw rpm (+$74) into a frequency word
  * T = sum of rpm shifts + $1A5E (by car), smoothed V = (T + V) >> 1, floored at
  * the idle word, capped by car, and trembling by 0-15 when steady; the pitch
- * is (V - detune) x 0.2032 Hz (block 3). The level is constant. In a tunnel
+ * is (V - detune) x 0.2032 Hz (block 3). The level is constant (lowered under
+ * the results, which play over the race). In a tunnel
  * (road flag bit 4) a second copy of the voice plays a little lower.
  *
  * Voices (order S1..S4, multiples of the base pitch, modulation indices from
@@ -24,6 +25,7 @@ class RacingEngineSound {
         this._word    = RacingEngineSound.IDLE;
         this._frames  = 0;
         this._random  = RacingEngineSound.RANDOM_SEED;
+        this._share   = 1;
         this._output  = this._context.createGain();
         this._output.gain.value = RacingEngineSound.LEVEL;
         this._output.connect(engine.getEffectsBus());
@@ -64,9 +66,23 @@ class RacingEngineSound {
      */
     setRunning(running) {
         this._running = running;
-        this._output.gain.setTargetAtTime((running ? RacingEngineSound.LEVEL : 0), this._context.currentTime, RacingEngineSound.GLIDE_S);
+        this._applyLevel();
 
         return this;
+    }
+
+    /**
+     * @param {number} share - share of the engine's level, 1 in the race
+     */
+    setLevelShare(share) {
+        this._share = share;
+        this._applyLevel();
+
+        return this;
+    }
+
+    _applyLevel() {
+        this._output.gain.setTargetAtTime((this._running ? (RacingEngineSound.LEVEL * this._share) : 0), this._context.currentTime, RacingEngineSound.GLIDE_S);
     }
 
     destroy() {

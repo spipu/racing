@@ -279,7 +279,11 @@
     line-height: 1;
 }
 
-/* --- Results of a race: one row per lap, then the total --- */
+/* --- Results of a race: one row per lap, then the total, over the race that goes on --- */
+.app-menu-modal.racing-results {
+    background: rgba(238, 243, 243, 0.82);
+}
+
 .racing-results-table {
     margin-bottom: 1em;
 }

@@ -11,9 +11,10 @@
  *     FASTEST LAP over the record: 80 ticks blinking 4 on / 4 off, $34E8), the
  *     split at the checkpoints against the record's ($825C), REVERSE ($C312),
  *     PIT WORK during a stop;
- *   - the finish after the last lap: the car drives itself 40 ticks, the
- *     blinds close in 8 ticks ($476A), then the results 51 ticks after the
- *     line.
+ *   - the finish after the last lap: the car drives itself, the results come
+ *     51 ticks after the line, over the race that goes on (user decision: the
+ *     original closes the blinds after 40 ticks, $476A); the laps and
+ *     checkpoints after the line count no more.
  * The display reads the state; the sounds go to a callback (command ids).
  */
 class RacingRaceControl {
@@ -249,6 +250,9 @@ class RacingRaceControl {
     // --- Laps ---
 
     _event(event, tick) {
+        if (this.finished) {
+            return;
+        }
         if (event.type === 'lap') {
             this._lap(event, tick);
         } else if (event.type === 'checkpoint') {
@@ -357,13 +361,9 @@ class RacingRaceControl {
         this.split   = ((this._split === null) ? null : {ms: this._split.ms, shown: on});
     }
 
-    // The blinds by eighths a tick ($B684): opened from tick 3 of the opening ($B6D0), closed after the 40 ticks of the
-    // finish drive ($B722); in between two ticks, the share goes from one step to the next.
+    // The blinds of the opening by eighths a tick ($B684, $B6D0) from tick 3; in between two ticks, the share goes from
+    // one step to the next.
     _blinds() {
-        if (this._finishTick !== null) {
-            this.blinds = this._blindsShare(RacingRaceControl.BLINDS_CLOSING, (this._ticks - this._finishTick - RacingRaceControl.FINISH_DRIVE_TICKS));
-            return;
-        }
         this.blinds = this._blindsShare(RacingRaceControl.BLINDS_OPENING, (this._ticks - RacingRaceControl.BLINDS_OPEN_FIRST));
     }
 
@@ -423,10 +423,9 @@ RacingRaceControl.MESSAGE_TICKS          = 80;
 RacingRaceControl.BLINK_BIT              = 4;
 RacingRaceControl.BLINDS_OPEN_FIRST      = 3;
 RacingRaceControl.BLINDS_EIGHTHS         = 8;
-// Eighths of the screen closed, a step a tick: masks FF FE FD FC FB FA F9 F8 F8 80, then 01 to 08.
+// Eighths of the screen closed, a step a tick: masks FF FE FD FC FB FA F9 F8 F8 80.
 RacingRaceControl.BLINDS_OPENING         = [8, 7, 6, 5, 4, 3, 2, 1, 1, 0];
-RacingRaceControl.BLINDS_CLOSING         = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-RacingRaceControl.FINISH_DRIVE_TICKS     = 40;
+// The 40 ticks of the finish drive and the 10 of the blinds closing ($476A).
 RacingRaceControl.RESULTS_TICKS          = 51;
 RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
 RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
