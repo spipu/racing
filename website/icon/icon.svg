@@ -1,55 +1,137 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-    <!-- Source of the icon set, flat polygons only (rasterised by tools/icon/buildIcons.js) -->
-    <rect x="0" y="0" width="512" height="512" fill="#1B2F9E"/>
-    <polygon points="0,0 512,0 512,150 0,230" fill="#2440C0"/>
-    <!-- checkered track -->
-    <polygon points="0,392 512,392 512,512 0,512" fill="#F2F2EC"/>
-    <polygon points="0,392 85,392 64,432 0,432" fill="#141414"/>
-    <polygon points="171,392 256,392 256,432 149,432" fill="#141414"/>
-    <polygon points="341,392 427,392 448,432 363,432" fill="#141414"/>
-    <polygon points="85,392 171,392 149,432 64,432" fill="#F2F2EC"/>
-    <polygon points="64,432 149,432 128,472 32,472" fill="#F2F2EC"/>
-    <polygon points="0,432 64,432 32,472 0,472" fill="#141414"/>
-    <polygon points="149,432 256,432 256,472 128,472" fill="#141414"/>
-    <polygon points="363,432 448,432 480,472 384,472" fill="#141414"/>
-    <polygon points="32,472 128,472 107,512 0,512" fill="#141414"/>
-    <polygon points="256,472 384,472 405,512 256,512" fill="#141414"/>
-    <polygon points="480,472 512,472 512,512 512,512" fill="#141414"/>
-    <polygon points="128,472 256,472 256,512 107,512" fill="#F2F2EC"/>
-    <polygon points="256,392 341,392 363,432 256,432" fill="#F2F2EC"/>
-    <polygon points="448,432 512,432 512,472 480,472" fill="#F2F2EC"/>
-    <polygon points="427,392 512,392 512,432 448,432" fill="#141414"/>
-    <!-- shadow -->
-    <polygon points="96,384 416,384 440,408 72,408" fill="#0A0A20"/>
-    <!-- rear wing -->
-    <polygon points="132,138 380,138 388,176 124,176" fill="#C41818"/>
-    <polygon points="124,176 388,176 380,190 132,190" fill="#7A0C0C"/>
-    <polygon points="226,190 238,190 238,232 226,232" fill="#2A2A30"/>
-    <polygon points="274,190 286,190 286,232 274,232" fill="#2A2A30"/>
-    <!-- rear wheels -->
-    <polygon points="84,214 158,206 168,312 92,320" fill="#26262C"/>
-    <polygon points="92,320 168,312 160,330 100,336" fill="#101014"/>
-    <polygon points="354,206 428,214 420,320 344,312" fill="#3A3A42"/>
-    <polygon points="344,312 420,320 412,336 352,330" fill="#101014"/>
-    <!-- body -->
-    <polygon points="196,218 316,218 330,300 182,300" fill="#E02828"/>
-    <polygon points="256,218 316,218 330,300 256,300" fill="#B41C1C"/>
-    <polygon points="160,262 196,250 182,320 150,322" fill="#F4F4F0"/>
-    <polygon points="352,262 316,250 330,320 362,322" fill="#C8C8C4"/>
-    <!-- cockpit and driver -->
-    <polygon points="226,222 286,222 292,262 220,262" fill="#14141C"/>
-    <polygon points="242,206 270,206 282,222 276,246 236,246 230,222" fill="#F0C800"/>
-    <polygon points="256,206 270,206 282,222 276,246 256,246" fill="#C89E00"/>
-    <polygon points="234,222 278,222 274,232 238,232" fill="#1B2F9E"/>
-    <!-- nose -->
-    <polygon points="210,300 302,300 284,350 228,350" fill="#F4F4F0"/>
-    <polygon points="256,300 302,300 284,350 256,350" fill="#C8C8C4"/>
-    <!-- front wheels -->
-    <polygon points="118,300 176,296 180,372 120,378" fill="#26262C"/>
-    <polygon points="336,296 394,300 392,378 332,372" fill="#3A3A42"/>
-    <!-- front wing -->
-    <polygon points="150,350 362,350 372,370 140,370" fill="#F4F4F0"/>
-    <polygon points="140,370 372,370 364,380 148,380" fill="#A8A8A4"/>
-    <polygon points="132,342 156,342 156,382 132,382" fill="#2050D0"/>
-    <polygon points="356,342 380,342 380,382 356,382" fill="#1838A0"/>
+    <!-- Source of the icon set, flat polygons only (rasterised by tools/icon/buildIcons.js): the Formula of the original on the road of Big Forest -->
+    <rect x="0" y="0" width="512" height="512" fill="#0049FF"/>
+    <polygon points="263,-27 -51703,-10924 22850,7664 1399,290" fill="#009C00"/>
+    <polygon points="-285,-143 -400,-167 1227,2273 6952,3700" fill="#3C3C44"/>
+    <polygon points="-286,-143 -291,-144 6666,3629 6899,3687" fill="#F4F4F4"/>
+    <polygon points="-394,-165 -399,-166 1280,2286 1513,2344" fill="#F4F4F4"/>
+    <polygon points="-338,-154 -341,-154 -339,-153 -336,-152" fill="#F4F4F4"/>
+    <polygon points="-334,-150 -337,-151 -334,-149 -331,-148" fill="#F4F4F4"/>
+    <polygon points="-328,-146 -331,-147 -329,-145 -325,-144" fill="#F4F4F4"/>
+    <polygon points="-322,-142 -326,-143 -323,-141 -319,-140" fill="#F4F4F4"/>
+    <polygon points="-316,-138 -319,-138 -316,-136 -312,-135" fill="#F4F4F4"/>
+    <polygon points="-308,-132 -312,-133 -308,-130 -304,-130" fill="#F4F4F4"/>
+    <polygon points="-300,-127 -304,-127 -299,-124 -295,-123" fill="#F4F4F4"/>
+    <polygon points="-290,-120 -294,-121 -289,-117 -285,-116" fill="#F4F4F4"/>
+    <polygon points="-279,-112 -284,-113 -278,-109 -273,-108" fill="#F4F4F4"/>
+    <polygon points="-267,-103 -271,-104 -264,-99 -259,-98" fill="#F4F4F4"/>
+    <polygon points="-252,-93 -257,-94 -249,-88 -243,-87" fill="#F4F4F4"/>
+    <polygon points="-234,-80 -240,-81 -230,-74 -224,-73" fill="#F4F4F4"/>
+    <polygon points="-213,-65 -219,-66 -206,-57 -200,-57" fill="#F4F4F4"/>
+    <polygon points="-186,-47 -193,-48 -177,-37 -170,-36" fill="#F4F4F4"/>
+    <polygon points="-153,-23 -160,-24 -140,-10 -132,-9" fill="#F4F4F4"/>
+    <polygon points="-109,7 -117,7 -90,26 -82,27" fill="#F4F4F4"/>
+    <polygon points="-49,49 -58,49 -20,76 -11,76" fill="#F4F4F4"/>
+    <polygon points="36,109 27,110 85,151 95,150" fill="#F4F4F4"/>
+    <polygon points="170,203 160,205 260,277 270,273" fill="#F4F4F4"/>
+    <polygon points="409,371 401,378 612,529 617,517" fill="#F4F4F4"/>
+    <polygon points="959,756 964,782 1674,1290 1627,1226" fill="#F4F4F4"/>
+    <polygon points="3525,2557 3836,2840 4015,2968 4164,3005" fill="#F4F4F4"/>
+    <polygon points="175,177 68,192 367,438 460,362" fill="#1E1E24"/>
+    <polygon points="201,187 199,185 187,178 188,178" fill="#262626"/>
+    <polygon points="201,187 219,184 231,176 212,179" fill="#262626"/>
+    <polygon points="199,185 210,178 181,160 187,178" fill="#242424"/>
+    <polygon points="232,173 236,156 235,157 231,176" fill="#202020"/>
+    <polygon points="228,137 235,157 236,156 229,139" fill="#2A2A2A"/>
+    <polygon points="183,141 194,133 195,131 184,140" fill="#2C2C2C"/>
+    <polygon points="181,160 210,178 214,159 183,141" fill="#242424"/>
+    <polygon points="201,187 212,179 210,178 199,185" fill="#212121"/>
+    <polygon points="195,169 194,169 159,162 160,162" fill="#6D6D6D"/>
+    <polygon points="228,137 214,130 195,131 209,139" fill="#343434"/>
+    <polygon points="231,176 235,157 216,159 212,179" fill="#292929"/>
+    <polygon points="198,154 197,154 159,162 160,162" fill="#777777"/>
+    <polygon points="207,140 194,133 183,141 214,159" fill="#242424"/>
+    <polygon points="216,159 235,157 228,137 209,139" fill="#353535"/>
+    <polygon points="196,170 195,169 179,175 180,175" fill="#6D6D6D"/>
+    <polygon points="195,131 194,133 207,140 209,139" fill="#373737"/>
+    <polygon points="216,159 214,159 210,178 212,179" fill="#2F2F2F"/>
+    <polygon points="199,155 198,154 179,175 180,175" fill="#777777"/>
+    <polygon points="209,139 207,140 214,159 216,159" fill="#383838"/>
+    <polygon points="165,145 181,154 188,106 171,97" fill="#610000"/>
+    <polygon points="196,182 157,159 149,156 198,183" fill="#9F0000"/>
+    <polygon points="188,106 181,154 189,151 194,115" fill="#610000"/>
+    <polygon points="224,181 205,182 196,182 198,183" fill="#8F0000"/>
+    <polygon points="202,187 198,183 149,156 136,157" fill="#E62E2E"/>
+    <polygon points="182,146 167,130 96,135 112,153" fill="#CF0000"/>
+    <polygon points="198,183 202,187 249,192 224,181" fill="#CB0B0B"/>
+    <polygon points="186,118 170,107 98,109 114,122" fill="#FFFFFF"/>
+    <polygon points="122,159 156,190 169,193 136,157" fill="#EE4747"/>
+    <polygon points="113,166 146,207 148,190 113,164" fill="#600000"/>
+    <polygon points="116,168 115,167 92,183 93,183" fill="#747474"/>
+    <polygon points="122,159 113,164 148,190 156,190" fill="#DF0C0C"/>
+    <polygon points="116,168 115,167 93,165 94,166" fill="#656565"/>
+    <polygon points="174,171 136,157 169,193 179,191" fill="#E42424"/>
+    <polygon points="136,182 135,181 93,183 94,184" fill="#747474"/>
+    <polygon points="136,182 135,181 94,166 95,167" fill="#646464"/>
+    <polygon points="202,187 281,229 295,216 249,192" fill="#FFFFFF"/>
+    <polygon points="111,162 115,108 98,98 95,151" fill="#B00A0A"/>
+    <polygon points="111,162 119,158 122,119 115,108" fill="#B00A0A"/>
+    <polygon points="156,190 148,190 137,193 125,197" fill="#940000"/>
+    <polygon points="107,196 79,200 69,209 96,204" fill="#262626"/>
+    <polygon points="179,191 236,170 174,171" fill="#CA0000"/>
+    <polygon points="46,176 53,196 64,206 73,198" fill="#242424"/>
+    <polygon points="107,196 107,194 109,172 108,172" fill="#1F1F1F"/>
+    <polygon points="301,227 292,233 285,259 294,251" fill="#181818"/>
+    <polygon points="169,193 156,190 125,197 150,211" fill="#D00B0B"/>
+    <polygon points="64,185 53,176 56,185 61,188" fill="#656565"/>
+    <polygon points="295,216 281,229 292,233 301,227" fill="#FFFFFF"/>
+    <polygon points="108,172 109,172 101,150 100,148" fill="#272727"/>
+    <polygon points="79,200 73,198 64,206 69,209" fill="#1F1F1F"/>
+    <polygon points="46,155 46,176 73,198 73,177" fill="#242424"/>
+    <polygon points="65,176 53,167 53,176 64,185" fill="#656565"/>
+    <polygon points="100,148 87,139 58,141 71,151" fill="#343434"/>
+    <polygon points="108,172 80,176 79,200 107,196" fill="#292929"/>
+    <polygon points="174,171 236,170 243,169" fill="#E45D5D"/>
+    <polygon points="57,164 53,167 65,176 61,167" fill="#656565"/>
+    <polygon points="150,211 125,197 123,215 147,234" fill="#7F0000"/>
+    <polygon points="100,148 71,151 80,176 108,172" fill="#353535"/>
+    <polygon points="46,155 73,177 66,154 54,145" fill="#242424"/>
+    <polygon points="169,193 247,238 238,220 179,191" fill="#EDEDED"/>
+    <polygon points="54,145 66,154 71,151 58,141" fill="#373737"/>
+    <polygon points="80,176 73,177 73,198 79,200" fill="#2E2E2E"/>
+    <polygon points="399,254 415,248 397,254 380,261" fill="#262626"/>
+    <polygon points="80,176 71,151 66,154 73,177" fill="#383838"/>
+    <polygon points="381,300 399,311 418,307 373,279" fill="#242424"/>
+    <polygon points="330,263 292,233 281,229" fill="#FDFDFD"/>
+    <polygon points="238,220 260,185 236,170 179,191" fill="#C8C8C8"/>
+    <polygon points="197,241 247,238 169,193 150,211" fill="#FFFFFF"/>
+    <polygon points="373,279 418,307 427,288 380,261" fill="#242424"/>
+    <polygon points="418,266 434,258 415,248 399,254" fill="#343434"/>
+    <polygon points="238,220 265,214 268,183 260,185" fill="#8B8B8B"/>
+    <polygon points="418,307 434,298 442,279 427,288" fill="#292929"/>
+    <polygon points="260,185 268,183 243,169 236,170" fill="#FFFFFF"/>
+    <polygon points="150,211 147,234 192,269 197,241" fill="#A7A7A7"/>
+    <polygon points="418,266 427,288 442,279 434,258" fill="#353535"/>
+    <polygon points="276,205 263,198 254,200 267,207" fill="#FFFFFF"/>
+    <polygon points="380,261 427,288 418,266 399,254" fill="#242424"/>
+    <polygon points="318,245 322,252 265,214" fill="#A4A4B3"/>
+    <polygon points="267,207 254,200 244,218 265,233" fill="#F1F1F1"/>
+    <polygon points="267,207 265,233 282,229 276,205" fill="#4E4EFF"/>
+    <polygon points="404,274 402,273 337,284 338,285" fill="#767676"/>
+    <polygon points="322,252 265,214 238,220 303,259" fill="#232323"/>
+    <polygon points="221,249 215,276 240,274 247,246" fill="#1E1E1E"/>
+    <polygon points="192,269 215,276 221,249 197,241" fill="#ACACAC"/>
+    <polygon points="221,249 247,246 247,238 197,241" fill="#FFFFFF"/>
+    <polygon points="405,275 404,274 375,314 377,315" fill="#757575"/>
+    <polygon points="238,220 247,238 299,275 303,259" fill="#FBFBFB"/>
+    <polygon points="299,275 247,238 247,246" fill="#FFFFFF"/>
+    <polygon points="238,220 303,259 301,250" fill="#F0F0FF"/>
+    <polygon points="303,259 322,252 318,245 301,250" fill="#FFFFFF"/>
+    <polygon points="447,341 436,326 443,313 486,364" fill="#0000D7"/>
+    <polygon points="299,275 247,246 240,274 451,397" fill="#A5A5A5"/>
+    <polygon points="448,341 436,326 412,357 416,363" fill="#3131FF"/>
+    <polygon points="451,397 322,252 303,259" fill="#4848FF"/>
+    <polygon points="451,397 303,259 299,275" fill="#0000FF"/>
+    <polygon points="310,297 308,296 296,322 298,324" fill="#696969"/>
+    <polygon points="475,358 450,340 364,402 392,427" fill="#FFFFFF"/>
+    <polygon points="358,325 356,324 298,324 300,325" fill="#696969"/>
+    <polygon points="402,373 397,368 348,384 361,402" fill="#3131FF"/>
+    <polygon points="264,311 293,299 274,305 245,316" fill="#262626"/>
+    <polygon points="249,366 269,384 289,381 239,339" fill="#242424"/>
+    <polygon points="296,357 245,316 239,339 289,381" fill="#242424"/>
+    <polygon points="285,327 314,314 293,299 264,311" fill="#343434"/>
+    <polygon points="348,384 361,402 404,436 355,368" fill="#0000D7"/>
+    <polygon points="296,357 289,381 317,365 325,342" fill="#292929"/>
+    <polygon points="325,342 314,314 285,327 296,357" fill="#353535"/>
+    <polygon points="264,311 245,316 296,357 285,327" fill="#242424"/>
 </svg>
