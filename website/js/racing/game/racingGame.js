@@ -425,7 +425,10 @@ class RacingGame {
     }
 
     _simulate(input, ticks) {
-        if (input.view) {
+        // After the line, the original holds the close chase view ($6B04: $C048 = 1).
+        if (this._race.finished) {
+            this._camera.setView(RacingGame.FINISH_VIEW);
+        } else if (input.view) {
             this._camera.cycleView();
         }
         if (this._selection.mirror) {
@@ -509,5 +512,6 @@ RacingGame.START_PLACE                    = 0;
 RacingGame.PIT_START_COURSES              = ['big_forest'];
 RacingGame.JINGLE_RESULTS                 = '8E';
 RacingGame.RESULTS_ENGINE_SHARE           = 0.5;
+RacingGame.FINISH_VIEW                    = 1;
 // Road flag bit 4 under the car: a tunnel, the engine echoes.
 RacingGame.ROAD_TUNNEL                    = 0x10;

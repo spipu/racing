@@ -54,12 +54,22 @@ class RacingCamera {
 
     // The next view of the loop, its boom moving over the transition ticks.
     cycleView() {
-        this._order = ((this._order + 1) % RacingCamera.ORDER.length);
-        const next  = RacingCamera.ORDER[this._order];
-        this._steps   = this._transitions[this._transition(this._view, next)];
+        return this.setView(RacingCamera.ORDER[(this._order + 1) % RacingCamera.ORDER.length]);
+    }
+
+    /**
+     * A view, its boom moving over the transition ticks; nothing if it is the view already.
+     * @param {int} view - 0..3
+     */
+    setView(view) {
+        if (view === this._view) {
+            return this;
+        }
+        this._order   = RacingCamera.ORDER.indexOf(view);
+        this._steps   = this._transitions[this._transition(this._view, view)];
         this._elapsed = 0;
         this._from    = this._units;
-        this._view    = next;
+        this._view    = view;
 
         return this;
     }
