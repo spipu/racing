@@ -1,0 +1,5 @@
+# Full throttle on the long straight of Acropolis, then steered into the left wall at 281 km/h: a frontal crash, with damage
+setup formula automatic acropolis
+420 B
+30 B+LEFT
+400 B

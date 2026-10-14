@@ -142,6 +142,10 @@ class RacingGame {
         });
         const [x, height, z, heading] = race.startGrids[this._selection.car].race[index][RacingGame.START_PLACE];
         result.laps = racingSettings.getSoloLaps();
+        // Damage on every course (user decision: the original damages the cars on Acropolis and Highland only, $D19C).
+        result.damaging = true;
+        // After a wall or a crash the player steers (user decision: the original drives the car back to its line 2 s).
+        result.drivenBackOnTrack = false;
 
         return result.place(x, height, z, heading);
     }

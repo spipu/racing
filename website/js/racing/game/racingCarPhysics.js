@@ -47,6 +47,7 @@ class RacingCarPhysics {
         this.overrevTimer = 0;      // +$84
         this.crashRecovery = 0;     // +$8C
         this.backOnTrack  = 0;      // +$92
+        this.drivenBackOnTrack = true; // the car driven back to the racing line while +$92 runs ($A470); false: steered
         this.speedState   = 0;      // +$A8
         this.throttleGate = RacingCarPhysics.THROTTLE_GATE_START; // $C0AC: the throttle opens while it is >= backOnTrack
         this.offRoadWheels = 0;     // $C31A
@@ -1207,13 +1208,17 @@ class RacingCarPhysics {
         if (this.wallTimer !== 0) {
             this._deflect();
             this._probe();
-        } else if (this.backOnTrack > 0) {
+        } else if ((this.backOnTrack > 0) && this._drivenBack()) {
             this.backOnTrack = this._countDown(this.backOnTrack);
             if (this.speed !== 0) {
                 this._autopilot();
             }
             this._probe();
         } else {
+            // Not driven back: the player steers while the throttle gate and the yaw still follow +$92.
+            if (this.backOnTrack > 0) {
+                this.backOnTrack = this._countDown(this.backOnTrack);
+            }
             const fromX = this.x;
             const fromZ = this.z;
             this.shownHeading = this._angle(this.heading + this.shownSlip);
@@ -1470,9 +1475,15 @@ class RacingCarPhysics {
             this._respawn(this.section, RacingCarPhysics.RESPAWN_TICKS);
             return;
         }
-        if (this.backOnTrack === 0) {
+        if ((this.backOnTrack === 0) || !this._drivenBack()) {
             this._startDeflection(angle);
         }
+    }
+
+    // While +$92 runs, the car is driven back to the racing line ($A470), and after the finish; otherwise the player
+    // steers it, and a wall deflects it.
+    _drivenBack() {
+        return (this.drivenBackOnTrack || (this.mode === RacingCarPhysics.MODE_FINISH));
     }
 
     // The car tumbles to the section of the crash table while it slows down.
