@@ -80,9 +80,13 @@ class TraceRecorder {
         process.stdout.write(name + ': ' + frames + ' frames\n');
     }
 
-    // The Time Attack menu navigation to the car, transmission and course, then the recording.
+    // The Time Attack menu navigation to the car, transmission and course, then the recording: from the grid after the
+    // start, or as the race loads.
     _setupLines(scenario) {
         const menu = this.menuInputs(scenario);
+        if (scenario.fromLoad) {
+            menu.pop();
+        }
         if (this._shots) {
             menu.push('shot ' + scenario.name);
         }

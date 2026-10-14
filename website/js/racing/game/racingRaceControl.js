@@ -1,7 +1,7 @@
 /**
  * The Time Attack race of the original around the car's physics, at its 20 Hz
  * ticks (race.md):
- *   - the opening (20 ticks, the car still), then the start: on Big Forest
+ *   - the opening (21 ticks, the car still), then the start: on Big Forest
  *     "PIT START" over the mechanics (60 ticks), "3", "2", "1" (20 ticks each,
  *     voices $C0-$C2), "GO!" ($C3, 60 ticks); elsewhere the "READY" lights,
  *     red after 21 ticks (beep $A6), green 21 ticks later = the start ($A7),
@@ -12,7 +12,8 @@
  *     split at the checkpoints against the record's ($825C), REVERSE ($C312),
  *     PIT WORK during a stop;
  *   - the finish after the last lap: the car drives itself 40 ticks, the
- *     blinds close in 10 ticks ($476A), then the results.
+ *     blinds close in 8 ticks ($476A), then the results 51 ticks after the
+ *     line.
  * The display reads the state; the sounds go to a callback (command ids).
  */
 class RacingRaceControl {
@@ -28,7 +29,7 @@ class RacingRaceControl {
     constructor(physics, course, record, pitStart, lapJingles, checkpointJingles) {
         this._lapJingles = lapJingles;
         this._checkpointJingles = checkpointJingles;
-        this._sounds     = [];          // {ticks, command}: sounds the race sends some ticks later
+        this._sounds     = [];          // {tick, command}: sounds the race sends some ticks later
         this._physics   = physics;
         this._course    = course;
         this._pitStart  = pitStart;
@@ -53,14 +54,16 @@ class RacingRaceControl {
         this.pitWork    = false;
         this.blinds     = 1;            // share of the screen closed by the blinds (opening, finish)
         this._ticks     = 0;            // ticks of the race, whole ones counted at their end
+        this._tickCount = 0;            // whole ticks ended
         this._step      = RacingRaceControl.STEP_INTRO;
         this._stepTicks = 0;            // $C8AA of the step
         this._blink     = 0;            // $C8AA as the blinking reads it
+        this._blinkRestart = false;     // a message shown at the end of the tick blinks from it, shown first
         this._crewTicks = 0;            // +$B0 of the start crew
         this._message   = null;
         this._split     = null;
         this._splitsMs  = [null, null]; // $C270 / $C274 of the lap
-        this._finishTicks = null;
+        this._finishTick = null;        // the tick the last lap ends
         physics.mode = RacingCarPhysics.MODE_INTRO;
         if (pitStart) {
             physics.pitCrewFrame = 0;
@@ -98,8 +101,9 @@ class RacingRaceControl {
         if (this.started && !this.finished) {
             this.lapMs += (ticks * RacingRaceControl.TICK_MS);
         }
+        // The events of the physics end the first tick ending in the frame.
         for (const event of this._physics.events) {
-            this._event(event);
+            this._event(event, (this._tickCount + 1));
         }
         this._physics.events.length = 0;
         const end = (this._ticks + ticks);
@@ -116,8 +120,10 @@ class RacingRaceControl {
     // --- A tick ---
 
     _tick() {
+        this._tickCount++;
         this._stepTicks++;
-        this._blink++;
+        this._blink = ((this._blinkRestart) ? 0 : (this._blink + 1));
+        this._blinkRestart = false;
         const physics = this._physics;
         this._start();
         this.reverse = ((physics.wrongWay !== 0) && !this.finished);
@@ -129,13 +135,14 @@ class RacingRaceControl {
         } else {
             this.pitWork = false;
         }
+        // $3D28 / $3D34: the mechanics' wrench every tick their frame is 4 or 22, at the start and at a pit stop.
+        if (RacingRaceControl.CREW_WRENCH_FRAMES.includes(physics.pitCrewFrame)) {
+            this._onSound(RacingRaceControl.SOUND_WRENCH);
+        }
         this._messages();
         this._delayedSounds();
-        if (this._finishTicks !== null) {
-            this._finishTicks++;
-            if (this._finishTicks === (RacingRaceControl.FINISH_DRIVE_TICKS + RacingRaceControl.BLINDS_TICKS)) {
-                this._onFinish(this.result());
-            }
+        if ((this._finishTick !== null) && ((this._tickCount - this._finishTick) === RacingRaceControl.RESULTS_TICKS)) {
+            this._onFinish(this.result());
         }
     }
 
@@ -149,6 +156,9 @@ class RacingRaceControl {
                     physics.mode = RacingCarPhysics.MODE_GRID;
                     this._next(this._pitStart ? RacingRaceControl.STEP_PIT_START : RacingRaceControl.STEP_LIGHTS);
                     this.pitStartSign = this._pitStart;
+                    if (this._pitStart) {
+                        this._crew();
+                    }
                 }
                 break;
             case RacingRaceControl.STEP_PIT_START:
@@ -226,10 +236,11 @@ class RacingRaceControl {
         this._physics.raceFlags |= RacingCarPhysics.RACE_STARTED;
         this.started  = true;
         // The start jingle (it chains the DAC $C6): 5 ticks after GO ($9FBC), 10 after the green light ($3E08).
-        this._later((this._pitStart ? RacingRaceControl.START_JINGLE_PIT_TICKS : RacingRaceControl.START_JINGLE_LIGHTS_TICKS), RacingRaceControl.JINGLE_START);
+        this._later(this._tickCount, (this._pitStart ? RacingRaceControl.START_JINGLE_PIT_TICKS : RacingRaceControl.START_JINGLE_LIGHTS_TICKS),
+            RacingRaceControl.JINGLE_START);
     }
 
-    // $A034: the crew of the pit start, frame = ticks x 7 / 30 from the end of the opening.
+    // $A034: the crew of the pit start, frame = ticks x 7 / 30 from the last tick of the opening.
     _crew() {
         this._physics.pitCrewFrame = RacingCarPhysics.crewFrame(this._crewTicks);
         this._crewTicks++;
@@ -237,16 +248,16 @@ class RacingRaceControl {
 
     // --- Laps ---
 
-    _event(event) {
+    _event(event, tick) {
         if (event.type === 'lap') {
-            this._lap(event);
+            this._lap(event, tick);
         } else if (event.type === 'checkpoint') {
             this._checkpoint(event.checkpoint);
         }
     }
 
     // $34E8 state 4 / $B2E4: the lap time less the time past the line, against the best lap of the race and the record.
-    _lap(event) {
+    _lap(event, tick) {
         // Whole milliseconds: the time is summed by shares of ticks.
         const lapMs = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.lineCorrection)));
         this.lapTimes.push(lapMs);
@@ -264,38 +275,38 @@ class RacingRaceControl {
         }
         this._splitsMs = [null, null];
         if (event.finished) {
-            this.finished     = true;
-            this._finishTicks = 0;
+            this.finished    = true;
+            this._finishTick = tick;
         }
         // $34E8 state 36: the jingle of the lap at the end of the first blink of its message (the second when the voice
         // of the last lap plays first), $97 for a new record; none after the finish nor through the pit lane.
         if (!event.throughPits && !event.finished) {
             const jingles = this._lapJingles;
             const command = ((kind === 'fastestLap') ? RacingRaceControl.JINGLE_RECORD : jingles[Math.min(event.lap, (jingles.length - 1))]);
-            this._later(((event.lap === (this.laps - 1)) ? RacingRaceControl.LAST_LAP_JINGLE_TICKS : RacingRaceControl.LAP_JINGLE_TICKS), command);
+            this._later(tick, ((event.lap === (this.laps - 1)) ? RacingRaceControl.LAST_LAP_JINGLE_TICKS : RacingRaceControl.LAP_JINGLE_TICKS), command);
         }
         // Through the pit lane the split flag is not set: the message stays hidden ($C04E = 0).
         if (!event.throughPits || event.finished) {
             this._message = {kind: kind, ms: lapMs, ticks: 0, frozen: event.finished};
             this._split   = null;
-            this._blink   = 0;
+            this._blinkRestart = true;
         }
     }
 
-    _later(ticks, command) {
+    // A sound some ticks after the tick it is decided in.
+    _later(tick, ticks, command) {
         if (command !== undefined) {
-            this._sounds.push({ticks: ticks, command: command});
+            this._sounds.push({tick: (tick + ticks), command: command});
         }
     }
 
     _delayedSounds() {
         for (const sound of this._sounds) {
-            sound.ticks--;
-            if (sound.ticks === 0) {
+            if (sound.tick === this._tickCount) {
                 this._onSound(sound.command);
             }
         }
-        this._sounds = this._sounds.filter((sound) => (sound.ticks > 0));
+        this._sounds = this._sounds.filter((sound) => (sound.tick > this._tickCount));
     }
 
     // $825C: the lap time at a checkpoint (less its correction) against the record's, unless a lap message shows.
@@ -313,7 +324,7 @@ class RacingRaceControl {
             return;
         }
         this._split = {ms: (ms - recordMs), ticks: 0};
-        this._blink = 0;
+        this._blinkRestart = true;
     }
 
     // $B2E4 / $B386: the time the car took past the point ((K + +$E2) x 800 / +$06 ms, at most 50).
@@ -346,15 +357,23 @@ class RacingRaceControl {
         this.split   = ((this._split === null) ? null : {ms: this._split.ms, shown: on});
     }
 
-    // The blinds open over ticks 3 to 12 of the opening and close in the 10 ticks after the 40 of the finish drive.
+    // The blinds by eighths a tick ($B684): opened from tick 3 of the opening ($B6D0), closed after the 40 ticks of the
+    // finish drive ($B722); in between two ticks, the share goes from one step to the next.
     _blinds() {
-        const ticks = this._ticks;
-        if (this._finishTicks !== null) {
-            const closing = (this._finishTicks - RacingRaceControl.FINISH_DRIVE_TICKS);
-            this.blinds = Math.min(1, Math.max(0, (closing / RacingRaceControl.BLINDS_TICKS)));
+        if (this._finishTick !== null) {
+            this.blinds = this._blindsShare(RacingRaceControl.BLINDS_CLOSING, (this._ticks - this._finishTick - RacingRaceControl.FINISH_DRIVE_TICKS));
             return;
         }
-        this.blinds = Math.min(1, Math.max(0, (1 - ((ticks - RacingRaceControl.BLINDS_OPEN_FIRST) / RacingRaceControl.BLINDS_TICKS))));
+        this.blinds = this._blindsShare(RacingRaceControl.BLINDS_OPENING, (this._ticks - RacingRaceControl.BLINDS_OPEN_FIRST));
+    }
+
+    _blindsShare(steps, at) {
+        const last  = (steps.length - 1);
+        const index = Math.min(last, Math.max(0, at));
+        const first = Math.floor(index);
+        const next  = Math.min(last, (first + 1));
+
+        return ((steps[first] + ((steps[next] - steps[first]) * (index - first))) / RacingRaceControl.BLINDS_EIGHTHS);
     }
 
     /**
@@ -392,19 +411,23 @@ RacingRaceControl.STEP_LIGHTS            = 36;
 RacingRaceControl.STEP_RED               = 40;
 RacingRaceControl.STEP_GREEN             = 44;
 RacingRaceControl.STEP_RACE              = 28;
-RacingRaceControl.INTRO_TICKS            = 20;
+RacingRaceControl.INTRO_TICKS            = 21;
 RacingRaceControl.PIT_START_TICKS        = 60;
 RacingRaceControl.COUNT_TICKS            = 20;
 RacingRaceControl.GO_TICKS               = 60;
-// The lights after the opening: red at tick 42, green at 63, gone at 104 ($3D9A takes one tick, then > 20, > 20, > 40).
-RacingRaceControl.RED_TICKS              = 22;
+// The lights after the opening: red at tick 42, green at 63, gone at 104 ($3D9A, then > 20, > 20, > 40).
+RacingRaceControl.RED_TICKS              = 21;
 RacingRaceControl.GREEN_TICKS            = 21;
 RacingRaceControl.LIGHTS_GONE_TICKS      = 41;
 RacingRaceControl.MESSAGE_TICKS          = 80;
 RacingRaceControl.BLINK_BIT              = 4;
 RacingRaceControl.BLINDS_OPEN_FIRST      = 3;
-RacingRaceControl.BLINDS_TICKS           = 10;
+RacingRaceControl.BLINDS_EIGHTHS         = 8;
+// Eighths of the screen closed, a step a tick: masks FF FE FD FC FB FA F9 F8 F8 80, then 01 to 08.
+RacingRaceControl.BLINDS_OPENING         = [8, 7, 6, 5, 4, 3, 2, 1, 1, 0];
+RacingRaceControl.BLINDS_CLOSING         = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 RacingRaceControl.FINISH_DRIVE_TICKS     = 40;
+RacingRaceControl.RESULTS_TICKS          = 51;
 RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
 RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
 RacingRaceControl.LAP_JINGLE_TICKS          = 7;
@@ -418,6 +441,8 @@ RacingRaceControl.LIGHTS_RED             = 1;
 RacingRaceControl.LIGHTS_GREEN           = 2;
 RacingRaceControl.SIGN_READY             = 'ready';
 RacingRaceControl.SOUND_BEEP_LOW         = 'A6';
+RacingRaceControl.SOUND_WRENCH           = 'BA';
+RacingRaceControl.CREW_WRENCH_FRAMES     = [4, 22];
 RacingRaceControl.SOUND_BEEP_HIGH        = 'A7';
 RacingRaceControl.JINGLE_START           = '93';
 RacingRaceControl.JINGLE_RECORD          = '97';

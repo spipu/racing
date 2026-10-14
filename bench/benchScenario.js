@@ -4,8 +4,13 @@ const zlib = require('zlib');
 
 /**
  * A scenario of bench/scenarios/ and its trace in bench/traces/. The source starts with
- * "setup <car> <transmission> <course>" and may hold a "pad 3" line (3-button pad instead of the 6-button one);
- * the other lines are the recorder's (frame count + buttons).
+ * "setup <car> <transmission> <course>" and may hold:
+ *   - "pad 3": a 3-button pad instead of the 6-button one;
+ *   - "from load": the trace starts as the race loads, before its opening, instead of on the grid after the start;
+ *   - "block <address> <bytes>": a RAM block traced besides the recorder's usual ones;
+ *   - "autopilot <frames>": the car driven by the original's carrying back on track ($A470, +$92 and $C0AC poked every
+ *     tick) at full throttle, along the racing line.
+ * The other lines are the recorder's (frame count + buttons).
  */
 class BenchScenario {
     /**
@@ -28,6 +33,8 @@ class BenchScenario {
         }
         const pad = this.source.match(/^\s*pad\s+(\d+)\s*$/m);
         this.pad  = ((pad !== null) ? pad[1] : BenchScenario.DEFAULT_PAD);
+        this.fromLoad = /^\s*from\s+load\s*$/m.test(this.source);
+        this.blocks   = [...this.source.matchAll(/^\s*block\s+\S+\s+\S+\s*$/gm)].map((match) => match[0].trim());
     }
 
     /**
@@ -42,12 +49,27 @@ class BenchScenario {
 
     /**
      * @param {string[]} setupLines - recorder lines that replace the setup line
-     * @returns {string[]} the recorder lines, the pad line left out
+     * @returns {string[]} the recorder lines, the scenario's blocks first, the pad and from lines left out
      */
     recorderLines(setupLines) {
-        return this.source.split('\n')
-            .filter((line) => !/^\s*pad\s/.test(line))
-            .flatMap((line) => ((/^\s*setup\s/.test(line)) ? setupLines : [line]));
+        const lines = this.source.split('\n')
+            .filter((line) => !/^\s*(pad|from|block)\s/.test(line))
+            .flatMap((line) => ((/^\s*setup\s/.test(line)) ? setupLines : this._expand(line)));
+
+        return [...this.blocks, ...lines];
+    }
+
+    _expand(line) {
+        const autopilot = line.match(/^\s*autopilot\s+(\d+)\s*$/);
+        if (autopilot === null) {
+            return [line];
+        }
+        const lines = [];
+        for (let frames = 0; frames < Number(autopilot[1]); frames += BenchScenario.TICK_FRAMES) {
+            lines.push(...BenchScenario.AUTOPILOT_POKES, BenchScenario.TICK_FRAMES + ' B');
+        }
+
+        return lines;
     }
 
     getTracePath() {
@@ -70,5 +92,8 @@ BenchScenario.TRANSMISSIONS = ['automatic', 'manual'];
 // In the order of the original's course tables.
 BenchScenario.COURSES       = ['big_forest', 'bay_bridge', 'acropolis', 'highland', 'sand_park'];
 BenchScenario.DEFAULT_PAD   = '6';
+BenchScenario.TICK_FRAMES   = 3;
+// The carrying back on track for 40 ticks, the throttle gate open.
+BenchScenario.AUTOPILOT_POKES = ['poke FF9092 0028', 'poke FFC0AC 0100'];
 
 module.exports = {BenchScenario};

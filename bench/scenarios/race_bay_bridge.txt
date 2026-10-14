@@ -1,0 +1,13 @@
+# A whole race from its loading, driven by the original's carrying back on track: start, laps, splits, finish
+setup formula automatic bay_bridge
+from load
+block FFC800 256
+block FFC200 128
+block FF6800 512
+block FF60C0 32
+block FF8500 16
+block FF66C0 32
+block FFFDAA 180
+330 B
+autopilot 12900
+600 -

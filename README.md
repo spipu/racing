@@ -5,7 +5,7 @@ Jeu de course PWA reprenant Virtua Racing Deluxe (Sega 32X). Projet personnel, n
 ## Arborescence
 
 ```
-bench/             traces de référence du jeu d'origine, enregistrement et comparaison de la physique
+bench/             traces de référence du jeu d'origine, enregistrement et comparaison de la physique et de la course
 ├── recorder/      enregistreur de traces (frontal libretro en C pour PicoDrive)
 ├── scenarios/     scénarios de commandes rejoués dans le jeu d'origine
 └── traces/        traces enregistrées (une ligne JSON par image, gzip)
@@ -32,7 +32,7 @@ node bench/recordTraces.js              # tous les scénarios
 node bench/recordTraces.js wall         # un scénario
 ```
 
-Chaque scénario rejoue la navigation Time Attack (voiture, boîte, circuit), puis ses commandes ; la trace garde, image par image depuis le départ, l'état de la voiture du joueur et les variables globales du jeu. Une ligne `poke <adresse> <mot>` écrit dans la RAM du jeu (la voiture placée devant les stands ou la ligne d'arrivée, des dégâts) ; la comparaison repart alors de l'état tracé.
+Chaque scénario rejoue la navigation Time Attack (voiture, boîte, circuit), puis ses commandes ; la trace garde, image par image depuis le départ, l'état de la voiture du joueur et les variables globales du jeu. Une ligne `poke <adresse> <mot>` écrit dans la RAM du jeu (la voiture placée devant les stands ou la ligne d'arrivée, des dégâts) ; la comparaison repart alors de l'état tracé. Une ligne `from load` enregistre dès le chargement de la course (avant l'intro), `block <adresse> <octets>` trace un bloc de RAM de plus, `autopilot <images>` fait conduire la voiture par le jeu d'origine sur sa trajectoire de course.
 
 ## Comparaison de la physique
 
@@ -42,7 +42,16 @@ node bench/comparePhysics.js wall --ticks 50         # un scénario, ses 50 prem
 node bench/comparePhysics.js --continuous --rate 3   # physique à pas variable, 3 pas par tick
 ```
 
-Le mode par défaut enchaîne `RacingCarPhysics` tick par tick depuis le premier état de la trace : chaque champ qui diffère du jeu d'origine est signalé, puis recalé sur la trace. Tous les scénarios doivent sortir `identical`. Le mode `--continuous` fait rouler librement `RacingCarContinuousPhysics` et mesure l'écart de trajectoire (mètres) et de vitesse (%) ; il échoue au-delà de 1,5 m ou 2 %. Les scénarios `views` et `views_3button` servent aux transitions de caméra : ils ne sont comparés que si on les nomme.
+Le mode par défaut enchaîne `RacingCarPhysics` tick par tick depuis le premier état de la trace : chaque champ qui diffère du jeu d'origine est signalé, puis recalé sur la trace. Tous les scénarios doivent sortir `identical`. Le mode `--continuous` fait rouler librement `RacingCarContinuousPhysics` et mesure l'écart de trajectoire (mètres) et de vitesse (%) ; il échoue au-delà de 1,5 m ou 2 %. Les scénarios `views` et `views_3button` servent aux transitions de caméra : ils ne sont comparés que si on les nomme ; les courses enregistrées depuis leur chargement relèvent de la comparaison de la course.
+
+## Comparaison de la course
+
+```bash
+node bench/compareRace.js                            # les courses enregistrées depuis leur chargement
+node bench/compareRace.js race_big_forest --show 1-30  # le détail de ticks choisis
+```
+
+Rejoue une course entière (départ, tours, points de passage, arrivée) et compare tick par tick ce que le joueur voit et entend : signes du départ, feux, mécaniciens, messages, écarts aux points de passage, stores, sons de la course, temps des tours et arrivée des résultats. Toutes les courses doivent sortir `identical`.
 
 ## Données du jeu d'origine
 

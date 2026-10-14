@@ -32,7 +32,6 @@ class RacingGame {
         this._crew      = null;
         this._race      = null;
         this._engineSound    = null;
-        this._crewFrame      = -1;
         this._results        = null;
         this._resultsDisplay = null;
         this._instances    = [];
@@ -398,18 +397,13 @@ class RacingGame {
         requestAnimationFrame(this._onFrame);
     }
 
-    // The commands of the tick, the mechanics' wrench at frames 4 and 22 ($3D28 / $3D34), the engine note.
+    // The commands of the tick, the engine note.
     _sounds(ticks) {
         const physics = this._physics;
         for (const command of physics.sounds) {
             racingSound.send(command);
         }
         physics.sounds.length = 0;
-        const frame = physics.pitCrewFrame;
-        if ((frame !== this._crewFrame) && RacingGame.CREW_WRENCH_FRAMES.includes(frame)) {
-            racingSound.send(RacingGame.SOUND_WRENCH);
-        }
-        this._crewFrame = frame;
         if (this._engineSound !== null) {
             this._engineSound.update(ticks, physics.rpm, ((physics.roadFlags & RacingGame.ROAD_TUNNEL) !== 0));
         }
@@ -506,8 +500,6 @@ RacingGame.METRES_PER_HEIGHT_UNIT         = (1 / (RacingGame.HEIGHT_UNITS_PER_SC
 RacingGame.START_PLACE                    = 0;
 // Big Forest starts in the pit box, with the mechanics ($6AB4).
 RacingGame.PIT_START_COURSES              = ['big_forest'];
-RacingGame.CREW_WRENCH_FRAMES             = [4, 0x16];
-RacingGame.SOUND_WRENCH                   = 'BA';
 RacingGame.JINGLE_RESULTS                 = '8E';
 // Road flag bit 4 under the car: a tunnel, the engine echoes.
 RacingGame.ROAD_TUNNEL                    = 0x10;
