@@ -449,12 +449,14 @@ class RacingGame {
 
     // Entity units: x / z in collision units (2 scenery units), height in 1/8 scenery unit; the original moves
     // along (sin(-h), cos(-h)), the engine's yaw along (sin(yaw), cos(yaw)).
+    // The height, smoothed by half a tick, lags up to a metre under a steep climb at full speed: the original paints the
+    // car over the road, the depth buffer would hide it, so it is drawn on the road (user decision).
     _placeCar(ticks) {
         const physics  = this._physics;
         const side     = this._side;
         const position = [
             (physics.x * RacingGame.METRES_PER_ENTITY_UNIT * side),
-            (physics.height * RacingGame.METRES_PER_HEIGHT_UNIT),
+            (Math.max(physics.height, physics.roadHeight()) * RacingGame.METRES_PER_HEIGHT_UNIT),
             (physics.z * RacingGame.METRES_PER_ENTITY_UNIT)
         ];
         // $2984 turns the camera and the body by the heading plus the shown slip (+$3C + +$96), not by +$40, which a

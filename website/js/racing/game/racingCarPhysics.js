@@ -1425,6 +1425,19 @@ class RacingCarPhysics {
         }
     }
 
+    /**
+     * The height of the road plane under the car, as the last probe found it; the smoothed height where none is known.
+     * @returns {number} in 1/256 m, as +$32
+     */
+    roadHeight() {
+        if (this._centerPolygon === null) {
+            return this.height;
+        }
+        const h = this._course.collision.height(this._centerPolygon, ...this._probeLocal[0]);
+
+        return ((h > 0) ? h : this.height);
+    }
+
     // $7CD8: grass spins, wall deflections, frontal crashes, carrying back.
     _walls() {
         // The original tests the walls at the end of each tick.
