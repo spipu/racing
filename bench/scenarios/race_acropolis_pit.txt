@@ -1,0 +1,18 @@
+# A whole race from its loading with a pit stop: driven by the original's carrying back on track, moved sideways into the
+# pit lane on the second lap (pokes, with damage), driven to the box and repaired by the original, then on to the finish
+setup formula automatic acropolis
+from load
+block FFC800 256
+block FFC200 128
+block FF6800 512
+block FF60C0 32
+block FF8500 16
+block FF66C0 32
+block FFFDAA 180
+330 B
+autopilot 5940
+poke FF9030 EA70
+poke FF908A 0003
+900 B
+autopilot 21000
+600 -

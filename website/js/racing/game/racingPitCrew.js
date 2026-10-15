@@ -7,7 +7,10 @@
  * Drawn smoothly (project decision): a model followed by one of the same
  * topology in the next frame is morphed towards it over the frame, from the
  * pose of the original when the frame begins; the wheels go from the hands to
- * where they lie and back without a jump (RacingPitCrewWheels).
+ * where they lie and back without a jump (RacingPitCrewWheels). The front
+ * mechanics, coarser in the ROM, play the rear ones' animation of their side
+ * (project decision), placed by their front wheel as those are by their rear
+ * wheel.
  */
 class RacingPitCrew {
     /**
@@ -24,21 +27,30 @@ class RacingPitCrew {
         const side   = ((mirror) ? -1 : 1);
         const wheels = new RacingPitCrewWheels(race, cars, car);
         const load   = (model) => loader.objects().loadFromData(null, converter.toObjectData(model, carScale, mirror));
+        const placed = (n) => {
+            const [dx, dz] = pit.mechanicOffsets[car.code][n];
+
+            return [(dx * RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT), 0, (-dz * RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT)];
+        };
         const [x, y, z] = pit.mechanicBases[course];
         this._frame     = -1;
         this._elapsed   = 0; // ticks the current frame has played
         this._instances = [];
-        this._mechanics = pit.mechanics.map((mechanic, n) => {
-            const [dx, dz] = pit.mechanicOffsets[car.code][n];
-            const origin   = [(dx * RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT), 0, (-dz * RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT)];
-            const shapes   = wheels.bodyShapes(mechanic.frames, origin);
-            const parts    = new Map();
-            const part     = (objectId) => {
+        this._mechanics = RacingPitCrew.ANIMATION_OF.map((source, n) => {
+            const mechanic    = pit.mechanics[source];
+            // On the ground, as far from its wheel as the mechanic whose animation it plays is from that one's.
+            const sourcePlace = placed(source);
+            const sourceHub   = wheels.nearestHub(sourcePlace);
+            const ownHub      = wheels.nearestHub(placed(n));
+            const origin      = [(ownHub[0] + sourcePlace[0] - sourceHub[0]), 0, (ownHub[2] + sourcePlace[2] - sourceHub[2])];
+            const shapes      = wheels.bodyShapes(mechanic.frames, origin);
+            const parts       = new Map();
+            const part        = (objectId) => {
                 const instanceId = loader.instances().loadFromData(null, RacingCarView.instanceData(objectId));
 
                 return {objectId: objectId, instanceId: instanceId};
             };
-            const own      = (code) => {
+            const own         = (code) => {
                 if (!parts.has(code)) {
                     parts.set(code, part(load(wheels.model(code))));
                 }
@@ -65,9 +77,9 @@ class RacingPitCrew {
             return {
                 frames,
                 position: [
-                    ((x + dx) * RacingGame.METRES_PER_ENTITY_UNIT * side),
+                    ((x + (origin[0] / RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT)) * RacingGame.METRES_PER_ENTITY_UNIT * side),
                     (y * RacingGame.METRES_PER_HEIGHT_UNIT),
-                    ((z - dz) * RacingGame.METRES_PER_ENTITY_UNIT)
+                    ((z + (origin[2] / RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT)) * RacingGame.METRES_PER_ENTITY_UNIT)
                 ],
             };
         });
@@ -179,3 +191,5 @@ RacingPitCrew.WHEELS_OFF_END   = 0x13;
 RacingPitCrew.BODY = 0;
 // Car model units per entity unit (x / z of the mechanics' offsets).
 RacingPitCrew.MODEL_UNITS_PER_ENTITY_UNIT = 64;
+// The mechanic whose animation each plays (race.json pit.mechanics: rear right, front right, rear left, front left).
+RacingPitCrew.ANIMATION_OF = [0, 0, 2, 2];

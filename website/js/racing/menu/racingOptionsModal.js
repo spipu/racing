@@ -118,13 +118,14 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         }, null, appTranslator.get('menu.back'));
     }
 
-    // The current binding of every action, device by device, then About.
+    // How a race goes, then About; the controls themselves are in the options.
     _buildHelp() {
-        this._addBindings(appTranslator.get('device.keyboard'), 'keyboard.');
-        this._addBindings(appTranslator.get('device.gamepadAny'), 'pad.');
-        this._addLines(['help.pauseKey']);
+        for (const [heading, lines] of RacingOptionsModal.HELP) {
+            this._addHeading(appTranslator.get(heading));
+            this._addLines(lines);
+        }
         this._addHeading(appTranslator.get('help.about'));
-        this._addLines(['help.about.what', 'help.about.sega', 'help.about.author']);
+        this._addLines(['help.about.what', 'help.about.sega', 'help.about.commercial', 'help.about.author']);
         this._addLines(['help.about.copyright'], {year: new Date().getFullYear()});
     }
 
@@ -141,5 +142,14 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 }
 
 RacingOptionsModal.DEVICE_REFRESH_MS = 500;
+// The help page: each heading and its lines.
+RacingOptionsModal.HELP = [
+    ['help.race', ['help.race.solo', 'help.race.laps']],
+    ['help.start', ['help.start.pits', 'help.start.lights']],
+    ['help.times', ['help.times.lap', 'help.times.checkpoints', 'help.times.records']],
+    ['help.driving', ['help.driving.gearbox', 'help.driving.grip', 'help.driving.walls', 'help.driving.reverse', 'help.driving.views', 'help.pauseKey']],
+    ['help.damage', ['help.damage.crash', 'help.damage.pits', 'help.damage.noPits']],
+    ['help.finish', ['help.finish.results']],
+];
 // Settings key prefix of each device.
 RacingOptionsModal.SETTING_PREFIXES  = {[RacingSettings.DEVICE_KEYBOARD]: 'keyboard.', [RacingSettings.DEVICE_GAMEPAD]: 'pad.', [RacingSettings.DEVICE_VIRTUAL_PAD]: 'virtual_pad.'};

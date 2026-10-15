@@ -61,6 +61,7 @@ class RacingRaceControl {
         this._blink     = 0;            // $C8AA as the blinking reads it
         this._blinkRestart = false;     // a message shown at the end of the tick blinks from it, shown first
         this._crewTicks = 0;            // +$B0 of the start crew
+        this._inPit     = false;        // in a pit stop at the end of the tick before
         this.crewRunning = false;       // the start crew plays its animation
         this._message   = null;
         this._split     = null;
@@ -129,14 +130,13 @@ class RacingRaceControl {
         const physics = this._physics;
         this._start();
         this.reverse = ((physics.wrongWay !== 0) && !this.finished);
-        if ((physics.pitState === RacingCarPhysics.PIT_DRIVEN) || (physics.pitState === RacingCarPhysics.PIT_WORK)) {
-            if (!this.pitWork) {
-                this._blink = 0;
-            }
-            this.pitWork = true;
-        } else {
-            this.pitWork = false;
+        // $ACC0 runs before the pit entry of the tick: PIT WORK shows from the next one, blinking from the entry.
+        const inPit = ((physics.pitState === RacingCarPhysics.PIT_DRIVEN) || (physics.pitState === RacingCarPhysics.PIT_WORK));
+        if (inPit && !this._inPit) {
+            this._blink = 0;
         }
+        this.pitWork = (inPit && this._inPit);
+        this._inPit  = inPit;
         // $3D28 / $3D34: the mechanics' wrench every tick their frame is 4 or 22, at the start and at a pit stop.
         if (RacingRaceControl.CREW_WRENCH_FRAMES.includes(physics.pitCrewFrame)) {
             this._onSound(RacingRaceControl.SOUND_WRENCH);
@@ -292,12 +292,11 @@ class RacingRaceControl {
             const command = ((kind === 'fastestLap') ? RacingRaceControl.JINGLE_RECORD : jingles[Math.min(event.lap, (jingles.length - 1))]);
             this._later(tick, ((event.lap === (this.laps - 1)) ? RacingRaceControl.LAST_LAP_JINGLE_TICKS : RacingRaceControl.LAP_JINGLE_TICKS), command);
         }
-        // Through the pit lane the split flag is not set: the message stays hidden ($C04E = 0).
-        if (!event.throughPits || event.finished) {
-            this._message = {kind: kind, ms: lapMs, ticks: 0, frozen: event.finished};
-            this._split   = null;
-            this._blinkRestart = true;
-        }
+        // Through the pit lane $C04E is left at 0 and counts down past it: the message blinks until the arrival in the box
+        // sets it to 0 again ($A972).
+        this._message      = {kind: kind, ms: lapMs, ticks: 0, frozen: event.finished, untilBox: (event.throughPits && !event.finished)};
+        this._split        = null;
+        this._blinkRestart = true;
     }
 
     // A sound some ticks after the tick it is decided in.
@@ -353,6 +352,9 @@ class RacingRaceControl {
                 return null;
             }
             item.ticks++;
+            if (item.untilBox === true) {
+                return ((this._physics.pitState === RacingCarPhysics.PIT_WORK) ? null : item);
+            }
 
             return ((item.ticks > RacingRaceControl.MESSAGE_TICKS) ? null : item);
         };

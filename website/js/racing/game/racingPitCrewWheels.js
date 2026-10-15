@@ -1,12 +1,12 @@
 /**
  * The wheels the mechanics handle (race.json pitModels, car model units),
  * prepared for a smooth animation (project decision):
- *   - the front mechanics' wheels, flat squares in the ROM, are drawn as the
- *     rear mechanics' wheel, placed in the square's plane;
+ *   - the wheels laid on the ground lack the side they lie on: it is closed,
+ *     as they turn up when picked or laid;
  *   - a body that picks a wheel up starts its frame with the wheel where it
  *     lay (on the ground, or on the car's hub), and a body that puts one down
  *     ends its frame with the wheel where it lies next, turned as it lies.
- * Every wheel is then the same 16 vertices, so that one moves onto another.
+ * The wheels are 16 vertices each, so that one turns and moves onto another.
  */
 class RacingPitCrewWheels {
     /**
@@ -15,17 +15,16 @@ class RacingPitCrewWheels {
      * @param {object} car  - entry of cars.json cars
      */
     constructor(race, cars, car) {
-        this._hubs     = RacingPitCrewWheels._hubs(cars, car);
-        this._template = RacingPitCrewWheels._template(race);
-        this._models   = {};
+        this._hubs   = RacingPitCrewWheels._hubs(cars, car);
+        this._models = {};
         for (const [code, model] of Object.entries(race.pitModels)) {
-            this._models[code] = this._roundWheels(model);
+            this._models[code] = RacingPitCrewWheels._closed(model);
         }
     }
 
     /**
      * @param {string} code - model of race.json pitModels
-     * @returns {object} the model, its square wheels drawn round
+     * @returns {object} the model, a wheel laid on the ground closed
      */
     model(code) {
         return this._models[code];
@@ -78,7 +77,7 @@ class RacingPitCrewWheels {
     _moved(body, from, pose, origin, others) {
         const wheel = RacingPitCrewWheels._points(body.v, from, RacingPitCrewWheels.WHEEL_VERTICES, origin);
         const own   = RacingPitCrewWheels._pose(wheel);
-        const goal  = (pose ?? {centre: this._nearestHub(own.centre), axis: RacingPitCrewWheels.HUB_AXIS});
+        const goal  = (pose ?? {centre: this.nearestHub(own.centre), axis: RacingPitCrewWheels.HUB_AXIS});
         const turn  = RacingPitCrewWheels._alignment(own.axis, goal.axis);
         const v     = [];
         for (let i = 0; i < (body.v.length / 3); i++) {
@@ -97,105 +96,73 @@ class RacingPitCrewWheels {
         return {...body, v};
     }
 
-    _nearestHub(point) {
+    /**
+     * @param {number[]} point - car model units around the box
+     * @returns {number[]} the centre of the car's wheel nearest to it
+     */
+    nearestHub(point) {
         const away = (hub) => RacingPitCrewWheels._distance(hub, point);
 
         return this._hubs.reduce((best, hub) => ((away(hub) < away(best)) ? hub : best));
     }
 
-    // A square standing for a wheel (4 vertices of its own, in a row) becomes the template wheel in its plane, scaled
-    // to its size; the other faces keep their order.
-    _roundWheels(model) {
-        const uses = new Map();
-        for (const face of model.f) {
-            for (const i of face.i) {
-                uses.set(i, ((uses.get(i) ?? 0) + 1));
-            }
-        }
-        const square = model.f.find((face) => this._isWheelSquare(model, face, uses));
-        if (square === undefined) {
+    // A wheel of 16 vertices open on one side (edges of a single face) gets that side: a fan of triangles over the
+    // loop of open edges, in the colour of the faces off that loop, facing out as the other faces do.
+    static _closed(model) {
+        if ((model.v.length / 3) !== RacingPitCrewWheels.WHEEL_VERTICES) {
             return model;
         }
-        const from    = Math.min(...square.i);
-        const extra   = (RacingPitCrewWheels.WHEEL_VERTICES - square.i.length);
-        const corners = square.i.map((i) => [model.v[i * 3], model.v[(i * 3) + 1], model.v[(i * 3) + 2]]);
-        const wheel   = this._placeTemplate(corners);
-        const shift   = (i) => ((i < from) ? i : (i + extra));
-        const faces   = [];
+        const edges = new Map();
         for (const face of model.f) {
-            if (face === square) {
-                faces.push(...this._template.model.f.map((own) => ({...own, i: own.i.map((i) => (i + from))})));
-            } else {
-                faces.push({...face, i: face.i.map(shift)});
+            face.i.forEach((a, k) => {
+                const b   = face.i[(k + 1) % face.i.length];
+                const key = Math.min(a, b) + '-' + Math.max(a, b);
+                edges.set(key, ((edges.has(key)) ? null : [a, b]));
+            });
+        }
+        const open = [...edges.values()].filter((edge) => (edge !== null));
+        const loop = RacingPitCrewWheels._loop(open);
+        if (loop === null) {
+            return model;
+        }
+        const points  = RacingPitCrewWheels._points(model.v, 0, RacingPitCrewWheels.WHEEL_VERTICES, [0, 0, 0]);
+        const centre  = RacingPitCrewWheels._centre(points);
+        const outside = (face) => {
+            const corners = face.map((i) => points[i]);
+            const normal  = RacingPitCrewWheels._cross(RacingPitCrewWheels._minus(corners[1], corners[0]), RacingPitCrewWheels._minus(corners[2], corners[0]));
+
+            return Math.sign(RacingPitCrewWheels._dot(normal, RacingPitCrewWheels._minus(RacingPitCrewWheels._centre(corners), centre)));
+        };
+        const onLoop = new Set(loop);
+        const far    = model.f.find((face) => !face.i.some((i) => onLoop.has(i)));
+        const side   = outside(model.f[0].i);
+        const faces  = [];
+        for (let k = 1; (k + 1) < loop.length; k++) {
+            const triangle = [loop[0], loop[k], loop[k + 1]];
+            faces.push({...far, i: ((outside(triangle) === side) ? triangle : triangle.reverse())});
+        }
+
+        return {...model, f: [...model.f, ...faces]};
+    }
+
+    // The open edges in a single closed loop, null when they make none.
+    static _loop(edges) {
+        if (edges.length < 3) {
+            return null;
+        }
+        const loop = [edges[0][0], edges[0][1]];
+        const left = edges.slice(1);
+        while (left.length > 0) {
+            const last = loop[loop.length - 1];
+            const k    = left.findIndex((edge) => edge.includes(last));
+            if (k < 0) {
+                return null;
             }
+            const [a, b] = left.splice(k, 1)[0];
+            loop.push(((a === last) ? b : a));
         }
-        const v = [...model.v.slice(0, (from * 3)), ...wheel.flat(), ...model.v.slice((from + square.i.length) * 3)];
 
-        return {...model, v, f: faces};
-    }
-
-    _isWheelSquare(model, face, uses) {
-        if ((face.i.length !== 4) || !face.i.every((i) => (uses.get(i) === 1)) || ((Math.max(...face.i) - Math.min(...face.i)) !== 3)) {
-            return false;
-        }
-        const corners = face.i.map((i) => [model.v[i * 3], model.v[(i * 3) + 1], model.v[(i * 3) + 2]]);
-
-        return [0, 1].every((k) => {
-            const side = RacingPitCrewWheels._distance(corners[k], corners[k + 1]);
-
-            return ((side >= RacingPitCrewWheels.SQUARE_SIDE_MIN) && (side <= RacingPitCrewWheels.SQUARE_SIDE_MAX));
-        });
-    }
-
-    // The template's vertices in the square's plane: its flat axis along the square's normal, its long one along the
-    // square's first side, scaled from its width across to the square's mean side.
-    _placeTemplate(corners) {
-        const sideA  = RacingPitCrewWheels._minus(corners[1], corners[0]);
-        const sideB  = RacingPitCrewWheels._minus(corners[3], corners[0]);
-        const normal = RacingPitCrewWheels._unit(RacingPitCrewWheels._cross(sideA, sideB));
-        const along  = RacingPitCrewWheels._unit(sideA);
-        const centre = RacingPitCrewWheels._centre(corners);
-        const scale  = (((Math.hypot(...sideA) + Math.hypot(...sideB)) / 2) / this._template.size);
-        const square = [along, normal, RacingPitCrewWheels._cross(along, normal)];
-        const own    = this._template.basis;
-
-        return this._template.points.map((p) => {
-            const local  = own.map((axis) => RacingPitCrewWheels._dot(axis, p));
-            const turned = [0, 1, 2].map((k) => ((local[0] * square[0][k]) + (local[1] * square[1][k]) + (local[2] * square[2][k])));
-
-            return [0, 1, 2].map((k) => (centre[k] + (scale * turned[k])));
-        });
-    }
-
-    // The rear mechanics' wheel: the first model of 16 vertices among the wheels they lay on the ground.
-    static _template(race) {
-        for (const mechanic of race.pit.mechanics) {
-            for (const frame of mechanic.frames) {
-                for (const code of frame.slice(RacingPitCrewWheels.BODY + 1)) {
-                    const model = ((code === null) ? null : race.pitModels[code]);
-                    if ((model !== null) && ((model.v.length / 3) === RacingPitCrewWheels.WHEEL_VERTICES)) {
-                        return RacingPitCrewWheels._templateOf(model);
-                    }
-                }
-            }
-        }
-        throw new Error('RacingPitCrewWheels - no wheel model of ' + RacingPitCrewWheels.WHEEL_VERTICES + ' vertices');
-    }
-
-    // A wheel around its centre, with its axes (longest, flat, the third) and its width across.
-    static _templateOf(model) {
-        const points = RacingPitCrewWheels._points(model.v, 0, RacingPitCrewWheels.WHEEL_VERTICES, [0, 0, 0]);
-        const centre = RacingPitCrewWheels._centre(points);
-        const around = points.map((p) => RacingPitCrewWheels._minus(p, centre));
-        const flat   = RacingPitCrewWheels._axis(around, true);
-        // The most spread axis, made square to the flat one.
-        const most   = RacingPitCrewWheels._axis(around, false);
-        const square = RacingPitCrewWheels._minus(most, RacingPitCrewWheels._scaled(flat, RacingPitCrewWheels._dot(flat, most)));
-        const long   = RacingPitCrewWheels._unit(square);
-        const across = around.map((p) => RacingPitCrewWheels._dot(long, p));
-        const basis  = [long, flat, RacingPitCrewWheels._cross(long, flat)];
-
-        return {model, points: around, basis, size: (Math.max(...across) - Math.min(...across))};
+        return ((loop[loop.length - 1] === loop[0]) ? loop.slice(0, -1) : null);
     }
 
     // Centre of each wheel of the car: a front wheel model each, the rear one on both sides.
@@ -244,14 +211,15 @@ class RacingPitCrewWheels {
     static _pose(points) {
         const centre = RacingPitCrewWheels._centre(points);
 
-        return {centre, axis: RacingPitCrewWheels._axis(points.map((p) => RacingPitCrewWheels._minus(p, centre)), true)};
+        return {centre, axis: RacingPitCrewWheels._flatAxis(points.map((p) => RacingPitCrewWheels._minus(p, centre)))};
     }
 
-    // Axis of the least (flat) or the most spread of points around their centre: power iteration on the spread.
-    static _axis(points, least) {
+    // The axis along which the points around their centre spread the least (a wheel's axle): power iteration on the
+    // spread taken from its trace, whose largest eigenvalue is then that axis's.
+    static _flatAxis(points) {
         const spread = [0, 1, 2].map((a) => [0, 1, 2].map((b) => points.reduce((sum, p) => (sum + (p[a] * p[b])), 0)));
         const trace  = (spread[0][0] + spread[1][1] + spread[2][2]);
-        const matrix = ((least) ? spread.map((row, a) => row.map((value, b) => (((a === b) ? trace : 0) - value))) : spread);
+        const matrix = spread.map((row, a) => row.map((value, b) => (((a === b) ? trace : 0) - value)));
         let axis = RacingPitCrewWheels._unit([1, 0.7, 0.4]);
         for (let step = 0; step < RacingPitCrewWheels.AXIS_STEPS; step++) {
             axis = RacingPitCrewWheels._unit(matrix.map((row) => RacingPitCrewWheels._dot(row, axis)));
@@ -326,9 +294,6 @@ class RacingPitCrewWheels {
 RacingPitCrewWheels.BODY = 0;
 // Vertices of the wheel the rear mechanics handle.
 RacingPitCrewWheels.WHEEL_VERTICES = 16;
-// Sides of the squares the front mechanics' wheels are (606-608 x 500-502; the tools' squares are other sizes).
-RacingPitCrewWheels.SQUARE_SIDE_MIN = 480;
-RacingPitCrewWheels.SQUARE_SIDE_MAX = 640;
 // Half width past which a wheel model is the rear axle (Formula 1070, a front wheel 310).
 RacingPitCrewWheels.AXLE_HALF_WIDTH = 600;
 // The car's wheels turn about the x axis (heading 0 in the box).

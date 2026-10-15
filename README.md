@@ -1,6 +1,21 @@
 # Spipu-Racing
 
-Jeu de course PWA reprenant Virtua Racing Deluxe (Sega 32X). Projet personnel, non diffusé : les données du jeu d'origine (© SEGA 1994) ne doivent pas être redistribuées.
+Jeu de course PWA reprenant Virtua Racing Deluxe (Sega 32X). Projet personnel, non diffusé : les données du jeu d'origine (© SEGA 1994) ne doivent pas être redistribuées. Le jeu est gratuit et à but non lucratif : toute exploitation commerciale, directe ou indirecte (vente, location, publicité, abonnement, dons ou toute autre forme de rémunération), est interdite.
+
+## Le jeu
+
+- **Course contre la montre** : seul sur le circuit, sur les cinq circuits de l'original (Big Forest, Bay Bridge, Acropolis, Highland, Sand Park) et leurs variantes miroir, avec les trois voitures (Formula, Stock, Prototype) en boîte automatique ou manuelle ; de 5 à 50 tours.
+- **Fidèle à l'original** : modèles, couleurs, ciels, physique, collisions, caméras et bruitages repris de la ROM, en haute définition et à la cadence de l'écran.
+- **Déroulé d'une course** : départ des stands avec les mécaniciens à Big Forest, aux feux ailleurs ; temps des tours, écarts au record aux points de passage, messages de tour, contresens ; arrivée suivie des résultats (temps de chaque tour, meilleur tour, temps total, nouveaux records).
+- **Dégâts et stands** : un choc frontal à pleine vitesse abîme la voiture ; à Big Forest, Acropolis et Highland, un arrêt aux stands la répare, avec les mécaniciens animés.
+- **HUD moderne** : compte-tours, vitesse en km/h ou mph, rapport, tours, record et temps des derniers tours.
+- **Quatre vues** : cockpit avec volant et bras du pilote, poursuite rapprochée, poursuite éloignée, vue haute.
+- **Son** : bruitages et jingles de l'original, moteur synthétisé dont la hauteur suit le régime.
+- **Commandes** : clavier, manette ou commandes tactiles, choisies automatiquement ou forcées, remappables dans les options.
+- **Records** : meilleur tour et meilleure course gardés sur l'appareil, par circuit, variante et voiture, consultables et effaçables dans « Meilleurs tours ».
+- **Menus et aide** : menu pause, options (affichage, course, son, contrôles), aide qui explique le déroulé d'une course ; en anglais, français, italien et espagnol.
+- **Application installable**, utilisable hors ligne.
+- À venir : carte du circuit dans le HUD, course à plusieurs en réseau.
 
 ## Arborescence
 
@@ -51,7 +66,7 @@ node bench/compareRace.js                            # les courses enregistrées
 node bench/compareRace.js race_big_forest --show 1-30  # le détail de ticks choisis
 ```
 
-Rejoue une course entière (départ, tours, points de passage, arrivée) et compare tick par tick ce que le joueur voit et entend : signes du départ, feux, mécaniciens, messages, écarts aux points de passage, stores, sons de la course, temps des tours et arrivée des résultats. Toutes les courses doivent sortir `identical`.
+Rejoue une course entière (départ, tours, points de passage, arrêt aux stands, arrivée) et compare tick par tick ce que le joueur voit et entend : signes du départ, feux, mécaniciens, messages, écarts aux points de passage, arrêt aux stands, stores, sons de la course, temps des tours et arrivée des résultats. Les courses enregistrées couvrent les cinq circuits et une course avec arrêt aux stands ; toutes doivent sortir `identical`.
 
 ## Données du jeu d'origine
 
