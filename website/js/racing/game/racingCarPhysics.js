@@ -496,7 +496,10 @@ class RacingCarPhysics {
         const pit = this._course.pit;
         const [boxX, boxZ] = pit.box;
         this.pitCrewFrame = 0;
-        const gap = w(boxZ - this.z);
+        // Gap, aim and turn are those of the car as the tick began: a share of a tick does not cross a threshold early.
+        const fromX = this._lastTick('x');
+        const fromZ = this._lastTick('z');
+        const gap   = w(boxZ - fromZ);
         if (gap < RacingCarPhysics.PIT_ARRIVAL) {
             this.x = boxX;
             this.z = boxZ;
@@ -523,8 +526,8 @@ class RacingCarPhysics {
             aim   = [boxX, (boxZ - RacingCarPhysics.PIT_AIM_NEAR)];
             speed = (((gap >> 4) * 3) + RacingCarPhysics.PIT_NEAR_BASE);
         }
-        const heading = this._angleTo(aim);
-        const turn    = RacingCarPhysics._clamp(w(heading - this.heading), -RacingCarPhysics.PIT_TURN, RacingCarPhysics.PIT_TURN);
+        const heading = this._angleTo(aim, fromX, fromZ);
+        const turn    = RacingCarPhysics._clamp(w(heading - this._lastTick('heading')), -RacingCarPhysics.PIT_TURN, RacingCarPhysics.PIT_TURN);
         this.heading = this._angle(this.heading + this._scaled(turn));
         // The heading of the whole tick snaps straight: a share of a tick has not turned it yet.
         if (this._atTickEnd() && (Math.abs(this.heading) < RacingCarPhysics.PIT_STRAIGHT)) {
@@ -1250,11 +1253,11 @@ class RacingCarPhysics {
         this.z = this._word(this.z + this._scaled(w((this._cosOf(angle) * this.speed) >> 8) >> 4));
     }
 
-    // $A7A0: heading from the car to a point.
-    _angleTo(point) {
+    // $A7A0: heading from the car (or another place) to a point.
+    _angleTo(point, fromX = this.x, fromZ = this.z) {
         const w  = RacingCarPhysics._w;
-        const dx = w(this.x - point[0]);
-        const dz = w(point[1] - this.z);
+        const dx = w(fromX - point[0]);
+        const dz = w(point[1] - fromZ);
         if (dz === 0) {
             return ((dx > 0) ? RacingCarPhysics.QUARTER_TURN : ((dx < 0) ? -RacingCarPhysics.QUARTER_TURN : 0));
         }

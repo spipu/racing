@@ -14,8 +14,9 @@
  * state the trace does not hold (polygons under the probes) carried along; a field that differs is reported, then
  * set back to the trace so that one error does not hide the next ones.
  *
- * --continuous runs the variable step physics of the game instead, n steps per original tick (default 1), never set
- * back to the trace: it reports how far each field drifts from the original, and the distance between the cars.
+ * --continuous runs the variable step physics of the game instead, n steps per original tick (default 1), set back to
+ * the trace only after a poke and as a pit stop begins or ends: it reports how far each field drifts from the original,
+ * and the distance between the cars.
  *
  * --resync runs the variable step physics from every traced tick in turn (set back to the trace), h original ticks at n
  * steps a tick, and measures where it ends against the exact physics run from the same state (the trace does not hold
@@ -334,8 +335,10 @@ class PhysicsComparator {
         let previous = {accelerate: false, brake: false, steer: 0, gearUp: false, gearDown: false};
         for (let t = 1; t < ticks.length; t++) {
             const input = BenchTrace.input(ticks[t]);
-            // A car placed by the scenario (poke): the run starts again from the traced state.
-            if (ticks[t].poked || ticks[t - 1].poked) {
+            // A car placed by the scenario (poke) or a pit stop begun or ended: the run starts again from the traced
+            // state. The drive to the box ignores the pad, so the tick of lag of the input above is not carried into it;
+            // its arrival is caught at a tick, a few units ahead shifting the stop and the leaving by whole ticks.
+            if (ticks[t].poked || ticks[t - 1].poked || this._pitChangeAt(ticks, t)) {
                 physics  = start(ticks[t].frame);
                 previous = input;
                 continue;
@@ -367,6 +370,12 @@ class PhysicsComparator {
             + (speed * 100).toFixed(1) + ' %' + (failed ? ' — over ' + PATH_TOLERANCE_METRES + ' m / ' + (SPEED_TOLERANCE * 100) + ' %' : '') + '\n');
 
         return (failed ? 1 : 0);
+    }
+
+    _pitChangeAt(ticks, t) {
+        const mode = BenchTrace.field('mode');
+
+        return ((BenchTrace.read(ticks[t].frame, mode) === MODE_PIT) !== (BenchTrace.read(ticks[t - 1].frame, mode) === MODE_PIT));
     }
 
     // Distance to the traced path, its segments a few ticks around the given one.

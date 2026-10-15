@@ -87,7 +87,7 @@ class RacingGame {
         }
         this._car     = new RacingCarView(converter, cars, car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._objects = new RacingCourseObjects(converter, course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
-        this._crew    = new RacingPitCrew(converter, race, this._selection.course, this._selection.car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
+        this._crew    = new RacingPitCrew(converter, race, cars, car, this._selection.course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._physics = this._startPhysics(course, race, physics);
         this._race    = this._startRace(race, best);
         this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions);
@@ -379,7 +379,7 @@ class RacingGame {
         }
         this._placeCar(ticks);
         this._objects.animate(ticks);
-        this._crew.setFrame(this._physics.pitCrewFrame);
+        this._crew.setFrame(this._physics.pitCrewFrame, ticks, (this._race.crewRunning || (this._physics.pitState === RacingCarPhysics.PIT_WORK)));
 
         const engine = this._engine;
         engine.setCamera(this._camera);

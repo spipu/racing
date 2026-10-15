@@ -17,6 +17,9 @@ class Object3d extends AbstractLoadedEntity {
         this._groupLightFactors = {};
         this._faceGroupsVersion = 0;
         this._renderTint        = null;
+        // Own vertices kept aside by the first setMorph.
+        this._ptBase            = null;
+        this._morphed           = false;
     }
 
     // Faces changed texture: renderers rebuild their cached draw-state batches
@@ -175,6 +178,24 @@ class Object3d extends AbstractLoadedEntity {
         }
 
         this._localNormals = new Float32Array(this.faceCount * 3);
+        this._computeLocalNormals();
+
+        this.opaqueFaces  = [];
+        this.alphaFaces   = [];
+        this._translucent = false;
+        for (let k = 0; k < this.faceCount; k++) {
+            const fc = this.faceList[k];
+            if (fc.collisionOnly === true) {
+                continue;
+            }
+            const translucent = ((fc.alpha < 1) || (fc.blendAdd === true));
+            fc.isAlpha = (translucent || ((fc.textureId !== null) && loader.textures().get(fc.textureId).isAlpha()));
+            ((fc.isAlpha) ? this.alphaFaces : this.opaqueFaces).push(k);
+            this._translucent = (this._translucent || translucent);
+        }
+    }
+
+    _computeLocalNormals() {
         for (let k = 0; k < this.faceCount; k++) {
             const fc = this.faceList[k];
             const A = this.ptOrigin[fc.pts[0]], B = this.ptOrigin[fc.pts[1]], C = this.ptOrigin[fc.pts[2]];
@@ -193,20 +214,6 @@ class Object3d extends AbstractLoadedEntity {
             this._localNormals[k*3+1] = ny;
             this._localNormals[k*3+2] = nz;
         }
-
-        this.opaqueFaces  = [];
-        this.alphaFaces   = [];
-        this._translucent = false;
-        for (let k = 0; k < this.faceCount; k++) {
-            const fc = this.faceList[k];
-            if (fc.collisionOnly === true) {
-                continue;
-            }
-            const translucent = ((fc.alpha < 1) || (fc.blendAdd === true));
-            fc.isAlpha = (translucent || ((fc.textureId !== null) && loader.textures().get(fc.textureId).isAlpha()));
-            ((fc.isAlpha) ? this.alphaFaces : this.opaqueFaces).push(k);
-            this._translucent = (this._translucent || translucent);
-        }
     }
 
     getTextureId(index) {
@@ -219,6 +226,77 @@ class Object3d extends AbstractLoadedEntity {
 
     getBoundingRadius() {
         return this._boundingRadius;
+    }
+
+    /**
+     * Whether setMorph can move this object towards the target: the same
+     * vertices, and the same faces on them in the same order.
+     *
+     * @param {Object3d} target
+     * @returns {boolean}
+     */
+    isMorphableTo(target) {
+        if ((target.ptCount !== this.ptCount) || (target.faceCount !== this.faceCount)) {
+            return false;
+        }
+        for (let k = 0; k < this.faceCount; k++) {
+            const a = this.faceList[k].pts;
+            const b = target.faceList[k].pts;
+            if ((a[0] !== b[0]) || (a[1] !== b[1]) || (a[2] !== b[2])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Moves the vertices towards those of another object of the same topology
+     * (isMorphableTo), for every instance of this object: an animation drawn
+     * between two of its frames. The geometry a collision indexed beforehand
+     * is not updated.
+     *
+     * @param {Object3d|null} target - null: back to the own shape
+     * @param {number} share - 0 = own shape, 1 = the target's
+     */
+    setMorph(target, share) {
+        const base = this._morphBase();
+        if ((target === null) || (share <= 0)) {
+            if (this._morphed) {
+                this._morphTo(base, base, 0);
+                this._morphed = false;
+            }
+            return this;
+        }
+        const goal = target._morphBase();
+        // Every blend lies in the hull of the two shapes: a sphere around both keeps the culling right.
+        const to    = target.getCenter();
+        const reach = (Math.hypot((to[0] - this._center[0]), (to[1] - this._center[1]), (to[2] - this._center[2])) + target.getBoundingRadius());
+        this._boundingRadius = Math.max(this._boundingRadius, reach);
+        this._morphTo(base, goal, Math.min(share, 1));
+        this._morphed = true;
+
+        return this;
+    }
+
+    _morphBase() {
+        if (this._ptBase === null) {
+            this._ptBase = this.ptOrigin.map((p) => [p[0], p[1], p[2]]);
+        }
+
+        return this._ptBase;
+    }
+
+    _morphTo(base, goal, share) {
+        for (let i = 0; i < this.ptCount; i++) {
+            const p = this.ptOrigin[i];
+            const a = base[i];
+            const b = goal[i];
+            p[0] = a[0] + ((b[0] - a[0]) * share);
+            p[1] = a[1] + ((b[1] - a[1]) * share);
+            p[2] = a[2] + ((b[2] - a[2]) * share);
+        }
+        this._computeLocalNormals();
     }
 
     ptTransform(m) {

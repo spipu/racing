@@ -61,6 +61,7 @@ class RacingRaceControl {
         this._blink     = 0;            // $C8AA as the blinking reads it
         this._blinkRestart = false;     // a message shown at the end of the tick blinks from it, shown first
         this._crewTicks = 0;            // +$B0 of the start crew
+        this.crewRunning = false;       // the start crew plays its animation
         this._message   = null;
         this._split     = null;
         this._splitsMs  = [null, null]; // $C270 / $C274 of the lap
@@ -189,7 +190,8 @@ class RacingRaceControl {
                 if (ticks >= RacingRaceControl.GO_TICKS) {
                     // $A04E: the crew goes.
                     physics.pitCrewFrame = -1;
-                    this.startSign = null;
+                    this.crewRunning     = false;
+                    this.startSign       = null;
                     this._next(RacingRaceControl.STEP_RACE);
                 }
                 break;
@@ -245,6 +247,7 @@ class RacingRaceControl {
     _crew() {
         this._physics.pitCrewFrame = RacingCarPhysics.crewFrame(this._crewTicks);
         this._crewTicks++;
+        this.crewRunning = true;
     }
 
     // --- Laps ---
