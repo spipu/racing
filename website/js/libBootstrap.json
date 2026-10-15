@@ -1,5 +1,5 @@
 {
-    "version": "v1.0137",
+    "version": "v1.0139",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -68,6 +68,7 @@
             "/assets/virtual_racing/sounds/dac_30.wav",
             "/assets/virtual_racing/sounds/dac_31.wav",
             "/assets/virtual_racing/sounds/pwm_jingle.wav",
+            "/js/racing/racingEngineProcessor.js",
             "/assets/virtual_racing/jingles.json",
             "/assets/virtual_racing/jingles/85.mp3",
             "/assets/virtual_racing/jingles/86.mp3",

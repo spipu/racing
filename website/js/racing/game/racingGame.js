@@ -168,7 +168,7 @@ class RacingGame {
         this._car.bind();
         this._objects.bind();
         this._crew.bind();
-        if (racingSound.getEngine() !== null) {
+        if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
         }
         this._controls  = new RacingControls(this._screen.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));

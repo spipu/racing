@@ -169,6 +169,8 @@ class VirtualRacingExporter {
                 frames:   script.frames,
                 priority: script.priority,
                 type:    ((script.samples.length > 0) ? 'dac' : 'fm'),
+                voice:    script.voice,
+                detune:   script.detune,
             };
         }
         this._json('sounds.json', {format: VirtualRacingExporter.FORMAT, samples, effects, pwmJingle: VirtualRacingExporter.PWM_FILE});

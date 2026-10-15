@@ -7,7 +7,8 @@
  * playing. The FM sounds are not samples: the jingles and the start beeps
  * were recorded from the emulated game (jingles.json, jingles/XX.mp3); a music
  * command ($81-$9E) replaces the music playing. The engine is
- * RacingEngineSound.
+ * RacingEngineSound, an FM voice of sounds.json computed by an AudioWorklet
+ * (RacingEngineProcessor) loaded here.
  *
  * Global `racingSound`: the engine and its AudioContext are born once for the
  * page, the samples are loaded on the first race and kept.
@@ -20,6 +21,8 @@ class RacingSound {
         this._musicPlayer = null;
         this._effects  = {};      // command id → {timeline: [{ms, id, fm}], ms, priority}
         this._jingles  = {};      // music command id → {id, loop}
+        this._voices   = {};      // FM command id → {voice, detune} (sounds.json)
+        this._worklet  = false;   // the engine's AudioWorklet is loaded
         this._music    = null;
         this._loading  = null;
         this.laps      = [];      // music command of the lap done, by laps done ($8989EE)
@@ -52,6 +55,21 @@ class RacingSound {
 
     getEngine() {
         return this._engine;
+    }
+
+    /**
+     * @returns {boolean} the engine note can play (its AudioWorklet loaded)
+     */
+    hasEngineVoice() {
+        return this._worklet;
+    }
+
+    /**
+     * @param {string} command - FM sound command id of the original ('A2')
+     * @returns {{voice: object, detune: number|null}|null}
+     */
+    fmVoice(command) {
+        return (this._voices[command] ?? null);
     }
 
     /**
@@ -169,6 +187,12 @@ class RacingSound {
 
             return files.get(entry.file);
         };
+        for (const [command, effect] of Object.entries(sounds.effects)) {
+            if (effect.voice !== null) {
+                this._voices[command] = {voice: effect.voice, detune: effect.detune};
+            }
+        }
+        await this._loadEngineVoice();
         const recorded = await this._loadJingles(base);
         for (const [command, effect] of Object.entries(sounds.effects)) {
             const ids     = await Promise.all(effect.timeline.map((entry) => sample(entry.sample)));
@@ -182,6 +206,16 @@ class RacingSound {
         }
         for (const [command, jingle] of recorded) {
             this._jingles[command] = jingle;
+        }
+    }
+
+    // A browser without AudioWorklet keeps the race, without its engine note.
+    async _loadEngineVoice() {
+        try {
+            await this._engine.getContext().audioWorklet.addModule(appBootstrap.buildUrl(RacingSound.ENGINE_PROCESSOR));
+            this._worklet = true;
+        } catch (error) {
+            console.warn('RacingSound - engine note unavailable: ' + error.message);
         }
     }
 
@@ -221,6 +255,7 @@ class RacingSound {
 }
 
 RacingSound.ASSETS          = '/assets/virtual_racing/';
+RacingSound.ENGINE_PROCESSOR = '/js/racing/racingEngineProcessor.js';
 RacingSound.WAV_HEADER_SIZE = 44;
 RacingSound.PCM_ZERO        = 128;
 RacingSound.FRAME_MS        = (1000 / 60);

@@ -10,7 +10,7 @@ Jeu de course PWA reprenant Virtua Racing Deluxe (Sega 32X). Projet personnel, n
 - **Dégâts et stands** : un choc frontal à pleine vitesse abîme la voiture ; à Big Forest, Acropolis et Highland, un arrêt aux stands la répare, avec les mécaniciens animés.
 - **HUD moderne** : compte-tours, vitesse en km/h ou mph, rapport, tours, record et temps des derniers tours.
 - **Quatre vues** : cockpit avec volant et bras du pilote, poursuite rapprochée, poursuite éloignée, vue haute.
-- **Son** : bruitages et jingles de l'original, moteur synthétisé dont la hauteur suit le régime.
+- **Son** : bruitages et jingles de l'original, moteur calculé comme la puce FM de la console, sa hauteur suivant le régime.
 - **Commandes** : clavier, manette ou commandes tactiles, choisies automatiquement ou forcées, remappables dans les options.
 - **Records** : meilleur tour et meilleure course gardés sur l'appareil, par circuit, variante et voiture, consultables et effaçables dans « Meilleurs tours ».
 - **Menus et aide** : menu pause, options (affichage, course, son, contrôles), aide qui explique le déroulé d'une course ; en anglais, français, italien et espagnol.

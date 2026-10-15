@@ -7,6 +7,10 @@
  *   2 samples per byte. Playback rate from the Z80 loop timing: 3 579 545 / ((411 + 26 x delay) / 2) Hz (computed, not measured).
  * - The 32X PWM sample: unsigned 8-bit stereo frames (left, right), played at 22 000 Hz by the SH2.
  * - Sound effect scripts (table of 68K pointers at a file offset, by effect id): a DAC command (FF 07 nn) plays sample nn, the end byte stops.
+ *   The header starts with the offset of the effect's FM voices from the script; EF nn picks voice nn, FF 06 hhll sets the
+ *   track's detune (a word added to its frequency word).
+ * - FM voices (SMPS, 25 bytes): feedback / algorithm, then by register DT / MUL, RS / AR, AM / D1R, D2R, D1L / RR, TL,
+ *   four bytes each in the driver's register order $30, $38, $34, $3C (table at $313CC): operators S1, S2, S3, S4.
  */
 class VrSoundReader {
     constructor(rom) {
@@ -50,6 +54,8 @@ class VrSoundReader {
             let frame    = 0;
             let duration = 0;
             let at       = script;
+            let voice    = null;
+            let detune   = null;
             for (let i = 0; i < effects.scriptMaxLength; i++) {
                 const byte = rom.u8(at);
                 if (byte === effects.scriptEnd) {
@@ -59,9 +65,14 @@ class VrSoundReader {
                     const command = rom.u8(at + 1);
                     if (command === effects.dacCommand[1]) {
                         timeline.push({frame: frame, sample: rom.u8(at + 2)});
+                    } else if ((command === VrSoundReader.SMPS_DETUNE) && (detune === null)) {
+                        detune = rom.u16(at + 2);
                     }
                     at += (2 + (VrSoundReader.SMPS_SUB_ARGUMENTS[command] ?? 0));
                 } else if (byte >= VrSoundReader.SMPS_FIRST_FLAG) {
+                    if ((byte === VrSoundReader.SMPS_VOICE) && (voice === null)) {
+                        voice = this._readVoice(script + rom.u16(script) + (rom.u8(at + 1) * VrSoundReader.VOICE_BYTES));
+                    }
                     at += (1 + (VrSoundReader.SMPS_FLAG_ARGUMENTS[byte] ?? 0));
                 } else if (byte >= VrSoundReader.SMPS_FIRST_NOTE) {
                     at++;
@@ -84,9 +95,33 @@ class VrSoundReader {
                 timeline: timeline.map((entry) => ({frame: (entry.frame - first), sample: entry.sample})),
                 frames:   (frame - first),
                 priority: rom.u8(effects.priorities + (id - VrSoundReader.FIRST_COMMAND)),
+                voice:    voice,
+                detune:   detune,
             });
         }
         return scripts;
+    }
+
+    // An FM voice as the chip takes it, values of the ROM.
+    _readVoice(offset) {
+        const rom   = this._rom;
+        const byte  = (group, operator) => rom.u8(offset + 1 + (group * VrSoundReader.VOICE_OPERATORS) + operator);
+        const first = rom.u8(offset);
+
+        return {
+            algorithm: (first & 0x07),
+            feedback:  ((first >> 3) & 0x07),
+            operators: Array.from({length: VrSoundReader.VOICE_OPERATORS}, (unused, k) => ({
+                dt:  ((byte(0, k) >> 4) & 0x07),
+                mul: (byte(0, k) & 0x0F),
+                ar:  (byte(1, k) & 0x1F),
+                d1r: (byte(2, k) & 0x1F),
+                d2r: (byte(3, k) & 0x1F),
+                d1l: (byte(4, k) >> 4),
+                rr:  (byte(4, k) & 0x0F),
+                tl:  (byte(5, k) & 0x7F),
+            })),
+        };
     }
 
     readPwm(offset, frames) {
@@ -119,6 +154,10 @@ VrSoundReader.SMPS_FIRST_NOTE     = 0x80;
 VrSoundReader.SMPS_FIRST_FLAG     = 0xE0;
 VrSoundReader.SMPS_SUB_COMMAND    = 0xFF;
 VrSoundReader.SMPS_SUB_ARGUMENTS  = {0x05: 1, 0x06: 2, 0x07: 1, 0x08: 1};
+VrSoundReader.SMPS_DETUNE         = 0x06;
+VrSoundReader.SMPS_VOICE          = 0xEF;
+VrSoundReader.VOICE_BYTES         = 25;
+VrSoundReader.VOICE_OPERATORS     = 4;
 VrSoundReader.SMPS_FLAG_ARGUMENTS = {
     0xE0: 1, 0xE1: 1, 0xE2: 1, 0xE3: 0, 0xE4: 0, 0xE5: 2, 0xE6: 1, 0xE7: 0, 0xE8: 1, 0xE9: 1, 0xEA: 1, 0xEB: 1,
     0xEC: 1, 0xED: 1, 0xEE: 0, 0xEF: 1, 0xF0: 4, 0xF1: 0, 0xF3: 1, 0xF4: 0, 0xF5: 1, 0xF9: 0, 0xFE: 0,
