@@ -35,7 +35,8 @@ class RacingSettings extends AppSettings {
             {key: 'pad.view',             nameCode: 'settings.action.view',            type: 'padButton', default: 3,    action: 'view'},
             {key: 'pad.gear_up',          nameCode: 'settings.action.gearUp',          type: 'padButton', default: 5,    action: 'gearUp'},
             {key: 'pad.gear_down',        nameCode: 'settings.action.gearDown',        type: 'padButton', default: 4,    action: 'gearDown'},
-            {key: 'pad.pause',            nameCode: 'settings.action.pause',           type: 'padButton', default: 9,    action: 'pause'}
+            {key: 'pad.pause',            nameCode: 'settings.action.pause',           type: 'padButton', default: 9,    action: 'pause'},
+            {key: 'virtual_pad.dead_zone', nameCode: 'settings.virtualPad.deadZone',    type: 'list', default: '7.5', values: RacingSettings.DEAD_ZONE_VALUES}
         ];
     }
 
@@ -82,6 +83,10 @@ class RacingSettings extends AppSettings {
         return this.get(RacingSettings.DEVICE_KEY);
     }
 
+    getVirtualPadDeadZone() {
+        return this.getPercent('virtual_pad.dead_zone');
+    }
+
     getMusicVolume() {
         return this.getPercent('sound.volume_music');
     }
@@ -113,6 +118,8 @@ RacingSettings.DEVICE_GAMEPAD      = 'gamepad';
 RacingSettings.DEVICE_VIRTUAL_PAD  = 'virtualGamepad';
 RacingSettings.LANGUAGE_KEY        = 'display.language';
 RacingSettings.DEVICE_KEY          = 'controls.device';
+// Same choices as doom_js's touch sticks.
+RacingSettings.DEAD_ZONE_VALUES    = AppSettings.percentValues([0, 2.5, 5, 7.5, 10, 15]);
 RacingSettings.VOLUME_VALUES       = AppSettings.percentValues([0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
 RacingSettings.NICKNAME_CHARSET    = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -';
 RacingSettings.NICKNAME_MAX_LENGTH = 16;

@@ -352,6 +352,12 @@ class RacingTranslations {
                 it: 'Numero di giri',
                 es: 'Número de vueltas'
             },
+            'settings.virtualPad.deadZone': {
+                fr: 'Stick de direction — zone morte',
+                en: 'Steering stick — dead zone',
+                it: 'Stick di sterzo — zona morta',
+                es: 'Stick de dirección — zona muerta'
+            },
             'settings.multiplayer.laps': {
                 fr: 'Nombre de tours',
                 en: 'Number of laps',

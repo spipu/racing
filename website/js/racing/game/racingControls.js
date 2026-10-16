@@ -26,6 +26,7 @@ class RacingControls {
     // The bindings and the device, read again after a change in the pause options.
     applySettings() {
         racingSettings.applyBindings(this._keyboard, this._gamepad);
+        this._virtualGamepad.setDeadZone('move', racingSettings.getVirtualPadDeadZone());
         this._device = null;
         this._selectDevice();
 
