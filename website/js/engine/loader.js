@@ -1,13 +1,14 @@
 class Loader {
     constructor() {
-        this._callback          = null;
-        this._loaded            = false;
-        this._batching          = false;
-        this._textureLoader     = new TextureLoader(() => this._checkFullyLoaded());
-        this._object3dLoader    = new Object3dLoader(() => this._checkFullyLoaded());
-        this._instanceLoader    = new InstanceLoader(() => this._checkFullyLoaded());
-        this._interactionLoader = new InteractionLoader(() => this._checkFullyLoaded());
-        this._worldLoader       = new WorldLoader(() => this._checkFullyLoaded());
+        this._callback            = null;
+        this._loaded              = false;
+        this._batching            = false;
+        this._textureLoader       = new TextureLoader(() => this._checkFullyLoaded());
+        this._animatedModelLoader = new AnimatedModelLoader(() => this._checkFullyLoaded());
+        this._object3dLoader      = new Object3dLoader(() => this._checkFullyLoaded());
+        this._instanceLoader      = new InstanceLoader(() => this._checkFullyLoaded());
+        this._interactionLoader   = new InteractionLoader(() => this._checkFullyLoaded());
+        this._worldLoader         = new WorldLoader(() => this._checkFullyLoaded());
     }
 
     reset() {
@@ -18,6 +19,7 @@ class Loader {
         this._interactionLoader.reset();
         this._instanceLoader.reset();
         this._object3dLoader.reset();
+        this._animatedModelLoader.reset();
         this._textureLoader.reset();
     }
 
@@ -43,6 +45,10 @@ class Loader {
     clearCallback() {
         this._callback = null;
         return this;
+    }
+
+    animatedModels() {
+        return this._animatedModelLoader;
     }
 
     instances() {
@@ -81,11 +87,15 @@ class Loader {
         if (!this._textureLoader.isLoaded()) {
             return false;
         }
+        if (!this._animatedModelLoader.isLoaded()) {
+            return false;
+        }
         if (!this._worldLoader.isLoaded()) {
             return false;
         }
 
         this._textureLoader.finalizeInit();
+        this._animatedModelLoader.finalizeInit();
         this._object3dLoader.finalizeInit();
         this._instanceLoader.finalizeInit();
         this._interactionLoader.finalizeInit();

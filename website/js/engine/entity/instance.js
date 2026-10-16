@@ -12,6 +12,7 @@ class Instance extends AbstractLoadedEntity {
         this._worldCenter       = [0, 0, 0];
         this._delta             = { translate: [0, 0, 0], rotate: [0, 0, 0] };
         this._preRotate         = null; // own rotation of the part, before the deltas (Matrix.composeInstanceTransform)
+        this._worldMatrix       = null; // Matrix whose orientation replaces rotation, deltas and preRotate (setWorldMatrix)
         this._prevTransform     = null;
 
         this._animKeyframes      = [];
@@ -210,6 +211,13 @@ class Instance extends AbstractLoadedEntity {
         return this;
     }
 
+    // The centre in the world again, once the object's own vertices have moved (Object3d.refreshGeometry).
+    refreshWorldCenter() {
+        this._refreshWorldCenter();
+
+        return this;
+    }
+
     _refreshWorldCenter() {
         const lc = this._object.getCenter();
         const m  = Matrix.composeInstanceTransform(this.getTransform());
@@ -267,6 +275,11 @@ class Instance extends AbstractLoadedEntity {
 
     getPosition() {
         return this._position;
+    }
+
+    // Degrees, as setRotation takes them.
+    getRotation() {
+        return this._rotation;
     }
 
     getWorldCenter() {
@@ -674,6 +687,25 @@ class Instance extends AbstractLoadedEntity {
     }
 
     /**
+     * Places the instance by a whole matrix (an object held in a hand): its rotation part replaces the rotation,
+     * the animation deltas and preRotate, its translation becomes the position, the render offset still applies.
+     * The matrix is kept, not copied.
+     *
+     * @param {Matrix|null} matrix - null: back to the position and angles
+     */
+    setWorldMatrix(matrix) {
+        this._worldMatrix = matrix;
+        if (matrix !== null) {
+            this._position[0] = matrix.v[3][0];
+            this._position[1] = matrix.v[3][1];
+            this._position[2] = matrix.v[3][2];
+        }
+        this._refreshWorldCenter();
+
+        return this;
+    }
+
+    /**
      * Rotation of the instance in degrees, set from outside the animation.
      *
      * @param {number[]} rotation - [x, y, z]
@@ -699,7 +731,8 @@ class Instance extends AbstractLoadedEntity {
             rotation:       t.rotation,
             deltaTranslate: t.deltaTranslate,
             deltaRotate:    t.deltaRotate,
-            preRotate:      t.preRotate
+            preRotate:      t.preRotate,
+            worldMatrix:    t.worldMatrix
         };
     }
 
@@ -1010,6 +1043,9 @@ class Instance extends AbstractLoadedEntity {
         // Only a part that has one carries it, so the transforms of the others stay as they were.
         if (this._preRotate !== null) {
             transform.preRotate = this._preRotate;
+        }
+        if (this._worldMatrix !== null) {
+            transform.worldMatrix = this._worldMatrix;
         }
 
         return transform;

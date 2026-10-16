@@ -1,5 +1,5 @@
 {
-    "version": "v1.0141",
+    "version": "v1.0147",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -96,6 +96,7 @@
         "js": [
             "/js/engine/entity/abstractLoadedEntity.js",
             "/js/engine/entity/instance.js",
+            "/js/engine/entity/animatedModel.js",
             "/js/engine/entity/interaction.js",
             "/js/engine/entity/face.js",
             "/js/engine/entity/light.js",
@@ -114,6 +115,8 @@
             "/js/engine/loader/object3dLoader.js",
             "/js/engine/loader/textureLoader.js",
             "/js/engine/loader/worldLoader.js",
+            "/js/engine/loader/gltfParser.js",
+            "/js/engine/loader/animatedModelLoader.js",
             "/js/engine/sound/soundEngine.js",
             "/js/engine/sound/soundSample.js",
             "/js/engine/sound/soundSampleLoader.js",
@@ -126,6 +129,18 @@
             "/js/engine/sound/soundSynth.js",
             "/js/engine/loader.js",
             "/js/engine/matrix.js",
+            "/js/engine/animation/mat4.js",
+            "/js/engine/animation/quaternion.js",
+            "/js/engine/animation/skeleton.js",
+            "/js/engine/animation/skeletonPose.js",
+            "/js/engine/animation/animationSampler.js",
+            "/js/engine/animation/animationChannel.js",
+            "/js/engine/animation/animationEvent.js",
+            "/js/engine/animation/animationClip.js",
+            "/js/engine/animation/skeletonSocket.js",
+            "/js/engine/animation/skinnedMesh.js",
+            "/js/engine/animation/animationPlayer.js",
+            "/js/engine/animation/animatedInstance.js",
             "/js/engine/zBuffer.js",
             "/js/engine/renderer/faceDepthQueue.js",
             "/js/engine/renderer/object3dRendererBase.js",

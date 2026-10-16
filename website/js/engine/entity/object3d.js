@@ -154,28 +154,7 @@ class Object3d extends AbstractLoadedEntity {
     }
 
     finalizeInit() {
-        const n = this.ptCount;
-        if (n > 0) {
-            let cx = 0, cy = 0, cz = 0;
-            for (let i = 0; i < n; i++) {
-                cx += this.ptOrigin[i][0];
-                cy += this.ptOrigin[i][1];
-                cz += this.ptOrigin[i][2];
-            }
-            cx /= n; cy /= n; cz /= n;
-            this._center = [cx, cy, cz];
-            let r = 0;
-            for (let i = 0; i < n; i++) {
-                const d = (this.ptOrigin[i][0]-cx)**2 + (this.ptOrigin[i][1]-cy)**2 + (this.ptOrigin[i][2]-cz)**2;
-                if (d > r) {
-                    r = d;
-                }
-            }
-            this._boundingRadius = Math.sqrt(r);
-        } else {
-            this._center = [0, 0, 0];
-            this._boundingRadius = 0;
-        }
+        this._computeBounds();
 
         this._localNormals = new Float32Array(this.faceCount * 3);
         this._computeLocalNormals();
@@ -193,6 +172,46 @@ class Object3d extends AbstractLoadedEntity {
             ((fc.isAlpha) ? this.alphaFaces : this.opaqueFaces).push(k);
             this._translucent = (this._translucent || translucent);
         }
+    }
+
+    /**
+     * After the vertices were written (a skinned pose): the centre, the bounding radius and the normals follow
+     * them, for the culling and the lighting. The geometry a collision indexed beforehand is not updated.
+     */
+    refreshGeometry() {
+        this._computeBounds();
+        this._computeLocalNormals();
+
+        return this;
+    }
+
+    // The centre is written in place once it exists: a refresh at each frame allocates nothing.
+    _computeBounds() {
+        const n = this.ptCount;
+        this._center = (this._center ?? [0, 0, 0]);
+        if (n === 0) {
+            this._center.fill(0);
+            this._boundingRadius = 0;
+            return;
+        }
+        let cx = 0, cy = 0, cz = 0;
+        for (let i = 0; i < n; i++) {
+            cx += this.ptOrigin[i][0];
+            cy += this.ptOrigin[i][1];
+            cz += this.ptOrigin[i][2];
+        }
+        cx /= n; cy /= n; cz /= n;
+        this._center[0] = cx;
+        this._center[1] = cy;
+        this._center[2] = cz;
+        let r = 0;
+        for (let i = 0; i < n; i++) {
+            const d = (this.ptOrigin[i][0]-cx)**2 + (this.ptOrigin[i][1]-cy)**2 + (this.ptOrigin[i][2]-cz)**2;
+            if (d > r) {
+                r = d;
+            }
+        }
+        this._boundingRadius = Math.sqrt(r);
     }
 
     _computeLocalNormals() {

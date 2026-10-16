@@ -30,6 +30,8 @@ tools/
 website/           the application, served as is
 ```
 
+`website/js/engine/` (Spipu3D, the 3D engine) and `website/js/webapp/` (the PWA core) are copied unchanged from their reference repository, [spipu/3d-engine](https://github.com/spipu/3d-engine), which also holds their checks and examples.
+
 ## Test locally
 
 ```bash

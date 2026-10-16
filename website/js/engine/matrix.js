@@ -4,6 +4,9 @@ class Matrix {
     // then the optional own rotation of the part, the first to turn a vertex:
     // about X, then Y, then Z (a wheel rolls, then steers).
     static composeInstanceTransform(tf) {
+        if (tf.worldMatrix !== undefined) {
+            return Matrix._placedBy(tf.worldMatrix, tf.position);
+        }
         const [px, py, pz]    = tf.position;
         const [irx, iry, irz] = tf.rotation;
         const [dtx, dty, dtz] = tf.deltaTranslate;
@@ -49,6 +52,19 @@ class Matrix {
                 apply('rotationX', prx * DEG_TO_RAD);
             }
         }
+        return m;
+    }
+
+    // The rotation part of a whole matrix (Instance.setWorldMatrix) at the given position.
+    static _placedBy(world, position) {
+        const w = world.v;
+        const m = new Matrix();
+        m.v = [
+            [w[0][0], w[0][1], w[0][2], 0.],
+            [w[1][0], w[1][1], w[1][2], 0.],
+            [w[2][0], w[2][1], w[2][2], 0.],
+            [position[0], position[1], position[2], 1.],
+        ];
         return m;
     }
 
