@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Spipu-Racing — pit crew viewer</title>
+        <meta charset="UTF-8" />
+        <link rel="stylesheet" href="pitCrewViewer.css" />
+    </head>
+    <body>
+        <div id="screen"></div>
+        <div id="controls">
+            <div id="clips"></div>
+            <div id="cars"></div>
+            <div>
+                <button id="play" class="on">Play</button>
+                <button id="previous">◀ image</button>
+                <button id="next">image ▶</button>
+                speed <input id="speed" type="range" min="0.05" max="2" step="0.05" value="1" /> <span id="speedValue">1.00</span>×
+            </div>
+            <div>time <input id="time" type="range" min="0" step="0.01" value="0" /></div>
+            <div>
+                <button id="car" class="on">Car</button>
+                <button id="loop" class="on">Loop</button>
+                drag: turn · wheel: zoom
+            </div>
+            <div id="state"></div>
+        </div>
+        <script src="/website/js/webapp/appBootstrap.js"></script>
+        <script src="main.js"></script>
+    </body>
+</html>

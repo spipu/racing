@@ -1,0 +1,8 @@
+html, body          { margin: 0; background: #1E2228; overflow: hidden; font-family: Helvetica, Arial, sans-serif; }
+#screen             { width: 100vw; height: 100vh; }
+#controls           { position: fixed; top: 8px; left: 8px; z-index: 10; max-width: 600px; padding: 8px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.65); color: #EEE; font-size: 13px; line-height: 1.9; }
+#controls button    { margin-right: 4px; padding: 2px 8px; border: 1px solid #6FB7EA; border-radius: 4px; background: #2C3A48; color: #EEE; font-size: 13px; }
+#controls button.on { background: #6FB7EA; color: #111; }
+#controls input     { vertical-align: middle; }
+#time               { width: 300px; }
+#state              { color: #FFD27A; font-family: monospace; font-size: 12px; white-space: pre; }

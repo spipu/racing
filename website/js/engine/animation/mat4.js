@@ -73,6 +73,23 @@ class Mat4 {
     }
 
     /**
+     * Reads a Matrix into a Mat4.
+     *
+     * @param {Float32Array} out
+     * @param {Matrix}       matrix
+     */
+    static fromMatrix(out, matrix) {
+        for (let i = 0; i < Mat4.ORDER; i++) {
+            const row = matrix.v[i];
+            for (let j = 0; j < Mat4.ORDER; j++) {
+                out[(Mat4.ORDER * i) + j] = row[j];
+            }
+        }
+
+        return out;
+    }
+
+    /**
      * a then b: a row vector times out is the vector times a, then times b. out may be a or b.
      */
     static multiply(out, a, b) {

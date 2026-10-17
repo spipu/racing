@@ -84,6 +84,46 @@ class Quaternion {
     }
 
     /**
+     * The rotation of a Mat4 without scale (the inverse of Mat4.fromTranslationRotationScale with a unit scale).
+     *
+     * @param {Float32Array} m
+     */
+    static fromMat4(out, oo, m) {
+        // m[4i + j] is the column-vector rotation's element (j, i).
+        const r00   = m[0];
+        const r11   = m[5];
+        const r22   = m[10];
+        const trace = (r00 + r11 + r22);
+        if (trace > 0) {
+            const s = (2 * Math.sqrt(trace + 1));
+            out[oo]     = ((m[6] - m[9]) / s);
+            out[oo + 1] = ((m[8] - m[2]) / s);
+            out[oo + 2] = ((m[1] - m[4]) / s);
+            out[oo + 3] = (s / 4);
+        } else if ((r00 > r11) && (r00 > r22)) {
+            const s = (2 * Math.sqrt(1 + r00 - r11 - r22));
+            out[oo]     = (s / 4);
+            out[oo + 1] = ((m[4] + m[1]) / s);
+            out[oo + 2] = ((m[8] + m[2]) / s);
+            out[oo + 3] = ((m[6] - m[9]) / s);
+        } else if (r11 > r22) {
+            const s = (2 * Math.sqrt(1 + r11 - r00 - r22));
+            out[oo]     = ((m[4] + m[1]) / s);
+            out[oo + 1] = (s / 4);
+            out[oo + 2] = ((m[9] + m[6]) / s);
+            out[oo + 3] = ((m[8] - m[2]) / s);
+        } else {
+            const s = (2 * Math.sqrt(1 + r22 - r00 - r11));
+            out[oo]     = ((m[8] + m[2]) / s);
+            out[oo + 1] = ((m[9] + m[6]) / s);
+            out[oo + 2] = (s / 4);
+            out[oo + 3] = ((m[1] - m[4]) / s);
+        }
+
+        return Quaternion.normalize(out, oo);
+    }
+
+    /**
      * The rotation of Instance.setRotation([x, y, z]): a vertex turns about y, then z, then x
      * (Matrix.composeInstanceTransform).
      *

@@ -1,14 +1,17 @@
 /**
- * Reads an animated model from glTF 2.0 (a .gltf and its single .bin):
- * nodes, one skinned mesh in triangles, its skin, animations, materials, and
- * in extras the sockets of a joint node ({sockets: [{name, translation,
- * rotation}]}), the events of an animation ({events: [{time, name, data}]})
- * and anything else of a material (paletteIndex…). Anything outside this
- * subset is refused with an error that names it.
+ * Reads a model from glTF 2.0 (a .gltf and its single .bin), in one of two
+ * subsets; anything outside them is refused with an error that names it.
+ *   - animated (parse): nodes, one skinned mesh in triangles, its skin,
+ *     animations, materials, and in extras the sockets of a joint node
+ *     ({sockets: [{name, translation, rotation}]}), the events of an animation
+ *     ({events: [{time, name, data}]}) and anything else of a material
+ *     (paletteIndex…);
+ *   - static (parseStatic): one mesh in triangles, no skin, its materials.
  *
  * glTF is right-handed, the engine left-handed: x is negated on reading
- * (vertices, translations, inverse bind matrices; quaternions get -y and -z;
- * the triangles turn the other way).
+ * (vertices, translations, inverse bind matrices, and the translation and
+ * rotation an event's data may carry; quaternions get -y and -z; the
+ * triangles turn the other way).
  */
 class GltfParser {
     /**
@@ -21,6 +24,15 @@ class GltfParser {
         return new GltfParser(gltf, binary)._parse();
     }
 
+    /**
+     * @param {object}      gltf   - the .gltf JSON
+     * @param {ArrayBuffer} binary - the content of buffers[0]
+     * @returns {{mesh: ModelMesh, materials: object[]}} - the data of StaticModel.populate
+     */
+    static parseStatic(gltf, binary) {
+        return new GltfParser(gltf, binary)._parseStatic();
+    }
+
     constructor(gltf, binary) {
         this._gltf     = gltf;
         this._binary   = binary;
@@ -30,6 +42,7 @@ class GltfParser {
 
     _parse() {
         this._checkSubset();
+        GltfParser._check(((this._gltf.skins ?? []).length === 1), 'exactly one skin expected');
         const skinned     = this._skinnedNode();
         const skin        = this._gltf.skins[skinned.skin];
         const order       = this._jointOrder(skin);
@@ -38,11 +51,26 @@ class GltfParser {
 
         return {
             skeleton:  this._skeleton(skin, order, jointOfNode),
-            mesh:      this._mesh(this._gltf.meshes[skinned.mesh], skinToJoint),
-            materials: (this._gltf.materials ?? []).map((material, i) => this._material(material, i)),
+            mesh:      this._skinnedMesh(this._gltf.meshes[skinned.mesh], skinToJoint),
+            materials: this._materials(),
             clips:     (this._gltf.animations ?? []).map((animation, i) => this._clip(animation, i, jointOfNode)),
             sockets:   order.flatMap((node, joint) => this._sockets(this._nodes[node], joint)),
         };
+    }
+
+    // The node carrying the mesh, and every node above it, must not move it: the mesh is read as it is.
+    _parseStatic() {
+        this._checkSubset();
+        GltfParser._check(((this._gltf.skins ?? []).length === 0), 'a static model has no skin');
+        const meshes = this._nodes.map((node, index) => [node, index]).filter(([node]) => (node.mesh !== undefined));
+        GltfParser._check((meshes.length === 1), 'exactly one mesh expected');
+        const [node, index] = meshes[0];
+        for (let at = index; at !== undefined; at = this._parentOf.get(at)) {
+            GltfParser._check(GltfParser._isIdentity(this._nodes[at]), 'node ' + at + ' must not move the mesh');
+        }
+        const {positions, faces} = this._primitives(this._gltf.meshes[node.mesh], null);
+
+        return {mesh: new ModelMesh({positions: new Float32Array(positions), faces: faces}), materials: this._materials()};
     }
 
     _checkSubset() {
@@ -52,7 +80,6 @@ class GltfParser {
             GltfParser._check(((gltf[key] ?? []).length === 0), '"' + key + '" is not supported');
         }
         GltfParser._check(((gltf.buffers ?? []).length === 1), 'exactly one buffer expected');
-        GltfParser._check(((gltf.skins ?? []).length === 1), 'exactly one skin expected');
     }
 
     // The one node that carries the mesh and its skin.
@@ -130,8 +157,19 @@ class GltfParser {
         return -1;
     }
 
-    // Every primitive in one mesh, triangle indices turned the other way.
-    _mesh(mesh, skinToJoint) {
+    _skinnedMesh(mesh, skinToJoint) {
+        const {positions, joints, weights, faces} = this._primitives(mesh, skinToJoint);
+
+        return new SkinnedMesh({positions: new Float32Array(positions), joints: new Uint16Array(joints), weights: new Float32Array(weights), faces: faces});
+    }
+
+    /**
+     * Every primitive in one mesh, triangle indices turned the other way; joints and weights only when skinned.
+     *
+     * @param {object}     mesh
+     * @param {int[]|null} skinToJoint - null: a static mesh
+     */
+    _primitives(mesh, skinToJoint) {
         const positions = [];
         const joints    = [];
         const weights   = [];
@@ -143,20 +181,28 @@ class GltfParser {
             for (const name of Object.keys(primitive.attributes)) {
                 GltfParser._check(GltfParser.ATTRIBUTES.includes(name), 'primitive ' + p + ': attribute ' + name + ' is not supported');
             }
-            const first  = (positions.length / SkinnedMesh.POSITION_SIZE);
+            const first  = (positions.length / ModelMesh.POSITION_SIZE);
             const points = this._floats(primitive.attributes.POSITION, GltfParser.VEC3);
-            for (let i = 0; i < points.length; i += SkinnedMesh.POSITION_SIZE) {
+            for (let i = 0; i < points.length; i += ModelMesh.POSITION_SIZE) {
                 positions.push(-points[i], points[i + 1], points[i + 2]);
             }
-            this._accessor(primitive.attributes.JOINTS_0, GltfParser.VEC4).forEach((k) => joints.push(skinToJoint[k]));
-            this._floats(primitive.attributes.WEIGHTS_0, GltfParser.VEC4).forEach((weight) => weights.push(weight));
-            const indices = ((primitive.indices === undefined) ? [...Array(points.length / SkinnedMesh.POSITION_SIZE).keys()] : [...this._accessor(primitive.indices, GltfParser.SCALAR)]);
+            if (skinToJoint !== null) {
+                this._accessor(primitive.attributes.JOINTS_0, GltfParser.VEC4).forEach((k) => joints.push(skinToJoint[k]));
+                this._floats(primitive.attributes.WEIGHTS_0, GltfParser.VEC4).forEach((weight) => weights.push(weight));
+            } else {
+                GltfParser._check(((primitive.attributes.JOINTS_0 === undefined) && (primitive.attributes.WEIGHTS_0 === undefined)), 'primitive ' + p + ': joints and weights without a skin');
+            }
+            const indices = ((primitive.indices === undefined) ? [...Array(points.length / ModelMesh.POSITION_SIZE).keys()] : [...this._accessor(primitive.indices, GltfParser.SCALAR)]);
             for (let i = 0; i < indices.length; i += GltfParser.TRIANGLE) {
                 faces.push({indices: [(first + indices[i]), (first + indices[i + 2]), (first + indices[i + 1])], material: primitive.material});
             }
         });
 
-        return new SkinnedMesh({positions: new Float32Array(positions), joints: new Uint16Array(joints), weights: new Float32Array(weights), faces: faces});
+        return {positions, joints, weights, faces};
+    }
+
+    _materials() {
+        return (this._gltf.materials ?? []).map((material, i) => this._material(material, i));
     }
 
     _material(material, i) {
@@ -180,7 +226,7 @@ class GltfParser {
 
             return new AnimationChannel(new AnimationSampler(this._floats(sampler.input, GltfParser.SCALAR), values, (sampler.interpolation ?? AnimationSampler.LINEAR), AnimationChannel.SIZES[path], (path === AnimationChannel.ROTATION)), jointOfNode.get(node), path);
         });
-        const events = (animation.extras?.events ?? []).map((event) => new AnimationEvent(event.time, event.name, (event.data ?? {})));
+        const events = (animation.extras?.events ?? []).map((event) => new AnimationEvent(event.time, event.name, GltfParser._eventData(event.data ?? {})));
 
         return new AnimationClip((animation.name ?? (GltfParser.ANIMATION_NAME + i)), channels, events);
     }
@@ -245,6 +291,19 @@ class GltfParser {
         }
 
         return values;
+    }
+
+    // An event's data, its translation and rotation (glTF conventions) turned to the engine's handedness.
+    static _eventData(data) {
+        const out = {...data};
+        if (data.translation !== undefined) {
+            out.translation = [...GltfParser._translation(data.translation)];
+        }
+        if (data.rotation !== undefined) {
+            out.rotation = [...GltfParser._rotation(data.rotation)];
+        }
+
+        return out;
     }
 
     static _translation(t) {

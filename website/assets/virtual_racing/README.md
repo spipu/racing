@@ -26,6 +26,25 @@ only (see `LICENSE.md`).
 | `physics.json` | Tables of the player car physics: gear ratios and shift points, torque curves, sine quarter wave, crash recovery; per car: parameters (named after the RAM variables they are loaded into), gears, drag tables and maximum speeds by gearbox, wheel probe offsets, hitbox, camera view transitions (playback order) |
 | `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`), per-course section tables and lap time corrections at the line and the checkpoints, the music command after a checkpoint by laps done (`checkpointJingles`, mode Virtua Racing), the pit (`pit`: the 4 mechanics' animation frames of 4 models, where they stand by course and car, the pit boxes) and the mechanics' models (`pitModels`, car scale) |
 
+## Pit crew models (`models/`)
+
+The mechanics are not exported: they were converted once from the ROM's animation frames (`race.json` `pit`,
+`pitModels`) into glTF 2.0 files, which are now their own source (no tool rebuilds them). Each file states its
+origin and the private use in its `asset`.
+
+| File | Content |
+|---|---|
+| `pit_mechanic.gltf` / `.bin` | The mechanic: one skinned body (13 bones, the ROM's pieces closed, its feet given a volume), sockets `wrench` (right forearm) and `wheel` (left forearm), one clip by place (`rearRight`, `frontRight`, `rearLeft`, `frontLeft`: 28 cubic keys at the original images' first ticks) with its events |
+| `pit_wrench.gltf` / `.bin` | The wheel gun the mechanic holds: the ROM's flat blue kite given a volume |
+
+Conventions: glTF axes and metres (the game reads them into its own, as any glTF); colours by palette index
+(`materials[].extras.paletteIndex`, the course palette). The events of a clip (`animations[].extras.events`, at the
+original ticks): `pickUp` / `putDown` of an object (`wrench`, `removedWheel`, `newWheel`) with its `socket`, its
+`transition` (seconds) and its place (`translation` / `rotation`: an object's frame on the mechanic's space, a wheel's
+on the ground, lifted by the game to rest on it), or `from` / `to: 'hub'` (the car's wheel at its hub); `wheelOff`,
+`wheelOn`, `repaired`, `finished`, `wrench` (a burst of the gun). The wheels handled are the car's own, made by the
+game (`RacingWheelModels`): their frame is the car's at the hub, axis on x, outer face towards +x.
+
 ## Model format
 
 `{v, f}`: `v` is the flat list of vertex coordinates `x, y, z` (signed 16-bit;

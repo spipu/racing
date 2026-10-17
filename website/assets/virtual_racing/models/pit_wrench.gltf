@@ -1,0 +1,96 @@
+{
+ "asset": {
+  "version": "2.0",
+  "generator": "Spipu-Racing pit crew converter (from the Virtua Racing Deluxe ROM, kept as the model source)",
+  "copyright": "Derived from Virtua Racing Deluxe data (c) SEGA 1994; private use only"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "name": "pit_wrench",
+   "mesh": 0
+  }
+ ],
+ "meshes": [
+  {
+   "name": "pit_wrench",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0
+     },
+     "indices": 1,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "materials": [
+  {
+   "name": "palette105",
+   "pbrMetallicRoughness": {
+    "baseColorFactor": [
+     0,
+     0,
+     0.6451612903225806,
+     1
+    ],
+    "metallicFactor": 0,
+    "roughnessFactor": 1
+   },
+   "doubleSided": false,
+   "extras": {
+    "paletteIndex": 105
+   }
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 120,
+   "uri": "pit_wrench.bin"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteOffset": 0,
+   "byteLength": 72
+  },
+  {
+   "buffer": 0,
+   "byteOffset": 72,
+   "byteLength": 48
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "type": "VEC3",
+   "count": 6,
+   "min": [
+    -0.234619140625,
+    -0.226806640625,
+    -0.0390625
+   ],
+   "max": [
+    0.301513671875,
+    0.197998046875,
+    0.0390625
+   ]
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5123,
+   "type": "SCALAR",
+   "count": 24
+  }
+ ]
+}

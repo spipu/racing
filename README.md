@@ -22,11 +22,13 @@ A PWA racing game after Virtua Racing Deluxe (Sega 32X). Personal project, not d
 ```
 bench/             reference traces of the original game, recording and comparison of the physics and of the race
 ├── recorder/      trace recorder (libretro front end in C for PicoDrive)
+├── goldens/       measures a check must not exceed (the pit mechanic's speed jumps)
 ├── scenarios/     input scenarios replayed in the original game
 └── traces/        recorded traces (one JSON line per frame, gzip)
 tools/
 ├── export/        exporter of the ROM data to website/assets/virtual_racing/
-└── icon/          icon set generation from website/icon/icon.svg
+├── icon/          icon set generation from website/icon/icon.svg
+└── pitCrewViewer/ viewer of the pit crew models around the cars
 website/           the application, served as is
 ```
 
@@ -69,6 +71,16 @@ node bench/compareRace.js race_big_forest --show 1-30  # the detail of chosen ti
 ```
 
 Replays a whole race (start, laps, checkpoints, pit stop, finish) and compares tick by tick what the player sees and hears: start signs, lights, mechanics, messages, checkpoint gaps, pit stop, blinds, race sounds, lap times and the arrival of the results. The recorded races cover the five courses and a race with a pit stop; all must come out `identical`.
+
+## Pit crew models
+
+```bash
+node bench/pitMechanic.js            # speed jumps of the mechanic's clips against their goldens
+node bench/pitMechanic.js --update   # writes the goldens again, for a wanted change of the model only
+python3 -m http.server 8085          # from the repository root, then http://localhost:8085/tools/pitCrewViewer/
+```
+
+The mechanics and their wheel gun are glTF files of `website/assets/virtual_racing/models/`, converted once from the original's animation frames. The bench samples each clip every 0.1 ms and fails when a joint or a socket changes speed more sharply than its golden. The viewer plays one mechanic or the four around each car, at any time, image by image or at any speed.
 
 ## Data of the original game
 

@@ -1,0 +1,58 @@
+{
+    "rearRight": {
+        "position": {
+            "change": 0.01488978330655074,
+            "ratio": 0.0015190586399335142,
+            "time": 0.0002,
+            "node": "socket wheel"
+        },
+        "axes": {
+            "change": 0.04171764532606025,
+            "ratio": 0.0017175497691316968,
+            "time": 0.1363,
+            "node": "socket wheel"
+        }
+    },
+    "frontRight": {
+        "position": {
+            "change": 0.015363613419123996,
+            "ratio": 0.0011978389959280832,
+            "time": 0.3635,
+            "node": "footLeft"
+        },
+        "axes": {
+            "change": 0.04465076333545055,
+            "ratio": 0.001777411785549712,
+            "time": 0.3558,
+            "node": "shinLeft"
+        }
+    },
+    "rearLeft": {
+        "position": {
+            "change": 0.020684384249381196,
+            "ratio": 0.001706139157607021,
+            "time": 5.4949,
+            "node": "socket wrench"
+        },
+        "axes": {
+            "change": 0.06250344745085674,
+            "ratio": 0.0021070067912670543,
+            "time": 5.4975000000000005,
+            "node": "upperArmRight"
+        }
+    },
+    "frontLeft": {
+        "position": {
+            "change": 0.010472169807021581,
+            "ratio": 0.0013640890283997723,
+            "time": 4.3848,
+            "node": "socket wheel"
+        },
+        "axes": {
+            "change": 0.03215841847961808,
+            "ratio": 0.0016606562372687662,
+            "time": 4.5,
+            "node": "upperArmLeft"
+        }
+    }
+}
