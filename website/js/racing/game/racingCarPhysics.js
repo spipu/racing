@@ -120,6 +120,10 @@ class RacingCarPhysics {
         this.pitCrewFrame = -1;
         this.pitCrewAway  = 0;
         this._pitArrival  = false;
+        // The game's crew sets the length of the work and repairs the car (releaseFromPit, setDamage); false: the
+        // original's 120 ticks, repaired at frame 20 (the reference of the benches).
+        this.pitWorkByCrew = false;
+        this._pitReleased  = false;
         this.raceFlags    = 0;      // $C30E, set by the race: bit 4 started, bit 5 finished (bits 5 and 0 close the pits)
         // Laps ($7F50): laps done +$2C, line crossings +$2E, best progress of the lap +$28, progress of the tick
         // before +$26, laps of the race $C310; distance past the section point along the road +$E2 ($764E).
@@ -546,11 +550,20 @@ class RacingCarPhysics {
         this._forces();
     }
 
-    // $AB88: the work, 120 ticks; the damage is repaired at frame 20 of the mechanics.
+    // $AB88: the work, 120 ticks; the damage is repaired at frame 20 of the mechanics. Worked by the game's crew, the
+    // car leaves at the end of the tick its crew is done in, as the countdown of the original ends it.
     _pitWork() {
         if (this._pitArrival) {
             this._forces();
             this._pitArrival = !this._atTickEnd();
+            return;
+        }
+        if (this.pitWorkByCrew) {
+            if (this._pitReleased && this._atTickEnd()) {
+                this._pitReleased = false;
+                this.pitState     = RacingCarPhysics.PIT_LEAVING;
+            }
+            this._idleRpm();
             return;
         }
         this.pitCrewFrame = RacingCarPhysics.crewFrame(RacingCarPhysics.PIT_WORK_TICKS - this.pitTicks);
@@ -1513,6 +1526,15 @@ class RacingCarPhysics {
         if (this.damaging && (this.damage < RacingCarPhysics.DAMAGE_MAX)) {
             this.setDamage(this.damage + 1);
         }
+    }
+
+    /**
+     * The game's crew is done (pitWorkByCrew): the car leaves the box at the end of the tick.
+     */
+    releaseFromPit() {
+        this._pitReleased = (this.pitState === RacingCarPhysics.PIT_WORK);
+
+        return this;
     }
 
     /**

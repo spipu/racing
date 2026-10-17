@@ -31,6 +31,7 @@ class RacingGame {
         this._controls  = null;
         this._crew      = null;
         this._crewVoice = null;
+        this._crewDone  = {repaired: 0, finished: 0, releaseIn: null};
         this._race      = null;
         this._engineSound    = null;
         this._hud            = null;
@@ -148,6 +149,8 @@ class RacingGame {
         result.damaging = true;
         // After a wall or a crash the player steers (user decision: the original drives the car back to its line 2 s).
         result.drivenBackOnTrack = false;
+        // The crew's own pace sets the stop, its last mechanic the repair (user decision: the original works 120 ticks).
+        result.pitWorkByCrew = true;
 
         return result.place(x, height, z, heading);
     }
@@ -174,7 +177,9 @@ class RacingGame {
             .setOnWheel((wheel, off) => this._car.setWheelOff(wheel, off))
             .setOnWrench((mechanic) => {
                 this._crewVoice ??= (RacingGame.CREW_VOICE + mechanic);
-            });
+            })
+            .setOnRepaired(() => this._crewRepaired())
+            .setOnFinished(() => this._crewFinished());
         if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
         }
@@ -424,13 +429,40 @@ class RacingGame {
         if (this._crewVoice !== null) {
             racingSound.send(RacingRaceControl.SOUND_WRENCH, this._crewVoice);
         }
+        const done = this._crewDone;
+        if (done.releaseIn !== null) {
+            done.releaseIn -= ticks;
+            if (done.releaseIn <= 0) {
+                done.releaseIn = null;
+                this._physics.releaseFromPit();
+            }
+        }
     }
 
-    // The crew starts with the pit start sequence or the work of a stop, on the car's wheels as just placed.
+    // The car repaired once the last mechanic reaches the repair (the original's frame 20, $AB88).
+    _crewRepaired() {
+        this._crewDone.repaired++;
+        if ((this._crewDone.repaired === RacingPitCrew.CLIPS.length) && (this._physics.damage !== 0)) {
+            this._physics.setDamage(0);
+        }
+    }
+
+    // The car leaves 4 ticks after the last mechanic is done, as the original after its last frame (tick 116 of 120).
+    _crewFinished() {
+        this._crewDone.finished++;
+        if (this._crewDone.finished === RacingPitCrew.CLIPS.length) {
+            this._crewDone.releaseIn = ((RacingPitCrewSchedule.RELEASE_DELAY * RacingGame.MS_PER_SECOND) / RacingGame.TICK_MS);
+        }
+    }
+
+    // The crew starts with the pit start sequence, all at once as the original, or the work of a stop, each mechanic
+    // as drawn; on the car's wheels as just placed.
     _startCrew() {
         const physics = this._physics;
         if (!this._crew.isStarted() && (physics.pitCrewFrame >= 0) && (this._race.crewRunning || (physics.pitState === RacingCarPhysics.PIT_WORK))) {
-            this._crew.start(RacingPitCrewSchedule.start(), RacingGame.WHEELS.map((wheel) => this._car.hubMatrix(wheel, Mat4.create())));
+            const schedule = ((this._race.crewRunning) ? RacingPitCrewSchedule.start() : RacingPitCrewSchedule.draw(Math.random));
+            this._crewDone = {repaired: 0, finished: 0, releaseIn: null};
+            this._crew.start(schedule, RacingGame.WHEELS.map((wheel) => this._car.hubMatrix(wheel, Mat4.create())));
         }
     }
 
@@ -527,6 +559,7 @@ RacingGame.HEIGHT_UNITS_PER_SCENERY_UNIT  = 8;
 RacingGame.CAR_UNITS_PER_SCENERY_UNIT     = 32;
 RacingGame.ANGLE_UNITS                    = 65536;
 RacingGame.TICK_MS                        = 50;
+RacingGame.MS_PER_SECOND                  = 1000;
 RacingGame.VIRTUAL_WIDTH                  = 1920;
 RacingGame.VIRTUAL_HEIGHT                 = 1080;
 RacingGame.NEAR                           = 0.5;

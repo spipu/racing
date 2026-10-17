@@ -79,7 +79,7 @@ class PitCrewViewer {
         this._chooseCar(cars.cars[0].code);
         let last = null;
         const frame = (timestamp) => {
-            const dt = ((last === null) ? 0 : Math.min(((timestamp - last) / PitCrewViewer.MS_PER_SECOND), PitCrewViewer.LONGEST_FRAME));
+            const dt = ((last === null) ? 0 : Math.min(((timestamp - last) / RacingGame.MS_PER_SECOND), PitCrewViewer.LONGEST_FRAME));
             last = timestamp;
             this._step((this._playing) ? (dt * this._speed) : 0);
             this._draw();
@@ -120,7 +120,7 @@ class PitCrewViewer {
 
     _advance(seconds) {
         this._time += seconds;
-        this._scene.crew.update((seconds * PitCrewViewer.MS_PER_SECOND) / RacingGame.TICK_MS);
+        this._scene.crew.update((seconds * RacingGame.MS_PER_SECOND) / RacingGame.TICK_MS);
     }
 
     // The car still on the box, as the game places it at the pit start.
@@ -263,7 +263,7 @@ class PitCrewViewer {
 
     // Time of an image of the original: its first tick, image = (ticks x $3BBB) >> 16 (RacingCarPhysics.crewFrame).
     static _keyTime(image) {
-        return ((Math.ceil((image * PitCrewViewer.FRAME_ONE) / PitCrewViewer.FRAME_RATE) * RacingGame.TICK_MS) / PitCrewViewer.MS_PER_SECOND);
+        return ((Math.ceil((image * PitCrewViewer.FRAME_ONE) / PitCrewViewer.FRAME_RATE) * RacingGame.TICK_MS) / RacingGame.MS_PER_SECOND);
     }
 
     static _imageAt(time) {
@@ -289,7 +289,6 @@ PitCrewViewer.DURATION          = 5.8;
 PitCrewViewer.FRAME_RATE        = 0x3BBB;
 PitCrewViewer.FRAME_ONE         = 0x10000;
 PitCrewViewer.TIME_EPSILON      = 1e-6;
-PitCrewViewer.MS_PER_SECOND     = 1000;
 // Seconds between two updates when going to a time.
 PitCrewViewer.SEEK_STEP         = (1 / 60);
 PitCrewViewer.LONGEST_FRAME     = 0.05;

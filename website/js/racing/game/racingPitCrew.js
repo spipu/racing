@@ -180,7 +180,7 @@ class RacingPitCrew {
      * @param {number} ticks - time elapsed, in original ticks (0 under the pause)
      */
     update(ticks) {
-        const seconds = ((ticks * RacingGame.TICK_MS) / RacingPitCrew.MS_PER_SECOND);
+        const seconds = ((ticks * RacingGame.TICK_MS) / RacingGame.MS_PER_SECOND);
         for (const mechanic of this._mechanics) {
             this._update(mechanic, seconds);
         }
@@ -287,7 +287,6 @@ RacingPitCrew.WRENCH_FILE   = 'models/pit_wrench.gltf';
 RacingPitCrew.HUB           = 'hub';
 // The wheel gun, as the clips' events name it.
 RacingPitCrew.WRENCH        = 'wrench';
-RacingPitCrew.MS_PER_SECOND = 1000;
 // Where a Mat4 holds the height of its translation, and what each of a point's x, y and z adds to it.
 RacingPitCrew.HEIGHT        = 13;
 RacingPitCrew.HEIGHT_COLUMN = [1, 5, 9];

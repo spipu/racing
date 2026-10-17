@@ -10,7 +10,9 @@
  * them: the wheel gun every tick of frames 4 and 22, the wheel taken off at frame 7, put back at frame 19, the repair
  * at frame 20, the end at frame 27. Played at the steps of the game's frames (16.7 ms, 33.3 ms), the events of each
  * mechanic come in the same order, each in the frame its tick falls in (each step played a hair long, against the
- * floating sums falling short of a tick). Around each car placed on its box (RacingCarView), mirrored or not, the
+ * floating sums falling short of a tick). With schedules of a stop fixed (RacingPitCrewSchedule: a delay and an end
+ * for each mechanic), the events keep their order, and the last repair and the last end fall when the schedule says
+ * (repairedAt, finishedAt; releaseAt 0.2 s later), within a frame. Around each car placed on its box (RacingCarView), mirrored or not, the
  * wheel each mechanic takes off and puts back is exactly on the car's hub, its hand near it. Exits with 1 on a failure.
  */
 
@@ -91,6 +93,12 @@ const LAST_TICK       = 130;
 const TICK_EPSILON    = 1e-6;
 // Each step played a hair long: a sum of floating steps must not fall short of a tick and hear its event one late.
 const STEP_LEAD       = 1e-9;
+// Stops' schedules: each mechanic's delay and end (s), within the drawn ranges and at their bounds.
+const SCHEDULES = [
+    {delays: [0, 0.1, 0.25, 0.5], ends: [5.3, 5.8, 6.3, 6.0]},
+    {delays: [0.5, 0.5, 0, 0], ends: [6.3, 5.3, 5.3, 6.3]},
+    {delays: [0.37, 0.02, 0.44, 0.19], ends: [5.61, 6.12, 5.94, 5.47]},
+];
 
 class PitCrewBench {
     constructor() {
@@ -127,6 +135,12 @@ class PitCrewBench {
                 this._equal(label(n) + 'same events, same order', events.map((event) => event.name).join(' '), original.map((event) => event.name).join(' '));
                 this._equal(label(n) + 'each in the frame of its tick', late.length, 0);
             });
+        }
+        for (const [k, times] of SCHEDULES.entries()) {
+            const schedule = new this.RacingPitCrewSchedule(times.delays, times.ends.map((end, n) => (this.RacingPitCrewSchedule.CLIP_END / (end - times.delays[n]))));
+            for (const step of GAME_STEPS) {
+                this._onSchedule(crew, schedule, step, original, ('schedule ' + (k + 1) + ' at ' + (step * this.RacingGame.TICK_MS).toFixed(1) + ' ms'));
+            }
         }
         for (const code of CARS) {
             for (const mirror of [false, true]) {
@@ -188,8 +202,21 @@ class PitCrewBench {
         this._check(label + ': wheels on the hubs (' + worst.gap.toFixed(4) + ' m), hands near (' + worst.reach.toFixed(2) + ' m)', ((worst.gap < HUB_GAP) && (worst.reach < HAND_REACH)));
     }
 
+    // A stop's schedule played at a step: each mechanic's events in the original's order; the last repair and the last
+    // end in the frame the schedule puts them in.
+    _onSchedule(crew, schedule, step, original, label) {
+        const heard   = this._play(crew, step, schedule);
+        const seconds = (ticks) => ((ticks * this.RacingGame.TICK_MS) / this.RacingGame.MS_PER_SECOND);
+        const frame   = (seconds(step) + TICK_EPSILON);
+        const last    = (name) => Math.max(...heard.map((events) => seconds(events.find((event) => (event.name === name)).at)));
+        const inFrame = (at, expected) => ((at >= (expected - TICK_EPSILON)) && ((at - frame) < expected));
+        this._check(label + ': each mechanic\'s events in the original\'s order', heard.every((events) => (events.map((event) => event.name).join(' ') === original.map((event) => event.name).join(' '))));
+        this._check(label + ': repaired at ' + schedule.repairedAt().toFixed(3) + ' s (heard ' + last('repaired').toFixed(3) + '), done at ' + schedule.finishedAt().toFixed(3) + ' s (heard ' + last('finished').toFixed(3) + '), released at ' + schedule.releaseAt().toFixed(3) + ' s',
+            (inFrame(last('repaired'), schedule.repairedAt()) && inFrame(last('finished'), schedule.finishedAt()) && (Math.abs(schedule.releaseAt() - schedule.finishedAt() - this.RacingPitCrewSchedule.RELEASE_DELAY) < TICK_EPSILON)));
+    }
+
     // Each mechanic's events played from the start at a step: {name, at (ticks played when heard)}.
-    _play(crew, step) {
+    _play(crew, step, schedule = this.RacingPitCrewSchedule.start()) {
         const heard = this.RacingPitCrew.CLIPS.map(() => []);
         let at      = 0;
         const hear  = (n, name) => heard[n].push({name: name, at: at});
@@ -199,8 +226,9 @@ class PitCrewBench {
             .setOnRepaired((n) => hear(n, 'repaired'))
             .setOnFinished((n) => hear(n, 'finished'))
             .show(true)
-            .start(this.RacingPitCrewSchedule.start(), this.RacingPitCrew.CLIPS.map(() => this.Mat4.create()));
-        while (at < LAST_TICK) {
+            .start(schedule, this.RacingPitCrew.CLIPS.map(() => this.Mat4.create()));
+        const lastTick = (LAST_TICK + ((this.RacingPitCrewSchedule.END_RANGE[1] - this.RacingPitCrewSchedule.CLIP_END) * this.RacingGame.MS_PER_SECOND / this.RacingGame.TICK_MS));
+        while (at < lastTick) {
             at += step;
             crew.update(step + STEP_LEAD);
         }
