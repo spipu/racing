@@ -45,6 +45,7 @@ class RacingGame {
         this._skyId        = null;
         this._rendererCode = null;
         this._side         = ((selection.mirror) ? -1 : 1);
+        this._eyeLean      = 0;
         this._onFrame      = (timestamp) => this._guard(this._frame, timestamp);
         this._onKey        = (event) => {
             if (event.code === 'Escape') {
@@ -523,28 +524,45 @@ class RacingGame {
         ];
         // $2984 turns the camera and the body by the heading plus the shown slip (+$3C + +$96), not by +$40, which a
         // wall deflection swings round.
-        const yaw     = (-RacingGame._degrees(physics.heading + physics.shownSlip) * side);
-        const pitch   = RacingGame._degrees(physics.pitch);
-        const roll    = (RacingGame._degrees(physics.roll) * side);
-        const cockpit = this._camera.isCockpitShown();
-        const pose    = this._bodyPose(physics, side, cockpit);
-        this._car.setCockpit(cockpit)
+        const yaw   = (-RacingGame._degrees(physics.heading + physics.shownSlip) * side);
+        const pitch = RacingGame._degrees(physics.pitch);
+        const roll  = (RacingGame._degrees(physics.roll) * side);
+        const pose  = this._bodyPose(physics, side);
+        this._car.setCockpit(this._camera.isCockpitShown())
             .setDamage(physics.damage)
             .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
             .place(position, yaw, pitch, roll, pose);
-        this._camera.follow(ticks, position, yaw, pitch, roll, ((cockpit) ? pose : null));
+        this._camera.follow(ticks, position, yaw, pitch, roll, pose, this._cockpitLean(ticks, physics, side));
+    }
+
+    // Not in the original (user decision): the cockpit eye leans into the turn like on a motorbike, by the steering
+    // (+$8E) and the speed above 100 km/h; +$8E drops to 0 on release, so the lean then comes back at a bounded rate.
+    _cockpitLean(ticks, physics, side) {
+        const top    = ((physics.maxSpeed * RacingCarPhysics.DISPLAY_FACTOR) >> 8);
+        const share  = Math.max(0, Math.min(1, ((physics.displaySpeed - RacingGame.COCKPIT_LEAN_FROM_KMH) / (top - RacingGame.COCKPIT_LEAN_FROM_KMH))));
+        const steer  = Math.max(-1, Math.min(1, (physics.steer / RacingGame.COCKPIT_LEAN_FULL_STEER)));
+        const target = (-steer * share * RacingGame.COCKPIT_LEAN_DEGREES * side);
+        const lean   = this._eyeLean;
+        if (((lean === 0) || (Math.sign(target) === Math.sign(lean))) && (Math.abs(target) >= Math.abs(lean))) {
+            this._eyeLean = target;
+
+            return target;
+        }
+        const step = ((RacingGame.COCKPIT_LEAN_DEGREES / RacingGame.COCKPIT_LEAN_RETURN_SECONDS) * ((ticks * RacingGame.TICK_MS) / RacingGame.MS_PER_SECOND));
+        this._eyeLean = (lean + Math.max(-step, Math.min(step, (target - lean))));
+
+        return this._eyeLean;
     }
 
     // $2984 / $70AA: a crash lifts the body by +$9C x 16 / 256 m and tumbles it (+$44 pitch); the slip and the shock
-    // yaw it (+$46), the turn and the crash roll it ((+$4A + +$4C) / 4); 1/65536 turn. The cockpit shell ($2ADE) is
-    // lifted and yawed the same, the eye with it (RacingCamera.follow), not tumbled, and only the turn rolls it: +$4C / 2.
-    _bodyPose(physics, side, cockpit) {
+    // yaw it (+$46), the turn and the crash roll it ((+$4A + +$4C) / 4); 1/65536 turn.
+    _bodyPose(physics, side) {
         return {
             lift:  (physics.crashPose[0] / RacingGame.LIFT_UNITS_PER_METRE),
             yaw:   (RacingGame._degrees(physics.bodyYaw) * side),
-            pitch: ((cockpit) ? 0 : RacingGame._degrees(physics.bodyPitch)),
-            roll:  (-RacingGame._degrees((cockpit) ? (physics.slipInput / 2) : ((physics.bodyRoll + physics.slipInput) / 4)) * side)
+            pitch: RacingGame._degrees(physics.bodyPitch),
+            roll:  (-RacingGame._degrees((physics.bodyRoll + physics.slipInput) / 4) * side)
         };
     }
 
@@ -568,6 +586,10 @@ RacingGame.NEAR                           = 0.5;
 RacingGame.FAR                            = 2000;
 RacingGame.COCKPIT_NEAR                   = 0.01;
 RacingGame.COCKPIT_FAR                    = 10;
+RacingGame.COCKPIT_LEAN_DEGREES           = 8;
+RacingGame.COCKPIT_LEAN_RETURN_SECONDS    = 0.25;
+RacingGame.COCKPIT_LEAN_FROM_KMH          = 100;
+RacingGame.COCKPIT_LEAN_FULL_STEER        = (RacingCarPhysics.STEER_SPEED_MAX << 8);
 RacingGame.AMBIENT                        = [255, 255, 255];
 RacingGame.LIFT_UNITS_PER_METRE           = 16;
 RacingGame.METRES_PER_ENTITY_UNIT         = (RacingGame.SCENERY_UNITS_PER_ENTITY_UNIT / RacingGame.SCENERY_UNITS_PER_METRE);
