@@ -523,26 +523,28 @@ class RacingGame {
         ];
         // $2984 turns the camera and the body by the heading plus the shown slip (+$3C + +$96), not by +$40, which a
         // wall deflection swings round.
-        const yaw   = (-RacingGame._degrees(physics.heading + physics.shownSlip) * side);
-        const pitch = RacingGame._degrees(physics.pitch);
-        const roll  = (RacingGame._degrees(physics.roll) * side);
-        const pose  = this._bodyPose(physics, side);
-        this._car.setCockpit(this._camera.isCockpitShown())
+        const yaw     = (-RacingGame._degrees(physics.heading + physics.shownSlip) * side);
+        const pitch   = RacingGame._degrees(physics.pitch);
+        const roll    = (RacingGame._degrees(physics.roll) * side);
+        const cockpit = this._camera.isCockpitShown();
+        const pose    = this._bodyPose(physics, side, cockpit);
+        this._car.setCockpit(cockpit)
             .setDamage(physics.damage)
             .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
             .place(position, yaw, pitch, roll, pose);
-        this._camera.follow(ticks, position, yaw, pitch, roll, pose);
+        this._camera.follow(ticks, position, yaw, pitch, roll, ((cockpit) ? pose : null));
     }
 
     // $2984 / $70AA: a crash lifts the body by +$9C x 16 / 256 m and tumbles it (+$44 pitch); the slip and the shock
-    // yaw it (+$46), the turn and the crash roll it ((+$4A + +$4C) / 4); 1/65536 turn.
-    _bodyPose(physics, side) {
+    // yaw it (+$46), the turn and the crash roll it ((+$4A + +$4C) / 4); 1/65536 turn. The cockpit shell ($2ADE) is
+    // lifted and yawed the same, the eye with it (RacingCamera.follow), not tumbled, and only the turn rolls it: +$4C / 2.
+    _bodyPose(physics, side, cockpit) {
         return {
             lift:  (physics.crashPose[0] / RacingGame.LIFT_UNITS_PER_METRE),
             yaw:   (RacingGame._degrees(physics.bodyYaw) * side),
-            pitch: RacingGame._degrees(physics.bodyPitch),
-            roll:  (-RacingGame._degrees((physics.bodyRoll + physics.slipInput) / 4) * side)
+            pitch: ((cockpit) ? 0 : RacingGame._degrees(physics.bodyPitch)),
+            roll:  (-RacingGame._degrees((cockpit) ? (physics.slipInput / 2) : ((physics.bodyRoll + physics.slipInput) / 4)) * side)
         };
     }
 

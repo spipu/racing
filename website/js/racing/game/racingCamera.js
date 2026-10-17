@@ -75,56 +75,34 @@ class RacingCamera {
     }
 
     /**
-     * The camera pitches and rolls with the car ($2984: the car's angles >> 3 plus $C0C8 / $C0CC, in 1/8192 turn).
+     * The camera pitches and rolls with the car ($2984: the car's angles >> 3 plus $C0C8 / $C0CC, in 1/8192 turn), not
+     * with the body's own pose. From the cockpit ($2ADE) the eye turns with the body's yaw and rises with its lift, as
+     * the shell: the shell only rolls a little on screen as the car is steered.
      *
      * @param {number}   ticks    - time elapsed, in original ticks
      * @param {number[]} position - car position on the ground, metres
      * @param {number}   yaw      - car yaw, degrees
      * @param {number}   pitch    - car pitch, degrees, nose down positive
      * @param {number}   roll     - car roll, degrees, the engine's lean
-     * @param {{lift: number, yaw: number, pitch: number, roll: number}|null} pose - the body's own pose, as RacingCarView.place
+     * @param {{lift: number, yaw: number}|null} cockpit - the body's own pose from the cockpit, as RacingCarView.place
      */
-    follow(ticks, position, yaw, pitch = 0, roll = 0, pose = null) {
+    follow(ticks, position, yaw, pitch = 0, roll = 0, cockpit = null) {
         this._advance(ticks);
         const up    = (this._units[0] / RacingCamera.UNITS_PER_METRE);
         const back  = (this._units[1] / RacingCamera.UNITS_PER_METRE);
-        if (this.isCockpitShown() && (pose !== null)) {
-            return this._followBody(position, (yaw + pose.yaw), (pitch + pose.pitch), (roll + pose.roll), pose.lift, up, back);
-        }
+        const lift  = ((cockpit === null) ? 0 : cockpit.lift);
+        const turns = ((cockpit === null) ? yaw : (yaw + cockpit.yaw));
         const down  = (RacingCamera.PITCH_DEGREES + pitch);
         const tilt  = ((down * Math.PI) / 180);
         const ahead = ((up * Math.sin(tilt)) - (back * Math.cos(tilt)));
         const rise  = ((up * Math.cos(tilt)) + (back * Math.sin(tilt)));
-        const turn  = ((yaw * Math.PI) / 180);
+        const turn  = ((turns * Math.PI) / 180);
         this.pitch  = -down;
-        this.yaw    = yaw;
+        this.yaw    = turns;
         this._roll  = roll;
         this._x     = (position[0] + (Math.sin(turn) * ahead));
-        this._y     = (position[1] + rise);
+        this._y     = (position[1] + lift + rise);
         this._z     = (position[2] + (Math.cos(turn) * ahead));
-
-        return this;
-    }
-
-    // The cockpit stays still on screen: the eye is a part of the body, turned by the same rotation as the parts
-    // (RacingCarView.place: Ry(yaw) · Rx(pitch) · Rz(roll)), then by the boom's own tilt; that rotation is split
-    // back into the engine's camera angles, its camera-to-world rotation being Ry(yaw) · Rz(-lean) · Rx(-pitch).
-    _followBody(position, yaw, pitch, roll, lift, up, back) {
-        const body = new Matrix().identity();
-        const step = new Matrix();
-        body.multiply(step.rotationX((pitch * Math.PI) / 180));
-        body.multiply(step.rotationZ((roll * Math.PI) / 180));
-        body.multiply(step.rotationX((RacingCamera.PITCH_DEGREES * Math.PI) / 180));
-        const m    = body.v;
-        const eye  = body.multiplyPosition([0, up, -back, 1]);
-        const turn = ((yaw * Math.PI) / 180);
-        // Column-major storage: m[column][row].
-        this.yaw    = (yaw + ((Math.atan2(-m[0][2], m[0][0]) * 180) / Math.PI));
-        this._roll  = -((Math.asin(Math.max(-1, Math.min(1, m[0][1]))) * 180) / Math.PI);
-        this.pitch  = -((Math.atan2(-m[2][1], m[1][1]) * 180) / Math.PI);
-        this._x     = (position[0] + (Math.cos(turn) * eye[0]) + (Math.sin(turn) * eye[2]));
-        this._y     = (position[1] + lift + eye[1]);
-        this._z     = (position[2] - (Math.sin(turn) * eye[0]) + (Math.cos(turn) * eye[2]));
 
         return this;
     }
