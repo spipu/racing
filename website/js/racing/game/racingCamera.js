@@ -1,7 +1,8 @@
 /**
- * The 4 camera views of the original ($C048): 0 cockpit, 1 close chase (start
- * view), 2 far chase, 3 high view. One button steps through them in a loop,
- * 0 1 2 3 0... (project decision); the race starts on view 1.
+ * The 4 camera views of the original ($C048): 0 cockpit, 1 close view (start
+ * view), 2 far view, 3 high view. One button steps through them in a loop,
+ * 0 1 2 3 0... (project decision); the race starts on the view set in the
+ * options, view 1 by default as in the original.
  *
  * The camera hangs on a boom from the car's ground point: the boom leaves it
  * backwards and upwards ($C056, $C054, in 1/256 m) in a frame tilted down by
@@ -14,15 +15,16 @@
 class RacingCamera {
     /**
      * @param {int[][][]} transitions - 16 transitions (old view x 4 + new view) of [$C054, $C056] per tick
+     * @param {int}       view        - the view the race starts on, 0..3
      */
-    constructor(transitions) {
+    constructor(transitions, view = RacingCamera.START_VIEW) {
         this._transitions = transitions;
-        this._view        = RacingCamera.START_VIEW;
-        this._order       = RacingCamera.ORDER.indexOf(RacingCamera.START_VIEW);
+        this._view        = view;
+        this._order       = RacingCamera.ORDER.indexOf(view);
         this._steps       = null;
         this._elapsed     = 0;
         this._from        = null;
-        this._units       = this._rest(RacingCamera.START_VIEW);
+        this._units       = this._rest(view);
         this._x           = 0;
         this._y           = 0;
         this._z           = 0;

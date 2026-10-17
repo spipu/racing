@@ -9,7 +9,7 @@ A PWA racing game after Virtua Racing Deluxe (Sega 32X). Personal project, not d
 - **How a race goes**: pit start with the mechanics at Big Forest, start lights elsewhere; lap times, gaps to the record at the checkpoints, lap messages, wrong way; at the finish, the results (time of each lap, best lap, total time, new records).
 - **Damage and pits**: a head-on crash at full speed damages the car; at Big Forest, Acropolis and Highland, a pit stop repairs it, with the mechanics animated.
 - **Modern HUD**: rev counter, speed in km/h or mph, gear, laps, fastest lap and the times of the last laps.
-- **Four views**: cockpit with the steering wheel and the driver's arms, close chase, far chase, high view.
+- **Four views**: cockpit with the steering wheel and the driver's arms, close view, far view, high view; the starting view is chosen in the options.
 - **Sound**: the original's sound effects and jingles, the engine computed as the console's FM chip does, its pitch following the revs.
 - **Controls**: keyboard, gamepad or touch controls, chosen automatically or forced, remappable in the options.
 - **Records**: fastest lap and best race kept on the device, by course, version and car, shown and erased in "Best laps".

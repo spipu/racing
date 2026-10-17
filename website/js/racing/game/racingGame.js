@@ -94,7 +94,7 @@ class RacingGame {
         this._crew    = new RacingPitCrew(RacingGame.ASSETS, converter, wheels, race.pit, car, this._selection.course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._physics = this._startPhysics(course, race, physics);
         this._race    = this._startRace(race, best);
-        this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions);
+        this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions, racingSettings.getStartView());
 
         const skyId = loader.textures().load(sky);
         // Called from the image load: an error there would not reach the promise of start().

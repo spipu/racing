@@ -13,6 +13,7 @@ class RacingSettings extends AppSettings {
             // 'auto' follows the language: mph in English, km/h otherwise.
             {key: 'display.speed_unit',   nameCode: 'settings.display.speedUnit',      type: 'list', default: RacingSettings.SPEED_UNIT_AUTO, values: [{code: RacingSettings.SPEED_UNIT_AUTO, labelCode: 'value.speedUnit.auto'}, {code: RacingSettings.SPEED_UNIT_KMH, label: 'km/h'}, {code: RacingSettings.SPEED_UNIT_MPH, label: 'mph'}]},
             {key: 'race.laps',            nameCode: 'settings.race.laps',              type: 'list', default: RacingSettings.DEFAULT_LAPS, values: RacingSettings.LAPS_VALUES},
+            {key: 'race.camera',          nameCode: 'settings.race.camera',            type: 'list', default: RacingSettings.DEFAULT_CAMERA, values: RacingSettings.CAMERA_VALUES},
             {key: 'sound.volume_music',   nameCode: 'settings.sound.volumeMusic',      type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'sound.volume_effects', nameCode: 'settings.sound.volumeEffects',    type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'multiplayer.nickname', nameCode: 'settings.multiplayer.nickname',   type: 'text', default: '', charset: RacingSettings.NICKNAME_CHARSET, maxLength: RacingSettings.NICKNAME_MAX_LENGTH},
@@ -103,6 +104,11 @@ class RacingSettings extends AppSettings {
         return parseInt(this.get('race.laps'), 10);
     }
 
+    // The view a race starts on, 0..3.
+    getStartView() {
+        return parseInt(this.get('race.camera'), 10);
+    }
+
     // Set by the main for every player.
     getMultiplayerLaps() {
         return parseInt(this.get('multiplayer.laps'), 10);
@@ -126,5 +132,13 @@ RacingSettings.NICKNAME_MAX_LENGTH = 16;
 // Laps of a race: the original offers 5 to 20 in Time Attack, longer races added (user request 2026-10-13).
 RacingSettings.LAPS_VALUES         = ['5', '10', '15', '20', '30', '50'].map((code) => ({code: code, label: code}));
 RacingSettings.DEFAULT_LAPS        = '5';
+// The 4 views of the original ($C048), in the order of the view button; the original starts on view 1.
+RacingSettings.CAMERA_VALUES       = [
+    {code: '0', labelCode: 'value.camera.cockpit'},
+    {code: '1', labelCode: 'value.camera.closeView'},
+    {code: '2', labelCode: 'value.camera.farView'},
+    {code: '3', labelCode: 'value.camera.highView'}
+];
+RacingSettings.DEFAULT_CAMERA      = '1';
 
 const racingSettings = new RacingSettings();

@@ -352,6 +352,12 @@ class RacingTranslations {
                 it: 'Numero di giri',
                 es: 'Número de vueltas'
             },
+            'settings.race.camera': {
+                fr: 'Caméra par défaut',
+                en: 'Default camera',
+                it: 'Telecamera predefinita',
+                es: 'Cámara predeterminada'
+            },
             'settings.virtualPad.deadZone': {
                 fr: 'Stick de direction — zone morte',
                 en: 'Steering stick — dead zone',
@@ -443,6 +449,30 @@ class RacingTranslations {
                 en: 'Software wireframe',
                 it: 'Software wireframe',
                 es: 'Software de alambre'
+            },
+            'value.camera.cockpit': {
+                fr: 'Cockpit',
+                en: 'Cockpit',
+                it: 'Abitacolo',
+                es: 'Cabina'
+            },
+            'value.camera.closeView': {
+                fr: 'Vue rapprochée',
+                en: 'Close view',
+                it: 'Visuale ravvicinata',
+                es: 'Vista cercana'
+            },
+            'value.camera.farView': {
+                fr: 'Vue éloignée',
+                en: 'Far view',
+                it: 'Visuale lontana',
+                es: 'Vista lejana'
+            },
+            'value.camera.highView': {
+                fr: 'Vue haute',
+                en: 'High view',
+                it: 'Visuale dall\'alto',
+                es: 'Vista elevada'
             },
             'value.speedUnit.auto': {
                 fr: 'Selon la langue',
@@ -633,10 +663,10 @@ class RacingTranslations {
                 es: '«Sentido contrario» aparece cuando conduces en el sentido equivocado. Una línea cruzada al revés debe cruzarse de nuevo en el sentido correcto antes de que la vuelta cuente.'
             },
             'help.driving.views': {
-                fr: 'Quatre vues se suivent : le cockpit, la poursuite rapprochée, la poursuite éloignée et la vue haute.',
-                en: 'Four views follow one another: the cockpit, the close chase, the far chase and the high view.',
-                it: 'Quattro visuali si susseguono: l\'abitacolo, l\'inseguimento ravvicinato, l\'inseguimento lontano e la visuale dall\'alto.',
-                es: 'Cuatro vistas se suceden: la cabina, la persecución cercana, la persecución lejana y la vista elevada.'
+                fr: 'Quatre vues se suivent : le cockpit, la vue rapprochée, la vue éloignée et la vue haute.',
+                en: 'Four views follow one another: the cockpit, the close view, the far view and the high view.',
+                it: 'Quattro visuali si susseguono: l\'abitacolo, la visuale ravvicinata, la visuale lontana e la visuale dall\'alto.',
+                es: 'Cuatro vistas se suceden: la cabina, la vista cercana, la vista lejana y la vista elevada.'
             },
             'help.damage': {
                 fr: 'Dégâts et stands',
