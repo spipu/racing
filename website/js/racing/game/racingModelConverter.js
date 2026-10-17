@@ -47,6 +47,16 @@ class RacingModelConverter {
     }
 
     /**
+     * The colour of a material of the game's glTF models: its palette index (extras.paletteIndex), in this palette.
+     *
+     * @param {{extras: {paletteIndex: int}}} material
+     * @returns {int[]} [r, g, b] 0..255
+     */
+    materialColor(material) {
+        return this._palette.getRgb(material.extras.paletteIndex);
+    }
+
+    /**
      * A face drawn over coplanar ones (exported lift, model units) gets its own
      * vertices, moved towards its visible side: opposite to its Newell normal.
      *

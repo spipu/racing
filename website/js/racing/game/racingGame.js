@@ -30,6 +30,7 @@ class RacingGame {
         this._physics   = null;
         this._controls  = null;
         this._crew      = null;
+        this._crewVoice = null;
         this._race      = null;
         this._engineSound    = null;
         this._hud            = null;
@@ -85,9 +86,10 @@ class RacingGame {
         if (car === undefined) {
             throw new Error('RacingGame - unknown car ' + this._selection.car);
         }
-        this._car     = new RacingCarView(converter, cars, car, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
+        const wheels  = new RacingWheelModels(cars, car);
+        this._car     = new RacingCarView(converter, cars, car, wheels, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._objects = new RacingCourseObjects(converter, course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
-        this._crew    = new RacingPitCrew(converter, race, cars, car, this._selection.course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
+        this._crew    = new RacingPitCrew(RacingGame.ASSETS, converter, wheels, race.pit, car, this._selection.course, (scenery / RacingGame.CAR_UNITS_PER_SCENERY_UNIT), mirror);
         this._physics = this._startPhysics(course, race, physics);
         this._race    = this._startRace(race, best);
         this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions);
@@ -158,6 +160,7 @@ class RacingGame {
         return new RacingRaceControl(this._physics, course, record, RacingGame.PIT_START_COURSES.includes(this._selection.course), racingSound.laps,
             race.checkpointJingles)
             .setOnSound((command) => racingSound.send(command))
+            .setCrewSoundsByClips(true)
             .setOnRecord((lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs))
             .setOnFinish((result) => this._guard(this._finish, result));
     }
@@ -167,7 +170,11 @@ class RacingGame {
         this._buildDisplay();
         this._car.bind();
         this._objects.bind();
-        this._crew.bind();
+        this._crew.bind()
+            .setOnWheel((wheel, off) => this._car.setWheelOff(wheel, off))
+            .setOnWrench((mechanic) => {
+                this._crewVoice ??= (RacingGame.CREW_VOICE + mechanic);
+            });
         if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
         }
@@ -377,9 +384,10 @@ class RacingGame {
             this._race.update(ticks);
             this._sounds(ticks);
         }
+        this._updateCrew(ticks);
         this._placeCar(ticks);
+        this._startCrew();
         this._objects.animate(ticks);
-        this._crew.setFrame(this._physics.pitCrewFrame, ticks, (this._race.crewRunning || (this._physics.pitState === RacingCarPhysics.PIT_WORK)));
 
         const engine = this._engine;
         engine.setCamera(this._camera);
@@ -402,6 +410,28 @@ class RacingGame {
         this._screen.update();
 
         requestAnimationFrame(this._onFrame);
+    }
+
+    // The crew stands at the box while the original shows it ($C026 not -1), its wheels and bursts as its clips go:
+    // the bursts of one frame make one sound (the mechanics in step would add up). Away, it is back to its first pose.
+    _updateCrew(ticks) {
+        const shown = (this._physics.pitCrewFrame >= 0);
+        if (!shown && this._crew.isStarted()) {
+            this._crew.reset();
+        }
+        this._crewVoice = null;
+        this._crew.show(shown).update(ticks);
+        if (this._crewVoice !== null) {
+            racingSound.send(RacingRaceControl.SOUND_WRENCH, this._crewVoice);
+        }
+    }
+
+    // The crew starts with the pit start sequence or the work of a stop, on the car's wheels as just placed.
+    _startCrew() {
+        const physics = this._physics;
+        if (!this._crew.isStarted() && (physics.pitCrewFrame >= 0) && (this._race.crewRunning || (physics.pitState === RacingCarPhysics.PIT_WORK))) {
+            this._crew.start(RacingPitCrewSchedule.start(), RacingGame.WHEELS.map((wheel) => this._car.hubMatrix(wheel, Mat4.create())));
+        }
     }
 
     // The commands of the tick, the engine note.
@@ -465,9 +495,8 @@ class RacingGame {
         const pitch = RacingGame._degrees(physics.pitch);
         const roll  = (RacingGame._degrees(physics.roll) * side);
         const pose  = this._bodyPose(physics, side);
-        const crew = physics.pitCrewFrame;
         this._car.setCockpit(this._camera.isCockpitShown())
-            .setDamage(physics.damage, ((crew >= RacingPitCrew.WHEELS_OFF_FIRST) && (crew < RacingPitCrew.WHEELS_OFF_END)))
+            .setDamage(physics.damage)
             .setEffects(physics.effectFrames, (physics.crashRecovery === 0), physics.smokeX)
             .animate(ticks, physics.displaySpeed, physics.steer, physics.yawRate)
             .place(position, yaw, pitch, roll, pose);
@@ -510,6 +539,9 @@ RacingGame.METRES_PER_ENTITY_UNIT         = (RacingGame.SCENERY_UNITS_PER_ENTITY
 RacingGame.METRES_PER_HEIGHT_UNIT         = (1 / (RacingGame.HEIGHT_UNITS_PER_SCENERY_UNIT * RacingGame.SCENERY_UNITS_PER_METRE));
 // The player starts on the first place of the grid.
 RacingGame.START_PLACE                    = 0;
+// The car's wheels (RacingCarView.setWheelOff), and the sound channel of a mechanic's wheel gun ('crew0').
+RacingGame.WHEELS                         = [0, 1, 2, 3];
+RacingGame.CREW_VOICE                     = 'crew';
 // Big Forest starts in the pit box, with the mechanics ($6AB4).
 RacingGame.PIT_START_COURSES              = ['big_forest'];
 RacingGame.JINGLE_RESULTS                 = '8E';

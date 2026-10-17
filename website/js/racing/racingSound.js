@@ -28,7 +28,7 @@ class RacingSound {
         this.laps      = [];      // music command of the lap done, by laps done ($8989EE)
         this._priority = 0;
         this._heldTo   = 0;       // ms (performance clock) the priority holds to
-        this._dac      = null;
+        this._dacs     = new Map(); // DAC channel by key: the main one, a crew voice's
         this._timers   = [];
     }
 
@@ -88,9 +88,14 @@ class RacingSound {
     }
 
     /**
-     * @param {string} command - sound command id of the original, in hexadecimal ('B1')
+     * A command goes through the original's queue (priority held for its frames). A voice plays its samples on its
+     * own DAC channel, beside the main one (the original has one, for one crew animation): each mechanic's wheel gun
+     * cuts only its own last burst; a sample of the main channel cuts every channel, as the original's one DAC.
+     *
+     * @param {string}      command - sound command id of the original, in hexadecimal ('B1')
+     * @param {string|null} voice   - a channel of its own ('crew0'), null: the main one
      */
-    send(command) {
+    send(command, voice = null) {
         if (this._player === null) {
             return this;
         }
@@ -116,7 +121,7 @@ class RacingSound {
             return this;
         }
         for (const entry of effect.timeline) {
-            const play = () => ((entry.fm) ? this._player.play(this._samples.get(entry.id), {key: command, gain: RacingSound.FM_GAIN}) : this._playDac(entry.id));
+            const play = () => ((entry.fm) ? this._player.play(this._samples.get(entry.id), {key: command, gain: RacingSound.FM_GAIN}) : this._playDac(entry.id, voice));
             if (entry.ms === 0) {
                 play();
             } else {
@@ -143,7 +148,7 @@ class RacingSound {
             this._player.stopAll(false);
             this._musicPlayer.stopAll(false);
         }
-        this._dac      = null;
+        this._dacs.clear();
         this._music    = null;
         this._priority = 0;
         this._heldTo   = 0;
@@ -161,11 +166,19 @@ class RacingSound {
         return this;
     }
 
-    _playDac(id) {
-        if (this._dac !== null) {
-            this._dac.stop();
+    _playDac(id, voice) {
+        const key = ((voice === null) ? RacingSound.DAC_KEY : (RacingSound.DAC_KEY + ':' + voice));
+        for (const [playing, channel] of this._dacs) {
+            if ((voice === null) || (playing === key)) {
+                channel.stop();
+                this._dacs.delete(playing);
+            }
         }
-        this._dac = this._player.play(this._samples.get(id), {key: 'dac', gain: RacingSound.DAC_GAIN});
+        const channel = this._player.play(this._samples.get(id), {key: key, gain: RacingSound.DAC_GAIN});
+        // None when the sound engine cannot play yet (locked, sample missing).
+        if (channel !== null) {
+            this._dacs.set(key, channel);
+        }
     }
 
     _cancelTimers() {
@@ -263,6 +276,7 @@ RacingSound.FRAME_MS        = (1000 / 60);
 // emulated game: -26.1 / -26.6 dB against -12.7 / -13.5 dB); the FM recordings come at that mix: 4 times (12 dB)
 // the gain of the samples, their peaks (-4.7 dB) still unclipped.
 RacingSound.DAC_GAIN        = 0.4;
+RacingSound.DAC_KEY         = 'dac';
 RacingSound.FM_GAIN         = 1.6;
 RacingSound.MUSIC_GAIN      = 1.6;
 

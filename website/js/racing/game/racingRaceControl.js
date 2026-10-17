@@ -63,6 +63,7 @@ class RacingRaceControl {
         this._crewTicks = 0;            // +$B0 of the start crew
         this._inPit     = false;        // in a pit stop at the end of the tick before
         this.crewRunning = false;       // the start crew plays its animation
+        this._crewSoundsByClips = false;
         this._message   = null;
         this._split     = null;
         this._splitsMs  = [null, null]; // $C270 / $C274 of the lap
@@ -74,6 +75,18 @@ class RacingRaceControl {
             this.startSign = RacingRaceControl.SIGN_READY;
             this.lights    = RacingRaceControl.LIGHTS_OFF;
         }
+    }
+
+    /**
+     * The game's mechanics send their own wheel gun bursts (RacingPitCrew): none sent by the frame of the original
+     * ($3D28), which the bench keeps.
+     *
+     * @param {boolean} byClips
+     */
+    setCrewSoundsByClips(byClips) {
+        this._crewSoundsByClips = byClips;
+
+        return this;
     }
 
     setOnSound(callback) {
@@ -138,7 +151,7 @@ class RacingRaceControl {
         this.pitWork = (inPit && this._inPit);
         this._inPit  = inPit;
         // $3D28 / $3D34: the mechanics' wrench every tick their frame is 4 or 22, at the start and at a pit stop.
-        if (RacingRaceControl.CREW_WRENCH_FRAMES.includes(physics.pitCrewFrame)) {
+        if (!this._crewSoundsByClips && RacingRaceControl.CREW_WRENCH_FRAMES.includes(physics.pitCrewFrame)) {
             this._onSound(RacingRaceControl.SOUND_WRENCH);
         }
         this._messages();

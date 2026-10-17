@@ -77,10 +77,11 @@ Replays a whole race (start, laps, checkpoints, pit stop, finish) and compares t
 ```bash
 node bench/pitMechanic.js            # speed jumps of the mechanic's clips against their goldens
 node bench/pitMechanic.js --update   # writes the goldens again, for a wanted change of the model only
+node bench/comparePitCrew.js         # the game's crew against the original's timing, its wheels on the cars' hubs
 python3 -m http.server 8085          # from the repository root, then http://localhost:8085/tools/pitCrewViewer/
 ```
 
-The mechanics and their wheel gun are glTF files of `website/assets/virtual_racing/models/`, converted once from the original's animation frames. The bench samples each clip every 0.1 ms and fails when a joint or a socket changes speed more sharply than its golden. The viewer plays one mechanic or the four around each car, at any time, image by image or at any speed.
+The mechanics and their wheel gun are glTF files of `website/assets/virtual_racing/models/`, converted once from the original's animation frames. The first bench samples each clip every 0.1 ms and fails when a joint or a socket changes speed more sharply than its golden. The second plays the game's crew at the original's tick and at the game's frame rates: each event must fall on the tick the original shows it, and around each car, mirrored or not, each wheel taken off or put back must lie on the car's hub. The viewer plays the game's crew around each car on the Big Forest box, at any time, image by image or at any speed, each mechanic looked at closer.
 
 ## Data of the original game
 

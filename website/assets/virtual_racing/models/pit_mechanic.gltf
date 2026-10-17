@@ -938,11 +938,6 @@
       "data": {}
      },
      {
-      "time": 1.5,
-      "name": "wheelOff",
-      "data": {}
-     },
-     {
       "time": 1.55,
       "name": "putDown",
       "data": {
@@ -960,6 +955,11 @@
         0.7552656988993692
        ]
       }
+     },
+     {
+      "time": 1.55,
+      "name": "wheelOff",
+      "data": {}
      },
      {
       "time": 1.95,
@@ -1299,12 +1299,12 @@
       "data": {}
      },
      {
-      "time": 1.5,
+      "time": 1.55,
       "name": "wheelOff",
       "data": {}
      },
      {
-      "time": 1.5,
+      "time": 1.55,
       "name": "pickUp",
       "data": {
        "object": "removedWheel",
@@ -1333,7 +1333,7 @@
       }
      },
      {
-      "time": 2.8,
+      "time": 2.85,
       "name": "pickUp",
       "data": {
        "object": "newWheel",
@@ -1641,12 +1641,12 @@
       "data": {}
      },
      {
-      "time": 1.5,
+      "time": 1.55,
       "name": "wheelOff",
       "data": {}
      },
      {
-      "time": 1.5,
+      "time": 1.55,
       "name": "pickUp",
       "data": {
        "object": "removedWheel",
@@ -1699,17 +1699,17 @@
      },
      {
       "time": 4.3,
+      "name": "repaired",
+      "data": {}
+     },
+     {
+      "time": 4.35,
       "name": "pickUp",
       "data": {
        "object": "wrench",
        "socket": "wrench",
        "transition": 0.2
       }
-     },
-     {
-      "time": 4.3,
-      "name": "repaired",
-      "data": {}
      },
      {
       "time": 4.75,
@@ -1983,7 +1983,7 @@
       }
      },
      {
-      "time": 1.5,
+      "time": 1.55,
       "name": "wheelOff",
       "data": {}
      },

@@ -3,7 +3,8 @@
  * departure from the original): the profile of the car's rear wheel in the
  * ROM (inner flank, tread, outer chamfer, hub cap, their colours), turned on
  * 16 sides instead of 8, then sized to each place: its own radius and width
- * there. Models are in the ROM's format ({v, f}, car model units).
+ * there; the tread's faces one in two a grey lighter, for the wheel to be
+ * seen turning. Models are in the ROM's format ({v, f}, car model units).
  */
 class RacingWheelModels {
     /**
@@ -93,12 +94,15 @@ class RacingWheelModels {
         }
         const corner = (ring, j) => (first + (ring * sides) + (j % sides));
         for (const part of this._profile.parts) {
+            // The tread: the band between two rings at the full radius (not a flank on one).
+            const tread = ((part.rings.length === 2) && part.rings.every((ring) => (this._profile.rings[ring].out === 1)));
             const faces = ((part.rings.length === 2)
                 ? [...Array(sides).keys()].map((j) => [corner(part.rings[0], j), corner(part.rings[0], (j + 1)), corner(part.rings[1], (j + 1)), corner(part.rings[1], j)])
                 : RacingWheelModels._cap(sides).map((face) => face.map((j) => corner(part.rings[0], j))));
-            for (const indices of faces) {
-                model.f.push({c: part.color, i: RacingWheelModels._turned(model.v, indices, at)});
-            }
+            faces.forEach((indices, j) => {
+                const color = ((tread && ((j % 2) === 1)) ? (part.color + RacingWheelModels.TREAD_STRIPE) : part.color);
+                model.f.push({c: color, i: RacingWheelModels._turned(model.v, indices, at)});
+            });
         }
     }
 
@@ -194,5 +198,7 @@ RacingWheelModels.REAR = 2;
 RacingWheelModels.AXLE_HALF_WIDTH = 600;
 // Sides of a wheel turned around its axle (8 in the ROM).
 RacingWheelModels.SIDES = 16;
+// Palette step from the tread's grey to its stripes': the next grey of the courses' ramp (indices 0-15, 8 apart).
+RacingWheelModels.TREAD_STRIPE = 1;
 // Car units within which two vertices of the profile are on one ring (the ROM rounds them).
 RacingWheelModels.RING_TOLERANCE = 3;

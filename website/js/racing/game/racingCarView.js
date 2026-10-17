@@ -2,10 +2,12 @@
  * The car as the original assembles it, every part one engine instance at the
  * car position, its offset and turn given as animation deltas:
  *   - outside: the body, the two front wheels and the rear axle at their
- *     offsets (cars.json wheels), and the flat shadow darkening the ground;
+ *     offsets (cars.json wheels), the axle cut in its two wheels, and the flat
+ *     shadow darkening the ground;
  *   - cockpit view: the cockpit shell, its front wheels at the same offsets
  *     when the car shows them (cars.json cockpitWheels: the Formula only), and
  *     the steering wheel with the driver's arms (the rear axle is not drawn).
+ * Every wheel is the car's one wheel made at its size (RacingWheelModels).
  * The wheels spin with the speed ($859A), the front wheels steer by the turn
  * rate (+$90, $2984), the steering wheel follows the steering ($C088). The
  * shadow, a part of the body (its descriptor relative to the body, angles 0),
@@ -16,17 +18,18 @@
  * (the left ones mirrored), sparks under the tail, exhaust flames; the Stock
  * moves its smoke towards the side it slides to. On the courses with damage,
  * a crash bends the body ($2A86: one crash, two and more) and the cockpit
- * shell; during the pit work the mechanics take the wheels off ($3CEC).
+ * shell; during the pit work the mechanics take the wheels off, one by one.
  */
 class RacingCarView {
     /**
      * @param {RacingModelConverter} converter
      * @param {object}  cars   - cars.json
      * @param {object}  car    - entry of cars.json cars
+     * @param {RacingWheelModels} wheels - the car's wheels
      * @param {number}  scale  - metres per model unit
      * @param {boolean} mirror
      */
-    constructor(converter, cars, car, scale, mirror) {
+    constructor(converter, cars, car, wheels, scale, mirror) {
         this._side      = ((mirror) ? -1 : 1);
         this._scale     = scale;
         this._outside   = [];
@@ -41,9 +44,10 @@ class RacingCarView {
         this._frames    = null;
         this._shadowOn  = true;
         this._damage    = 0;
-        this._wheelsOff = false;
+        this._wheelsOff = [false, false, false, false];
         this._shadowOff = car.pitHidesShadow;
         this._body      = new Matrix();
+        this._partPlace = Mat4.create();
         this._axis      = new Matrix();
         this._rotation  = [0, 0, 0];
 
@@ -51,8 +55,21 @@ class RacingCarView {
         const offset = (units) => [(units[0] * scale * this._side), (units[1] * scale), (units[2] * scale)];
         this._bodies = [car.body, ...car.damaged].map((code) => this._addPart(model(code, mirror), [0, 0, 0], null));
         this._outside.push(this._bodies[0]);
-        this._wheels = car.wheels.map((wheel, i) => this._addPart(model(wheel.model, mirror), offset(wheel.offset), ((i < 2) ? 'front' : 'spin')));
+        // The wheels, as RacingWheelModels.wheelsOf finds them: front left, front right, rear left, rear right.
+        const made   = (wheel) => converter.toObjectData(wheels.replace(wheel.model, wheel.offset), scale, mirror);
+        const [frontLeft, frontRight, axle] = car.wheels;
+        this._wheels = [
+            this._addPart(made(frontLeft), offset(frontLeft.offset), 'front'),
+            this._addPart(made(frontRight), offset(frontRight.offset), 'front'),
+            ...RacingCarView._splitAxle(made(axle), this._side).map((data) => this._addPart(data, offset(axle.offset), 'spin')),
+        ];
         this._outside.push(...this._wheels);
+        // Each hub in its wheel part, in the frame of a wheel handled by the mechanics (RacingWheelModels.centred).
+        this._hubs = car.wheels.flatMap((wheel) => wheels.wheelsOf(wheel.model, wheel.offset).map((hub) => {
+            const at = hub.centre.map((value, k) => ((value - wheel.offset[k]) * scale * ((k === 0) ? this._side : 1)));
+
+            return Mat4.fromTranslationRotationScale(Mat4.create(), at, 0, ((hub.side < 0) ? RacingCarView.HALF_TURN : RacingCarView.NO_TURN), 0, RacingCarView.UNIT_SCALE, 0);
+        }));
         this._shadow = this._addPart(RacingCarView._screened(model(car.shadow, mirror)), [0, RacingCarView.SHADOW_LIFT, 0], null);
         this._outside.push(this._shadow);
 
@@ -82,7 +99,7 @@ class RacingCarView {
         this._cockpit.push(this._shells[0]);
         this._cockpitWheels = [];
         if (car.cockpitWheels) {
-            this._cockpitWheels = [left, right].map((code, i) => this._addPart(model(code, mirror), offset(car.wheels[i].offset), 'front'));
+            this._cockpitWheels = [left, right].map((code, i) => this._addPart(converter.toObjectData(wheels.replace(code, car.wheels[i].offset), scale, mirror), offset(car.wheels[i].offset), 'front'));
             this._cockpit.push(...this._cockpitWheels);
         }
         this._cockpit.push(this._addPart(model(cars.steeringWheel, mirror), offset(car.steeringWheelOffset), 'steer'));
@@ -114,15 +131,37 @@ class RacingCarView {
     }
 
     /**
-     * @param {int}     damage    - frontal crashes (+$8A): the body bent after one, more after two; the cockpit shell
-     * @param {boolean} wheelsOff - the mechanics hold the wheels (pit work frames 7 to 18): front wheels, rear axle
-     *                              and, for the Formula, the shadow are hidden outside, the front wheels inside
+     * @param {int} damage - frontal crashes (+$8A): the body bent after one, more after two; the cockpit shell
      */
-    setDamage(damage, wheelsOff) {
-        this._damage    = damage;
-        this._wheelsOff = wheelsOff;
+    setDamage(damage) {
+        this._damage = damage;
 
         return this;
+    }
+
+    /**
+     * A wheel taken off by its mechanic is hidden, inside too for a front one; the Formula's shadow with it.
+     *
+     * @param {int}     wheel - 0 front left, 1 front right, 2 rear left, 3 rear right
+     * @param {boolean} off
+     */
+    setWheelOff(wheel, off) {
+        this._wheelsOff[wheel] = off;
+
+        return this;
+    }
+
+    /**
+     * Where a wheel is now, as placed last (its turn and steering included), in the frame of a wheel handled by the
+     * mechanics: its hub, its axis on x, its outer face towards +x.
+     *
+     * @param {int}          wheel - as setWheelOff
+     * @param {Float32Array} out   - Mat4
+     */
+    hubMatrix(wheel, out) {
+        const part = Mat4.fromMatrix(this._partPlace, Matrix.composeInstanceTransform(this._wheels[wheel].instance.getTransform()));
+
+        return Mat4.multiply(out, this._hubs[wheel], part);
     }
 
     /**
@@ -247,10 +286,24 @@ class RacingCarView {
 
     _isShown(part) {
         if (part === this._shadow) {
-            return (this._shadowOn && !(this._wheelsOff && this._shadowOff));
+            return (this._shadowOn && !(this._shadowOff && this._wheelsOff.includes(true)));
         }
+        const wheel = this._wheels.indexOf(part);
+        if (wheel >= 0) {
+            return !this._wheelsOff[wheel];
+        }
+        const cockpitWheel = this._cockpitWheels.indexOf(part);
 
-        return (!this._wheelsOff || (!this._wheels.includes(part) && !this._cockpitWheels.includes(part)));
+        return ((cockpitWheel < 0) || !this._wheelsOff[cockpitWheel]);
+    }
+
+    // The rear axle's two wheels, each its own part (the mechanics take them off one by one): its faces cut by the
+    // side of x their corners are on, the vertices kept.
+    static _splitAxle(data, side) {
+        return [-side, side].map((sign) => ({
+            points: data.points,
+            faces:  data.faces.filter((face) => face.pts.every((index) => (Math.sign(data.points[index - 1][0]) === sign))),
+        }));
     }
 
     // A wheel rolls, then steers; the steering wheel turns on its column.
@@ -308,6 +361,10 @@ RacingCarView.SPIN_FAST_FACTOR = 4;
 RacingCarView.SPIN_LIMIT       = 0x7000;
 RacingCarView.SPIN_MAX         = 0x7080;
 RacingCarView.STEERING_TURN    = 8192;
+// A left wheel is the right one turned half round the vertical.
+RacingCarView.HALF_TURN        = [0, 1, 0, 0];
+RacingCarView.NO_TURN          = [0, 0, 0, 1];
+RacingCarView.UNIT_SCALE       = [1, 1, 1];
 // Wheel of an effect pair; the left one is mirrored.
 RacingCarView.LEFT             = 0;
 RacingCarView.RIGHT            = 1;

@@ -41,6 +41,7 @@ class AnimatedInstance {
         this._object      = null;
         this._instance    = null;
         this._placement   = Mat4.create();
+        this._unplacement = Mat4.create();
         this._translation = new Float32Array(Skeleton.TRANSLATION_SIZE);
         this._orientation = new Float32Array(Skeleton.ROTATION_SIZE);
         this._rootMotion  = new Float32Array(AnimationPlayer.ROOT_MOTION_SIZE);
@@ -177,6 +178,18 @@ class AnimatedInstance {
         }
 
         return Mat4.multiply(out, local, this._placement);
+    }
+
+    /**
+     * A transform in the world into the model's space: the inverse of toWorld (a place for detach, from the world).
+     *
+     * @param {Float32Array} out   - may be world
+     * @param {Float32Array} world
+     */
+    toLocal(out, world) {
+        Mat4.multiply(out, world, Mat4.invertRigid(this._unplacement, this._placement));
+
+        return ((this._mirror) ? Mat4.mirrorX(out, out) : out);
     }
 
     // Buffers made here, once per taking or laying: the frames that move the instance allocate nothing.

@@ -45,6 +45,37 @@ class Mat4 {
     }
 
     /**
+     * The inverse of a rotation then a translation (no scale): the rotation transposed, the translation taken back
+     * through it. out may be a.
+     */
+    static invertRigid(out, a) {
+        const r01 = a[1];
+        const r02 = a[2];
+        const r12 = a[6];
+        const tx  = a[12];
+        const ty  = a[13];
+        const tz  = a[14];
+        out[0]  = a[0];
+        out[1]  = a[4];
+        out[2]  = a[8];
+        out[3]  = 0;
+        out[4]  = r01;
+        out[5]  = a[5];
+        out[6]  = a[9];
+        out[7]  = 0;
+        out[8]  = r02;
+        out[9]  = r12;
+        out[10] = a[10];
+        out[11] = 0;
+        out[12] = -((tx * out[0]) + (ty * out[4]) + (tz * out[8]));
+        out[13] = -((tx * out[1]) + (ty * out[5]) + (tz * out[9]));
+        out[14] = -((tx * out[2]) + (ty * out[6]) + (tz * out[10]));
+        out[15] = 1;
+
+        return out;
+    }
+
+    /**
      * The point (x, y, z) times the matrix, written at out[offset..offset + 2].
      */
     static transformPoint(out, offset, m, x, y, z) {
@@ -90,7 +121,8 @@ class Mat4 {
     }
 
     /**
-     * a then b: a row vector times out is the vector times a, then times b. out may be a or b.
+     * a then b: a row vector times out is the vector times a, then times b. out may be a, not b (each row of out is
+     * written while b is still read).
      */
     static multiply(out, a, b) {
         for (let i = 0; i < Mat4.ORDER; i++) {
