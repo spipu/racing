@@ -79,16 +79,13 @@ const VR_ROM_MAP = {
         damagedCockpit:  0xC750,
         offsetScale:     4,
     },
-    // Pit stops and mechanics (68K addresses; checked in emulation on Big Forest, Acropolis and Highland).
-    // mechanics: 4 SH2 pointers ($3CCE) to frame tables of 16 bytes (body, tool, removed wheel, new wheel: SH2 model
-    // pointers, 0 = none), frame = ticks x 7 / 30 up to the last one. They stand at the pit box of the course
-    // (mechanicBases: {x, y, z} by course, $3C7E) plus offsets by car (mechanicOffsets: 4 x {dx, dz}: x + dx, z - dz).
+    // Pit stops and mechanics (68K addresses; checked in emulation on Big Forest, Acropolis and Highland). The
+    // mechanics' frames are not read: $895B7E, 4 SH2 pointers ($3CCE) to tables of 28 frames of 16 bytes (body, tool,
+    // removed wheel, new wheel: SH2 model pointers, 0 = none), converted once into the game's glTF models. They stand
+    // at the pit box of the course (mechanicBases: {x, y, z} by course, $3C7E) plus offsets by car (mechanicOffsets:
+    // 4 x {dx, dz}: x + dx, z - dz).
     // pitBoxes: {x, z} of the 4 boxes of each course ($A868); approachX: x offset of the automatic approach ($A8C8).
     pit: {
-        mechanics:       0x895B7E,
-        mechanicCount:   4,
-        mechanicFrames:  28,
-        mechanicRecord:  16,
         mechanicBases:   {address: 0x883C2A, words: 3},
         mechanicOffsets: {address: 0x883C4E, words: 8},
         pitBoxes:        {address: 0x88A868, words: 8},

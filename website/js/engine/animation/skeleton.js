@@ -26,7 +26,7 @@ class Skeleton {
         this._restTranslation = data.restTranslation;
         this._restRotation    = data.restRotation;
         this._restScale       = data.restScale;
-        this._inverseBindOf   =Object.freeze(this._names.map((name, i) => data.inverseBind.subarray((i * Mat4.SIZE), ((i + 1) * Mat4.SIZE))));
+        this._inverseBindOf   = Object.freeze(this._names.map((name, i) => data.inverseBind.subarray((i * Mat4.SIZE), ((i + 1) * Mat4.SIZE))));
         this._indexByName     = new Map(this._names.map((name, i) => [name, i]));
         Object.freeze(this);
     }

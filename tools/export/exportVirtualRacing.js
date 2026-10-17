@@ -134,16 +134,14 @@ class VirtualRacingExporter {
             ...physics,
             cars:   this._byCode(map.cars, physics.cars),
         });
-        const pitModels = new Map();
-        const pit       = new VrPitReader(this._rom, this._reader, map).read(pitModels);
+        const pit     = new VrPitReader(this._rom, map).read();
         this._json('race.json', {
             format:     VirtualRacingExporter.FORMAT,
             startGrids: this._byCode(map.cars, race.startGrids.map((groups) => Object.fromEntries(map.gameData.startGridGroups.map((group, g) => [group, groups[g]])))),
             courses:    this._byCode(map.courses, race.courses),
             checkpointJingles: race.checkpointJingles,
-            // The mechanics and the pit boxes; car-scale models (1024 units a metre).
+            // Where the mechanics stand, the pit boxes.
             pit:        pit,
-            pitModels:  Object.fromEntries([...pitModels].map(([id, model]) => [id, this._encoder.encode(model)])),
         });
     }
 
