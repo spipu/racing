@@ -192,7 +192,7 @@ RacingControls.VIRTUAL_PAD_ICONS = {
     gearDown:   {shapes: '<rect x="4" y="10.6" width="16" height="2.8" rx="1.4"/>'}
 };
 
-// Pause then view at the top, right of the rev counter (it ends at 34.5 % of the
+// Pause then view at the top, right of the rev counter (it ends at 37.1 % of the
 // height from the left edge, measured), at the HUD margin of 2.5 % of the height
 // from the top and between each other (x in widths: × 1080 / 1920); one row in
 // the bottom-right corner under the map (it ends at 76.4 % of the height,
@@ -200,8 +200,8 @@ RacingControls.VIRTUAL_PAD_ICONS = {
 // brake to its left; gear up right above accelerate and gear down above brake,
 // same width, at the same margin, shipped hidden and shown by the manual gearbox.
 RacingControls.VIRTUAL_PAD_BUTTONS = {
-    pause:      {x: 0.208, y: 0.025, w: 0.079, h: 0.112, icon: 'menu'},
-    view:       {x: 0.301, y: 0.025, w: 0.079, h: 0.112, icon: 'view'},
+    pause:      {x: 0.2225, y: 0.025, w: 0.079, h: 0.112, icon: 'menu'},
+    view:       {x: 0.3156, y: 0.025, w: 0.079, h: 0.112, icon: 'view'},
     gearUp:     {x: 0.876, y: 0.652, w: 0.110, h: 0.112, icon: 'gearUp', allowed: false},
     gearDown:   {x: 0.752, y: 0.652, w: 0.110, h: 0.112, icon: 'gearDown', allowed: false},
     accelerate: {x: 0.876, y: 0.789, w: 0.110, h: 0.186, icon: 'accelerate'},
