@@ -358,6 +358,12 @@ class RacingTranslations {
                 it: 'Telecamera predefinita',
                 es: 'Cámara predeterminada'
             },
+            'settings.race.showMap': {
+                fr: 'Afficher la carte',
+                en: 'Show the map',
+                it: 'Mostra la mappa',
+                es: 'Mostrar el mapa'
+            },
             'settings.virtualPad.deadZone': {
                 fr: 'Stick de direction — zone morte',
                 en: 'Steering stick — dead zone',

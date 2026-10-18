@@ -156,6 +156,42 @@
     color: #FFD21E;
 }
 
+/* Square on the right edge, centred in height; the outline fills it whatever the course (RacingHudMap). */
+.racing-hud-map {
+    position: absolute;
+    right: 2.5cqh;
+    top: 50%;
+    /* Clear of the times with the 5 last laps (down to about 37.5cqh). */
+    width: 22cqh;
+    height: 22cqh;
+    transform: translateY(-50%);
+}
+
+.racing-hud-map-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.racing-hud-map-outline {
+    fill: #FFF;
+    stroke: #FFF;
+    stroke-linejoin: round;
+}
+
+.racing-hud-map-track {
+    fill: #000;
+}
+
+.racing-hud-map-start {
+    stroke: #FF5050;
+}
+
+.racing-hud-map-car {
+    fill: #FFD21E;
+    stroke: #000;
+}
+
 /* --- Centre: start, notices, lap message, split --- */
 .racing-hud-centre {
     position: absolute;

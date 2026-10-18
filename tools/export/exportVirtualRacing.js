@@ -96,6 +96,8 @@ class VirtualRacingExporter {
         const collision    = new VrCollisionReader(this._rom);
         const objectModels = new Map();
         const objects      = new VrCourseObjectReader(this._rom, this._reader, map.courseObjects).read(index, course.code, objectModels);
+        const mapEntry     = (this._rom.fileFrom68k(map.courseMaps.table) + (index * map.courseMaps.stride));
+        const mapModel     = this._reader.read(this._rom.fileFromSh2(this._rom.u32(mapEntry + map.courseMaps.modelPointer)));
         return {
             format:      VirtualRacingExporter.FORMAT,
             code:        course.code,
@@ -107,6 +109,8 @@ class VirtualRacingExporter {
             // Car-scale models (1024 units a metre), placed and animated by the game.
             objects:      objects,
             objectModels: Object.fromEntries([...objectModels].map(([id, model]) => [id, this._encoder.encode(model)])),
+            // Outline drawn on the HUD map, in scenery units like the course: flat, no coplanar order.
+            map:         this._encoder.encode(mapModel, mapModel.faces.map(() => 0)),
             collision:   {
                 gridSize:  map.collisionGridSize,
                 cellSize:  map.collisionCellSize,

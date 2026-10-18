@@ -35,6 +35,7 @@ class RacingGame {
         this._race      = null;
         this._engineSound    = null;
         this._hud            = null;
+        this._hudMap         = null;
         this._results        = null;
         this._resultsDisplay = null;
         this._instances    = [];
@@ -95,6 +96,7 @@ class RacingGame {
         this._physics = this._startPhysics(course, race, physics);
         this._race    = this._startRace(race, best);
         this._camera  = new RacingCamera(physics.cars[this._selection.car].viewTransitions, racingSettings.getStartView());
+        this._hudMap  = new RacingHudMap(course.map, race.courses[this._selection.course].racePath, course.collision.toScenery, mirror);
 
         const skyId = loader.textures().load(sky);
         // Called from the image load: an error there would not reach the promise of start().
@@ -209,7 +211,8 @@ class RacingGame {
         this._hud = new RacingHud(this._engine).bindRace(this._race, this._physics, {
             car:    this._selection.car,
             course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
-            manual: (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL)
+            manual: (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL),
+            map:    this._hudMap
         });
         this._screen.bindHud(this._hud);
     }

@@ -8,14 +8,14 @@ A PWA racing game after Virtua Racing Deluxe (Sega 32X). Personal project, not d
 - **True to the original**: models, colours, skies, physics, collisions, cameras and sound effects taken from the ROM, in high definition and at the screen's frame rate.
 - **How a race goes**: pit start with the mechanics at Big Forest, start lights elsewhere; lap times, gaps to the record at the checkpoints, lap messages, wrong way; at the finish, the results (time of each lap, best lap, total time, new records).
 - **Damage and pits**: a head-on crash at full speed damages the car; at Big Forest, Acropolis and Highland, a pit stop repairs it, with the mechanics animated.
-- **Modern HUD**: rev counter, speed in km/h or mph, gear, laps, fastest lap and the times of the last laps.
+- **Modern HUD**: rev counter, speed in km/h or mph, gear, laps, fastest lap and the times of the last laps, and a map of the course with the car (the original's outline, start upwards), hidden from the options if wanted.
 - **Four views**: cockpit with the steering wheel and the driver's arms, close view, far view, high view; the starting view is chosen in the options.
 - **Sound**: the original's sound effects and jingles, the engine computed as the console's FM chip does, its pitch following the revs.
 - **Controls**: keyboard, gamepad or touch controls, chosen automatically or forced, remappable in the options.
 - **Records**: fastest lap and best race kept on the device, by course, version and car, shown and erased in "Best laps".
 - **Menus and help**: pause menu, options (display, race, sound, controls), a help explaining how a race goes; in English, French, Italian and Spanish.
 - **Installable application**, usable offline.
-- To come: a map of the course in the HUD, races with several players over the network.
+- To come: races with several players over the network.
 
 ## Tree
 

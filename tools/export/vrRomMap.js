@@ -213,6 +213,9 @@ const VR_ROM_MAP = {
             ],
         },
     },
+    // Map of each course on the HUD (table $15668, copied by $CBCA): 16 bytes by course {x, y, z, 0, model pointer};
+    // the model is a flat outline of the course in scenery units, same origin and axes as the course.
+    courseMaps: {table: 0x895668, stride: 16, modelPointer: 8},
     sceneryGridSize:  32,
     sceneryEmptyCell: 0x2207FFFE,
     coursePalettes:   {start: 0x3A238, stride: 0x200, colors: 256},

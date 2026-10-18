@@ -8,6 +8,7 @@
  *   - bottom left: the lap of the race, the speed (km/h or mph), the gear with
  *     every gearbox, "(A)" beside it in automatic (the original shows it with a
  *     manual one only: user request);
+ *   - right, centred: the map of the course (RacingHudMap), when the setting shows it;
  *   - bottom right: the course;
  *   - centre: the start (PIT START, 3, 2, 1, GO!, the READY lights), REVERSE,
  *     PIT WORK, the lap message and the checkpoint split, blinking as the
@@ -23,6 +24,7 @@ class RacingHud extends AbstractHud {
         this._car     = null;
         this._course  = '';
         this._manual  = false;
+        this._map     = null;
         this._els     = {};
         this._shown   = {};
         this._lapsShown = -1;
@@ -31,7 +33,7 @@ class RacingHud extends AbstractHud {
     /**
      * @param {RacingRaceControl} race
      * @param {RacingCarPhysics}  physics
-     * @param {{car: string, course: string, manual: boolean}} info - car code, course name, gearbox
+     * @param {{car: string, course: string, manual: boolean, map: RacingHudMap}} info - car code, course name, gearbox, map
      */
     bindRace(race, physics, info) {
         this._race    = race;
@@ -39,6 +41,7 @@ class RacingHud extends AbstractHud {
         this._car     = info.car;
         this._course  = info.course;
         this._manual  = info.manual;
+        this._map     = info.map;
 
         return this;
     }
@@ -73,6 +76,9 @@ class RacingHud extends AbstractHud {
         this._add(els.gearRow, 'racing-hud-label', appTranslator.get('hud.gear'));
         els.gear     = this._add(els.gearRow, 'racing-hud-value racing-hud-gear');
         els.gearbox  = this._add(els.gearRow, 'racing-hud-unit');
+
+        els.map = this._add(root, 'racing-hud-map');
+        this._map.build(els.map);
 
         els.course = this._add(root, 'racing-hud-block racing-hud-course');
 
@@ -132,6 +138,11 @@ class RacingHud extends AbstractHud {
         this._text('gear', String(physics.gear + 1));
         this._text('gearbox', (this._manual ? '' : appTranslator.get('hud.automatic')));
         this._text('course', this._course);
+        const mapShown = racingSettings.isMapShown();
+        this._display('map', mapShown);
+        if (mapShown) {
+            this._map.update(physics.x, physics.z);
+        }
 
         this._updateStart(race);
         let notice = null;

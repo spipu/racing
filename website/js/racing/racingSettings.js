@@ -14,6 +14,7 @@ class RacingSettings extends AppSettings {
             {key: 'display.speed_unit',   nameCode: 'settings.display.speedUnit',      type: 'list', default: RacingSettings.SPEED_UNIT_AUTO, values: [{code: RacingSettings.SPEED_UNIT_AUTO, labelCode: 'value.speedUnit.auto'}, {code: RacingSettings.SPEED_UNIT_KMH, label: 'km/h'}, {code: RacingSettings.SPEED_UNIT_MPH, label: 'mph'}]},
             {key: 'race.laps',            nameCode: 'settings.race.laps',              type: 'list', default: RacingSettings.DEFAULT_LAPS, values: RacingSettings.LAPS_VALUES},
             {key: 'race.camera',          nameCode: 'settings.race.camera',            type: 'list', default: RacingSettings.DEFAULT_CAMERA, values: RacingSettings.CAMERA_VALUES},
+            {key: 'race.show_map',        nameCode: 'settings.race.showMap',           type: 'bool', default: true},
             {key: 'sound.volume_music',   nameCode: 'settings.sound.volumeMusic',      type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'sound.volume_effects', nameCode: 'settings.sound.volumeEffects',    type: 'list', default: '100', values: RacingSettings.VOLUME_VALUES},
             {key: 'multiplayer.nickname', nameCode: 'settings.multiplayer.nickname',   type: 'text', default: '', charset: RacingSettings.NICKNAME_CHARSET, maxLength: RacingSettings.NICKNAME_MAX_LENGTH},
@@ -107,6 +108,10 @@ class RacingSettings extends AppSettings {
     // The view a race starts on, 0..3.
     getStartView() {
         return parseInt(this.get('race.camera'), 10);
+    }
+
+    isMapShown() {
+        return (this.get('race.show_map') === true);
     }
 
     // Set by the main for every player.
