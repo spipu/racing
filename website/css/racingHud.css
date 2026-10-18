@@ -101,15 +101,15 @@
     stroke-linecap: round;
 }
 
-/* Right column: the course, then the times below it at the screen margin, both on the right edge. */
+/* Right column: the course, then the times below it at the screen margin, both on the right edge; the column is
+   as wide as the wider of them, the course stretched to it (at least as wide as the times), the times not. */
 .racing-hud-right {
     position: absolute;
     top: 2.5cqh;
     right: 2.5cqh;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2.5cqh;
+    display: grid;
+    justify-items: end;
+    row-gap: 2.5cqh;
 }
 
 .racing-hud-right .racing-hud-block {
@@ -171,6 +171,8 @@
 }
 
 .racing-hud-course {
+    justify-self: stretch;
+    text-align: center;
     font-size: 3cqh;
     font-weight: 800;
     font-style: italic;
