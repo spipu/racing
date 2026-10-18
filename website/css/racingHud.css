@@ -133,8 +133,6 @@
 }
 
 .racing-hud-status {
-    /* 8 % wider than the content and the usual padding (user request), the rev counter with it. */
-    padding: 1.2cqh 2.88cqh;
     display: grid;
     grid-template-columns: auto auto auto;
     align-items: baseline;
