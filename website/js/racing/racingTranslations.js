@@ -304,11 +304,11 @@ class RacingTranslations {
                 it: 'Giro record!',
                 es: '¡Vuelta récord!'
             },
-            'hud.lapTimeOf': {
-                fr: 'Temps du tour {lap}',
-                en: 'Lap {lap} time',
-                it: 'Tempo del giro {lap}',
-                es: 'Tiempo de la vuelta {lap}'
+            'hud.lapOf': {
+                fr: 'Tour {lap} :',
+                en: 'Lap {lap}:',
+                it: 'Giro {lap}:',
+                es: 'Vuelta {lap}:'
             },
             'hud.automatic': {
                 fr: '(A)',

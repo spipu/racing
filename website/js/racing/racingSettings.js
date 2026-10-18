@@ -137,6 +137,7 @@ RacingSettings.NICKNAME_MAX_LENGTH = 16;
 // Laps of a race: the original offers 5 to 20 in Time Attack, longer races added (user request 2026-10-13).
 RacingSettings.LAPS_VALUES         = ['5', '10', '15', '20', '30', '50'].map((code) => ({code: code, label: code}));
 RacingSettings.DEFAULT_LAPS        = '5';
+RacingSettings.MAX_LAPS            = Math.max(...RacingSettings.LAPS_VALUES.map((value) => parseInt(value.code, 10)));
 // The 4 views of the original ($C048), in the order of the view button; the original starts on view 1.
 RacingSettings.CAMERA_VALUES       = [
     {code: '0', labelCode: 'value.camera.cockpit'},

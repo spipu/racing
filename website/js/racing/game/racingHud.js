@@ -2,14 +2,18 @@
  * In-race overlay: the information of the original Time Attack HUD in blocks
  * in the corners, sized in cqh of the letterbox (race.md § HUD):
  *   - top left: the rev counter of the car (needle from the smoothed rpm +$7E,
- *     $B06A: a quarter turn from 6000 rpm, its own scale by car);
- *   - top right: the fastest lap (the record of the course and car), the lap
- *     time, then the times of the last laps done (user request);
- *   - bottom left: the lap of the race, the speed (km/h or mph), the gear with
- *     every gearbox, "(A)" beside it in automatic (the original shows it with a
- *     manual one only: user request);
- *   - right, centred: the map of the course (RacingHudMap), when the setting shows it;
- *   - bottom right: the course;
+ *     $B06A: a quarter turn from 6000 rpm, its own scale by car), as wide as
+ *     the block below it (user request): both in one left column;
+ *   - top right: the course, then under it (user request) the fastest lap
+ *     (the record of the course and car), the lap time, then the times of the
+ *     last laps done (user request): both in one right column; the times as
+ *     wide as their longest line in any language, whatever the laps done;
+ *   - left, under the rev counter (user request): the lap of the race, the
+ *     speed (km/h or mph), the gear with every gearbox, "(A)" beside it in
+ *     automatic (the original shows it with a manual one only: user request);
+ *   - right, under the times with the last laps all shown, as wide as the
+ *     times (user request): the map of the course (RacingHudMap), when the
+ *     setting shows it;
  *   - centre: the start (PIT START, 3, 2, 1, GO!, the READY lights), REVERSE,
  *     PIT WORK, the lap message and the checkpoint split, blinking as the
  *     original does; the blinds of the opening and of the finish over all;
@@ -52,18 +56,30 @@ class RacingHud extends AbstractHud {
         const els  = this._els;
         els.root   = root;
 
-        els.tach   = this._add(root, 'racing-hud-block racing-hud-tach');
+        const left  = this._add(root, 'racing-hud-left');
+        const right = this._add(root, 'racing-hud-right');
+
+        els.tach   = this._add(left, 'racing-hud-block racing-hud-tach');
         this._buildTach(els.tach);
 
-        const times = this._add(root, 'racing-hud-block racing-hud-times');
+        els.course = this._add(right, 'racing-hud-block racing-hud-course');
+
+        const stack = this._add(right, 'racing-hud-times-stack');
+        const times = this._add(stack, 'racing-hud-block racing-hud-times');
         this._add(times, 'racing-hud-label', appTranslator.get('hud.fastestLap'));
         els.record  = this._add(times, 'racing-hud-time racing-hud-record');
         this._add(times, 'racing-hud-label', appTranslator.get('hud.lapTime'));
         els.lapTime = this._add(times, 'racing-hud-time');
         els.lastLaps = this._add(times, 'racing-hud-last-laps');
         this._lapsShown = -1;
+        // Hidden, no height: the longest lap line of every language gives the block its width, the same in all.
+        for (const label of Object.values(RacingTranslations.CATALOG['hud.lapOf'])) {
+            const sizer = this._add(times, 'racing-hud-last-lap racing-hud-sizer');
+            this._add(sizer, 'racing-hud-label', label.replace('{lap}', String(RacingSettings.MAX_LAPS)));
+            this._add(sizer, 'racing-hud-last-lap-time', RacingHud.SIZER_TIME);
+        }
 
-        const status = this._add(root, 'racing-hud-block racing-hud-status');
+        const status = this._add(left, 'racing-hud-block racing-hud-status');
         const lapRow = this._add(status, 'racing-hud-row');
         this._add(lapRow, 'racing-hud-label', appTranslator.get('hud.laps'));
         els.lap      = this._add(lapRow, 'racing-hud-value');
@@ -77,10 +93,8 @@ class RacingHud extends AbstractHud {
         els.gear     = this._add(els.gearRow, 'racing-hud-value racing-hud-gear');
         els.gearbox  = this._add(els.gearRow, 'racing-hud-unit');
 
-        els.map = this._add(root, 'racing-hud-map');
+        els.map = this._add(stack, 'racing-hud-map');
         this._map.build(els.map);
-
-        els.course = this._add(root, 'racing-hud-block racing-hud-course');
 
         const centre = this._add(root, 'racing-hud-centre');
         els.sign     = this._add(centre, 'racing-hud-sign');
@@ -206,7 +220,7 @@ class RacingHud extends AbstractHud {
         list.textContent = '';
         for (let i = first; i < lapTimes.length; i++) {
             const row = this._add(list, 'racing-hud-last-lap');
-            this._add(row, 'racing-hud-label', appTranslator.get('hud.lapTimeOf', {lap: (i + 1)}));
+            this._add(row, 'racing-hud-label', appTranslator.get('hud.lapOf', {lap: (i + 1)}));
             this._add(row, 'racing-hud-last-lap-time', RacingTime.format(lapTimes[i]));
         }
     }
@@ -330,6 +344,8 @@ RacingHud.SVG          = 'http://www.w3.org/2000/svg';
 RacingHud.MPH_PER_KMH  = 0.621371;
 RacingHud.LAMPS        = 5;
 RacingHud.LAST_LAPS    = 5;
+// Widest lap time the sizer line keeps room for (never shown).
+RacingHud.SIZER_TIME   = '99\'99"999';
 RacingHud.SLATS        = 12;
 // Rev counter: 6000 rpm on the top graduation, a quarter turn ($800 / 8192) for 11000 more (reached about 16900).
 RacingHud.TACH_FROM    = 6000;

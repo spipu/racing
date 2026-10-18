@@ -192,25 +192,29 @@ RacingControls.VIRTUAL_PAD_ICONS = {
     gearDown:   {shapes: '<rect x="4" y="10.6" width="16" height="2.8" rx="1.4"/>'}
 };
 
-// Pause and view in the top-left corner, at the same edge margin as the right
-// column; accelerate and brake in the bottom-right corner at the same margin,
-// under the right thumb, held for the whole race, hence larger; gear up right
-// above accelerate and gear down above brake, same width, ship hidden and the
-// manual gearbox shows them.
+// Pause then view at the top, right of the rev counter (it ends at 34.5 % of the
+// height from the left edge, measured), at the HUD margin of 2.5 % of the height
+// from the top and between each other (x in widths: × 1080 / 1920); one row in
+// the bottom-right corner under the map (it ends at 76.4 % of the height,
+// measured), at the same margins: accelerate in the corner under the right thumb,
+// brake to its left; gear up right above accelerate and gear down above brake,
+// same width, at the same margin, shipped hidden and shown by the manual gearbox.
 RacingControls.VIRTUAL_PAD_BUTTONS = {
-    pause:      {x: 0.019, y: 0.020, w: 0.079, h: 0.112, icon: 'menu'},
-    view:       {x: 0.107, y: 0.020, w: 0.079, h: 0.112, icon: 'view'},
-    gearUp:     {x: 0.871, y: 0.600, w: 0.110, h: 0.112, icon: 'gearUp', allowed: false},
-    gearDown:   {x: 0.749, y: 0.600, w: 0.110, h: 0.112, icon: 'gearDown', allowed: false},
-    accelerate: {x: 0.871, y: 0.720, w: 0.110, h: 0.260, icon: 'accelerate'},
-    brake:      {x: 0.749, y: 0.720, w: 0.110, h: 0.260, icon: 'brake'}
+    pause:      {x: 0.208, y: 0.025, w: 0.079, h: 0.112, icon: 'menu'},
+    view:       {x: 0.301, y: 0.025, w: 0.079, h: 0.112, icon: 'view'},
+    gearUp:     {x: 0.876, y: 0.652, w: 0.110, h: 0.112, icon: 'gearUp', allowed: false},
+    gearDown:   {x: 0.752, y: 0.652, w: 0.110, h: 0.112, icon: 'gearDown', allowed: false},
+    accelerate: {x: 0.876, y: 0.789, w: 0.110, h: 0.186, icon: 'accelerate'},
+    brake:      {x: 0.752, y: 0.789, w: 0.110, h: 0.186, icon: 'brake'}
 };
 
 RacingControls.VIRTUAL_PAD_LAYOUT = {
     // Bottom-left quadrant, left thumb, as doom_js's move stick.
     moveArea:    {x: 0, y: 0.5, w: 0.5, h: 0.5},
     aimArea:     null,
-    stickHints:  {move: {x: 0.170, y: 0.698}},
+    // Resting outline in the bottom-left corner, 2.5 % of the height from both edges like the HUD blocks:
+    // centre at radius + margin, x = 0.225 × 1080 / 1920.
+    stickHints:  {move: {x: 0.127, y: 0.775}},
     // Larger than doom_js's sticks: a longer travel steers more finely.
     stickRadius: 0.2,
     buttons:     RacingControls.VIRTUAL_PAD_BUTTONS,

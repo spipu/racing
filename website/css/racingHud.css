@@ -33,10 +33,25 @@
     color: #9FD3FF;
 }
 
-.racing-hud-tach {
+/* Left column: the rev counter, then the block below it at the screen margin; the rev counter takes the
+   width of that block, whatever the font. */
+.racing-hud-left {
+    position: absolute;
     top: 2.5cqh;
     left: 2.5cqh;
-    width: 24cqh;
+    display: flex;
+    flex-direction: column;
+    gap: 2.5cqh;
+}
+
+.racing-hud-left > .racing-hud-block {
+    position: relative;
+}
+
+.racing-hud-tach {
+    /* No width of its own (the dial follows its width): it fills the column, sized by the block below. */
+    width: 0;
+    min-width: 100%;
     padding: 0.8cqh;
 }
 
@@ -86,10 +101,22 @@
     stroke-linecap: round;
 }
 
-.racing-hud-times {
+/* Right column: the course, then the times below it at the screen margin, both on the right edge. */
+.racing-hud-right {
+    position: absolute;
     top: 2.5cqh;
     right: 2.5cqh;
-    min-width: 25cqh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2.5cqh;
+}
+
+.racing-hud-right .racing-hud-block {
+    position: relative;
+}
+
+.racing-hud-times {
     text-align: right;
 }
 
@@ -106,8 +133,6 @@
 }
 
 .racing-hud-status {
-    left: 2.5cqh;
-    bottom: 2.5cqh;
     display: grid;
     grid-template-columns: auto auto auto;
     align-items: baseline;
@@ -146,8 +171,6 @@
 }
 
 .racing-hud-course {
-    right: 2.5cqh;
-    bottom: 2.5cqh;
     font-size: 3cqh;
     font-weight: 800;
     font-style: italic;
@@ -156,15 +179,19 @@
     color: #FFD21E;
 }
 
-/* Square on the right edge, centred in height; the outline fills it whatever the course (RacingHudMap). */
+/* The times, and the map under them as wide as they are. */
+.racing-hud-times-stack {
+    position: relative;
+}
+
+/* Square; the outline fills it whatever the course (RacingHudMap). */
 .racing-hud-map {
     position: absolute;
-    right: 2.5cqh;
-    top: 50%;
-    /* Clear of the times with the 5 last laps (down to about 37.5cqh). */
-    width: 22cqh;
-    height: 22cqh;
-    transform: translateY(-50%);
+    /* Fixed, at the margin under the times with the 5 last laps (33.6cqh high, measured). */
+    top: 36.1cqh;
+    left: 0;
+    width: 100%;
+    aspect-ratio: 1;
 }
 
 .racing-hud-map-svg {
@@ -371,6 +398,8 @@
     font-size: 5cqh;
     font-weight: 800;
     margin-left: -1cqh;
+    /* Room for "/50", the most laps: the block keeps its width whatever the race. */
+    min-width: 3ch;
 }
 
 /* The last laps done, under the lap time: label and time on one line. */
@@ -385,6 +414,12 @@
     justify-content: space-between;
     align-items: baseline;
     gap: 1.5cqh;
+}
+
+.racing-hud-sizer {
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
 }
 
 .racing-hud-last-lap-time {
