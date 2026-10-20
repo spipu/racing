@@ -1,5 +1,5 @@
 {
-    "version": "v1.0198",
+    "version": "v1.0202",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -242,6 +242,17 @@
             "/js/racing/game/racingCamera.js",
             "/js/racing/game/racingHudMap.js",
             "/js/racing/game/racingHud.js",
+            "/js/racing/game/racingCarState.js",
+            "/js/racing/game/racingCommand.js",
+            "/js/racing/game/racingCommandSampler.js",
+            "/js/racing/game/racingTurnEvents.js",
+            "/js/racing/game/racingPitWork.js",
+            "/js/racing/game/racingPlayer.js",
+            "/js/racing/game/racingPlayerRoster.js",
+            "/js/racing/game/racingSimulation.js",
+            "/js/racing/game/abstractRacingRole.js",
+            "/js/racing/game/racingMainRole.js",
+            "/js/racing/game/racingPresentation.js",
             "/js/racing/game/racingGame.js",
             "/js/racing/menu/abstractRacingMenuScreen.js",
             "/js/racing/menu/mainMenuScreen.js",

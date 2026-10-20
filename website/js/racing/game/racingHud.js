@@ -24,7 +24,7 @@ class RacingHud extends AbstractHud {
         super(engine);
 
         this._race    = null;
-        this._physics = null;
+        this._state   = null;
         this._car     = null;
         this._course  = '';
         this._manual  = false;
@@ -35,13 +35,13 @@ class RacingHud extends AbstractHud {
     }
 
     /**
-     * @param {RacingRaceControl} race
-     * @param {RacingCarPhysics}  physics
+     * @param {RacingRaceControl} race  - the display of the race shown
+     * @param {RacingCarState}    state - its car's
      * @param {{car: string, course: string, manual: boolean, map: RacingHudMap}} info - car code, course name, gearbox, map
      */
-    bindRace(race, physics, info) {
+    bindRace(race, state, info) {
         this._race    = race;
-        this._physics = physics;
+        this._state   = state;
         this._car     = info.car;
         this._course  = info.course;
         this._manual  = info.manual;
@@ -134,28 +134,28 @@ class RacingHud extends AbstractHud {
             return;
         }
         this._updateFps();
-        if ((this._race === null) || (this._physics === null)) {
+        if ((this._race === null) || (this._state === null)) {
             return;
         }
-        const race    = this._race;
-        const physics = this._physics;
+        const race  = this._race;
+        const state = this._state;
 
-        this._needle(physics.smoothRpm);
+        this._needle(state.smoothRpm);
         this._text('lapTime', RacingTime.format(race.lapMs));
         this._text('record', RacingTime.format((race.record === null) ? null : race.record.lapMs));
         this._updateLastLaps(race.lapTimes);
-        this._text('lap', String(Math.min((physics.lap + 1), race.laps)));
+        this._text('lap', String(Math.min((state.lap + 1), race.laps)));
         this._text('laps', '/' + race.laps);
         const mph = (racingSettings.getSpeedUnit() === RacingSettings.SPEED_UNIT_MPH);
-        this._text('speed', String(Math.round(mph ? (physics.displaySpeed * RacingHud.MPH_PER_KMH) : physics.displaySpeed)));
+        this._text('speed', String(Math.round(mph ? (state.displaySpeed * RacingHud.MPH_PER_KMH) : state.displaySpeed)));
         this._text('unit', (mph ? 'mph' : 'km/h'));
-        this._text('gear', String(physics.gear + 1));
+        this._text('gear', String(state.gear + 1));
         this._text('gearbox', (this._manual ? '' : appTranslator.get('hud.automatic')));
         this._text('course', this._course);
         const mapShown = racingSettings.isMapShown();
         this._display('map', mapShown);
         if (mapShown) {
-            this._map.update(physics.x, physics.z);
+            this._map.update(state.x, state.z);
         }
 
         this._updateStart(race);

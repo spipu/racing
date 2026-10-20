@@ -26,7 +26,7 @@ const {BenchTrace}    = require('./benchTrace');
 const ROOT_DIR    = path.resolve(__dirname, '..');
 const WEBSITE_DIR = path.join(ROOT_DIR, 'website');
 const SOURCES     = ['js/racing/game/racingCourseCollision.js', 'js/racing/game/racingCarPhysics.js', 'js/racing/game/racingRaceControl.js'];
-// The start with the pit crew (RacingGame.PIT_START_COURSES).
+// The start with the pit crew (RacingSimulation.PIT_START_COURSES).
 const PIT_START_COURSES = ['big_forest'];
 // HUD entries of the original ($FF6800 list, research-race.md § 3): visible when byte 0 is not 0, image at +8.
 const HUD = {
@@ -71,7 +71,7 @@ const FINISH_RESULTS = 0x0C;
 const RACE_OWNED = ['mode', 'raceFlags', 'pitCrewFrame'];
 // Crew descriptor $FF66DC: drawn at frame 0 while $C026 is still -1 (the opening).
 const CREW_SHOWN = 0x1C;
-// The results music of RacingGame, as the race control ends.
+// The results music (RacingPresentation.JINGLE_RESULTS), as the race control ends.
 const RESULTS_MUSIC = '8E';
 const LAP_COUNT    = {block: 'FFC300', offset: 0x10};
 const RACE_FLAGS   = {block: 'FFC300', offset: 0x0E};

@@ -5,7 +5,11 @@
  * offered off touch-only devices, the touch controls on them, the gamepad once
  * detected. The player's bindings come from RacingSettings (keyboard.* / pad.*).
  * Buttons steer all or nothing like the original digital pad; a stick steers in
- * proportion to its deflection. Gear, view and pause presses count once per press.
+ * proportion to its deflection. As Inputs, every reader gives the state of the
+ * moment, never an edge: whoever consumes it derives the presses (the game the
+ * pause, the presentation the view, the simulation the gear changes from the
+ * previous command). Gamepad presence is event-driven (gamepadconnected /
+ * gamepaddisconnected: the browser only exposes a pad once a button is pressed).
  */
 class RacingControls {
     /**
@@ -16,11 +20,19 @@ class RacingControls {
         this._keyboard       = new AppInputKeyboard();
         this._gamepad        = new AppInputGamepad();
         this._virtualGamepad = new AppInputVirtualGamepad(RacingControls.VIRTUAL_PAD_LAYOUT);
-        this._held           = new Set();
         this._device         = null;
         this._padSuppressed  = false;
+        this._onGamepad      = () => this._selectDevice();
         this._virtualGamepad.allowControl('gearUp', manual).allowControl('gearDown', manual).bindDisplay(display);
         this.applySettings();
+        window.addEventListener('gamepadconnected', this._onGamepad);
+        window.addEventListener('gamepaddisconnected', this._onGamepad);
+    }
+
+    // The race is over: the gamepad events no longer choose its device.
+    teardown() {
+        window.removeEventListener('gamepadconnected', this._onGamepad);
+        window.removeEventListener('gamepaddisconnected', this._onGamepad);
     }
 
     // The bindings and the device, read again after a change in the pause options.
@@ -55,29 +67,52 @@ class RacingControls {
         return this;
     }
 
-    /**
-     * @returns {{accelerate: boolean, brake: boolean, steer: int, steerAxis: (number|null), gearUp: boolean, gearDown: boolean, view: boolean, quit: boolean}}
-     *          steer: +1 left, -1 right; steerAxis: stick deflection from -1 (right) to +1 (left), null when a button
-     *          steers or the stick is at rest; gearUp / gearDown / view / quit: pressed since the last read
-     */
-    read() {
-        this._selectDevice();
-        const held  = (action) => this._readAction(action);
-        const stick = this._readSteer();
-        const left  = held('steerLeft');
-        const right = held('steerRight');
-        const axis  = ((!left && !right && (stick !== 0)) ? -stick : null);
+    readButtonAccelerate() {
+        return this._readAction('accelerate');
+    }
 
-        return {
-            accelerate: held('accelerate'),
-            brake:      held('brake'),
-            steer:      ((axis !== null) ? Math.sign(axis) : (((left) ? 1 : 0) - ((right) ? 1 : 0))),
-            steerAxis:  axis,
-            gearUp:     this._press('gearUp', held('gearUp')),
-            gearDown:   this._press('gearDown', held('gearDown')),
-            view:       this._press('view', held('view')),
-            quit:       this._press('pause', held('pause')),
-        };
+    readButtonBrake() {
+        return this._readAction('brake');
+    }
+
+    readButtonSteerLeft() {
+        return this._readAction('steerLeft');
+    }
+
+    readButtonSteerRight() {
+        return this._readAction('steerRight');
+    }
+
+    readButtonGearUp() {
+        return this._readAction('gearUp');
+    }
+
+    readButtonGearDown() {
+        return this._readAction('gearDown');
+    }
+
+    readButtonView() {
+        return this._readAction('view');
+    }
+
+    // Escape on the keyboard side, not remappable, read even with a pad active: it must pause for a hybrid
+    // player (Inputs.readButtonPause).
+    readButtonPause() {
+        return (this._readAction('pause') || this._keyboard.readKey(RacingControls.PAUSE_KEY));
+    }
+
+    /**
+     * @returns {number} the steering stick, from -1 (right) to +1 (left), 0 at rest or on the keyboard
+     */
+    readSteerAxis() {
+        if (this._device === RacingSettings.DEVICE_GAMEPAD) {
+            return -this._gamepad.readSlot('steer');
+        }
+        if (this._device === RacingSettings.DEVICE_VIRTUAL_PAD) {
+            return -this._virtualGamepad.readMoveX();
+        }
+
+        return 0;
     }
 
     /**
@@ -148,30 +183,9 @@ class RacingControls {
 
         return this._keyboard.readAction(action);
     }
-
-    _readSteer() {
-        if (this._device === RacingSettings.DEVICE_GAMEPAD) {
-            return this._gamepad.readSlot('steer');
-        }
-        if (this._device === RacingSettings.DEVICE_VIRTUAL_PAD) {
-            return this._virtualGamepad.readMoveX();
-        }
-
-        return 0;
-    }
-
-    _press(action, down) {
-        const pressed = (down && !this._held.has(action));
-        if (down) {
-            this._held.add(action);
-        } else {
-            this._held.delete(action);
-        }
-
-        return pressed;
-    }
 }
 
+RacingControls.PAUSE_KEY       = 'Escape';
 // Order in which the devices are listed to the player.
 RacingControls.DEVICES         = [RacingSettings.DEVICE_KEYBOARD, RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD];
 RacingControls.AUTO_PRIORITY   = [RacingSettings.DEVICE_GAMEPAD, RacingSettings.DEVICE_VIRTUAL_PAD, RacingSettings.DEVICE_KEYBOARD];

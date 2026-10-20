@@ -63,11 +63,15 @@ const SOURCES     = [
     'js/racing/game/racingCarView.js',
     'js/racing/game/racingPitCrewSchedule.js',
     'js/racing/game/racingPitCrew.js',
+    'js/racing/game/racingCarState.js',
+    'js/racing/game/racingPlayer.js',
     'js/racing/game/racingGame.js',
 ];
 const CLASSES    = ['RacingPalette', 'RacingModelConverter', 'RacingWheelModels', 'RacingCarPhysics', 'RacingCarView', 'RacingPitCrewSchedule', 'RacingPitCrew', 'RacingGame', 'Mat4', 'Matrix'];
 const DATA       = 'assets/virtual_racing/';
 const COURSE     = 'big_forest';
+// Its index in the start grids of race.json (the courses of the original's order).
+const COURSE_INDEX = 0;
 const CAR        = 'formula';
 const CARS       = ['formula', 'stock', 'prototype'];
 // The pit start's car: on the first place of the grid, the pit box.
@@ -167,7 +171,7 @@ class PitCrewBench {
             this.loader.setCallback(resolve);
             this.loader.endBatch();
         });
-        const [x, height, z] = data.race.startGrids[code].race[this.RacingGame.PIT_START_COURSES.indexOf(COURSE)][START_PLACE];
+        const [x, height, z] = data.race.startGrids[code].race[COURSE_INDEX][START_PLACE];
         const position       = [(x * this.RacingGame.METRES_PER_ENTITY_UNIT * (mirror ? -1 : 1)), (height * this.RacingGame.METRES_PER_HEIGHT_UNIT), (z * this.RacingGame.METRES_PER_ENTITY_UNIT)];
         // As the game: every instance made before the car is placed (the loader sets new ones as loaded).
         view.bind();
