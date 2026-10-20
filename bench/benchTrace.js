@@ -91,10 +91,32 @@ class BenchTrace {
         const last = keys.pop();
         keys.reduce((parent, key) => parent[key], object)[last] = value;
     }
+
+    /**
+     * @returns {number} the turn from one heading to the other, in degrees, the shorter way
+     */
+    static headingGap(heading, reference) {
+        const turns = BenchTrace.ANGLE_UNITS;
+        const turn  = ((((heading - reference) % turns) + (turns * 1.5)) % turns) - (turns / 2);
+
+        return Math.abs((turn * 360) / turns);
+    }
+
+    /**
+     * @returns {string} the median, 95th percentile and worst of the gaps measured, scaled, in the unit
+     */
+    static spread(values, scale, unit) {
+        const sorted = values.slice().sort((a, b) => (a - b));
+        const at     = (share) => (sorted[Math.min((sorted.length - 1), Math.floor(share * sorted.length))] * scale);
+
+        return 'median ' + at(0.5).toFixed(2) + ', 95 % ' + at(0.95).toFixed(2) + ', max ' + at(1).toFixed(2) + ' ' + unit;
+    }
 }
 
 BenchTrace.TICK_COUNTER    = {block: 'FFC000', offset: 0xA4};
 BenchTrace.MAX_TICK_FRAMES = 5;
+// Heading units in a turn.
+BenchTrace.ANGLE_UNITS     = 65536;
 // Bits of the pad copy $C300.
 BenchTrace.PAD_LEFT        = 2;
 BenchTrace.PAD_RIGHT       = 3;

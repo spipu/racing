@@ -6,8 +6,8 @@
  *   node bench/recordTraces.js wall           one scenario
  *   node bench/recordTraces.js --shots        also writes a screenshot after each setup (.tmp.claude/traces/)
  *
- * The setup line of a scenario (BenchScenario) is expanded into the Time Attack menu navigation; the
- * rest is passed as is to bench/recorder/vrTraceRecorder (frame count + buttons).
+ * The setup line of a scenario (BenchScenario) is expanded into the Time Attack menu navigation, or the 2 players VS
+ * one; the rest is passed as is to bench/recorder/vrTraceRecorder (frame count + buttons).
  * Each trace is written to bench/traces/<scenario>.jsonl.gz: one JSON line per frame from the race start.
  */
 const childProcess = require('child_process');
@@ -27,12 +27,17 @@ const RECORDER_PATH = path.join(RECORDER_DIR, 'vrTraceRecorder');
 const WORK_DIR      = path.join(ROOT_DIR, '.tmp.claude', 'traces');
 
 const RAM_BLOCKS   = ['block FF9000 256', 'block FFC000 256', 'block FFC300 64'];
+// Two players: the second car's entity, and the race variables ($C87E: the phase of the frame cycle that runs next).
+const TWO_PLAYERS_BLOCKS = ['block FF9F00 256', 'block FFC800 256'];
 
 const PRESS_FRAMES  = 5;
 const SCREEN_WAIT   = 120;
 const CURSOR_WAIT   = 40;
 const BOOT_WAIT     = 600;
 const GRID_WAIT     = 600;
+// The 2 players VS entry of MODE SELECT, after Virtua Racing and Time Attack.
+const TWO_PLAYERS_MODE = 2;
+const BOTH_PADS_START  = 'START+2.START';
 
 class TraceRecorder {
     constructor(args) {
@@ -64,7 +69,8 @@ class TraceRecorder {
 
     _record(scenario) {
         const name      = scenario.name;
-        const input     = [...RAM_BLOCKS, ...scenario.recorderLines(this._setupLines(scenario))].join('\n') + '\n';
+        const blocks    = [...RAM_BLOCKS, ...((scenario.players === 2) ? TWO_PLAYERS_BLOCKS : [])];
+        const input     = [...blocks, ...scenario.recorderLines(this._setupLines(scenario))].join('\n') + '\n';
         const workTrace = path.join(WORK_DIR, name + '.jsonl');
         const args      = [CORE_PATH, ROM_PATH, '-', workTrace];
         if (this._shots) {
@@ -96,24 +102,48 @@ class TraceRecorder {
 
     // Time Attack menu navigation of a setup ({car, transmission, course}), up to the start grid.
     menuInputs(scenario) {
-        const carIndex    = BenchScenario.CARS.indexOf(scenario.car);
-        const courseIndex = BenchScenario.COURSES.indexOf(scenario.course);
-        const press = (button, wait) => [PRESS_FRAMES + ' ' + button, wait + ' -'];
-        const inputs = [BOOT_WAIT + ' -'];
-        inputs.push(...press('START', SCREEN_WAIT), ...press('START', SCREEN_WAIT), ...press('START', SCREEN_WAIT));
-        inputs.push(...press('RIGHT', CURSOR_WAIT), ...press('START', SCREEN_WAIT), SCREEN_WAIT + ' -');
-        for (let i = 0; i < carIndex; i++) {
-            inputs.push(...press('RIGHT', CURSOR_WAIT));
+        if (scenario.players === 2) {
+            return this._twoPlayersInputs(scenario);
         }
+        const press  = TraceRecorder._press;
+        const inputs = TraceRecorder._titleInputs();
+        inputs.push(...press('RIGHT', CURSOR_WAIT), ...press('START', SCREEN_WAIT), SCREEN_WAIT + ' -');
+        inputs.push(...TraceRecorder._rights(BenchScenario.CARS.indexOf(scenario.car)));
         if (scenario.transmission === 'manual') {
             inputs.push(...press('DOWN', CURSOR_WAIT), ...press('RIGHT', CURSOR_WAIT));
         }
         inputs.push(...press('START', SCREEN_WAIT), SCREEN_WAIT + ' -');
-        for (let i = 0; i < courseIndex; i++) {
-            inputs.push(...press('RIGHT', CURSOR_WAIT));
-        }
+        inputs.push(...TraceRecorder._rights(BenchScenario.COURSES.indexOf(scenario.course)));
         inputs.push(...press('START', GRID_WAIT));
         return inputs;
+    }
+
+    // 2 players VS menu navigation, each screen validated by both pads, up to the start grid: validating the course
+    // starts the race. The transmission and handicap lines stay at their defaults (automatic, 3).
+    _twoPlayersInputs(scenario) {
+        if ((scenario.transmission !== 'automatic') || (scenario.transmission2 !== 'automatic')) {
+            throw new Error(scenario.name + ': the 2 players menu navigation only sets the automatic transmissions');
+        }
+        const press  = TraceRecorder._press;
+        const inputs = TraceRecorder._titleInputs();
+        inputs.push(...TraceRecorder._rights(TWO_PLAYERS_MODE), ...press(BOTH_PADS_START, SCREEN_WAIT), SCREEN_WAIT + ' -');
+        inputs.push(...TraceRecorder._rights(BenchScenario.CARS.indexOf(scenario.car)), ...press(BOTH_PADS_START, SCREEN_WAIT), SCREEN_WAIT + ' -');
+        inputs.push(...TraceRecorder._rights(BenchScenario.COURSES.indexOf(scenario.course)), ...press(BOTH_PADS_START, GRID_WAIT));
+        return inputs;
+    }
+
+    // From the boot to MODE SELECT.
+    static _titleInputs() {
+        const press = TraceRecorder._press;
+        return [BOOT_WAIT + ' -', ...press('START', SCREEN_WAIT), ...press('START', SCREEN_WAIT), ...press('START', SCREEN_WAIT)];
+    }
+
+    static _press(button, wait) {
+        return [PRESS_FRAMES + ' ' + button, wait + ' -'];
+    }
+
+    static _rights(count) {
+        return Array.from({length: count}, () => TraceRecorder._press('RIGHT', CURSOR_WAIT)).flat();
     }
 }
 

@@ -7,7 +7,8 @@
  *
  * Scenario lines (# starts a comment):
  *   block <hex 68K address> <byte count>   RAM block dumped every frame (declared first)
- *   <frame count> <buttons>                buttons held, joined by '+' (A B C X Y Z START MODE UP DOWN LEFT RIGHT), '-' for none
+ *   <frame count> <buttons>                buttons held, joined by '+' (A B C X Y Z START MODE UP DOWN LEFT RIGHT), '-' for none;
+ *                                          a button prefixed '2.' is held on the second pad (2.START)
  *   shot <name>                            writes <shots_dir>/<name>.ppm of the last frame
  *   record                                 frames are written to the trace from here on
  *   poke <hex 68K address> <hex word>      writes a word of work RAM (a car placed for a test); the next frame
@@ -57,7 +58,10 @@ static const ButtonName BUTTONS[] = {
 };
 #define BUTTON_COUNT (sizeof(BUTTONS) / sizeof(BUTTONS[0]))
 
-static uint16_t      g_inputMask    = 0;
+#define PAD_COUNT        2
+#define SECOND_PAD_PREFIX "2."
+
+static uint16_t      g_inputMask[PAD_COUNT] = {0, 0};
 static const void   *g_frameData    = NULL;
 static unsigned      g_frameWidth   = 0;
 static unsigned      g_frameHeight  = 0;
@@ -186,13 +190,13 @@ static void on_input_poll(void) {
 
 static int16_t on_input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
     (void)index;
-    if ((port != 0) || (device != RETRO_DEVICE_JOYPAD)) {
+    if ((port >= PAD_COUNT) || (device != RETRO_DEVICE_JOYPAD)) {
         return 0;
     }
     if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
-        return (int16_t)g_inputMask;
+        return (int16_t)g_inputMask[port];
     }
-    return (int16_t)((g_inputMask >> id) & 1);
+    return (int16_t)((g_inputMask[port] >> id) & 1);
 }
 
 static void *load_symbol(void *handle, const char *name) {
@@ -245,26 +249,31 @@ static void *read_file(const char *path, size_t *size) {
     return data;
 }
 
-static uint16_t parse_buttons(const char *text, int lineNumber) {
+static void parse_buttons(const char *text, int lineNumber, uint16_t *masks) {
+    masks[0] = 0;
+    masks[1] = 0;
     if (strcmp(text, "-") == 0) {
-        return 0;
+        return;
     }
-    uint16_t mask = 0;
     char copy[MAX_LINE];
     snprintf(copy, sizeof(copy), "%s", text);
     for (char *token = strtok(copy, "+"); token != NULL; token = strtok(NULL, "+")) {
+        int pad = 0;
+        if (strncmp(token, SECOND_PAD_PREFIX, strlen(SECOND_PAD_PREFIX)) == 0) {
+            pad    = 1;
+            token += strlen(SECOND_PAD_PREFIX);
+        }
         bool found = false;
         for (size_t i = 0; i < BUTTON_COUNT; i++) {
             if (strcmp(token, BUTTONS[i].name) == 0) {
-                mask  = (uint16_t)(mask | (1u << BUTTONS[i].id));
-                found = true;
+                masks[pad] = (uint16_t)(masks[pad] | (1u << BUTTONS[i].id));
+                found      = true;
             }
         }
         if (!found) {
             fail("scenario line %d: unknown button %s", lineNumber, token);
         }
     }
-    return mask;
 }
 
 /* PicoDrive keeps work RAM as native 16-bit words: byte n of a word lives at index n ^ 1 on little-endian hosts. */
@@ -409,7 +418,7 @@ int main(int argc, char **argv) {
         if ((*end != '\0') || (count < 0)) {
             fail("scenario line %d: bad frame count '%s'", lineNumber, first);
         }
-        g_inputMask = parse_buttons(second, lineNumber);
+        parse_buttons(second, lineNumber, g_inputMask);
         for (long i = 0; i < count; i++) {
             core_run();
             if (recording) {

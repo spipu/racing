@@ -1,0 +1,6 @@
+# Two players: the second car set overlapping the side of the first (pokes), both at the same speed: pushed apart
+setup two_players formula automatic automatic bay_bridge
+120 B+2.B
+poke FF9F30 F338
+poke FF9F34 0121
+150 B+2.B

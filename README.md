@@ -51,7 +51,7 @@ node bench/recordTraces.js              # every scenario
 node bench/recordTraces.js wall         # one scenario
 ```
 
-Each scenario replays the Time Attack menu navigation (car, transmission, course), then its inputs; the trace keeps, frame by frame from the start, the state of the player's car and the game's global variables. A `poke <address> <word>` line writes to the game's RAM (the car placed before the pits or the finish line, damage); the comparison then starts again from the traced state. A `from load` line records from the loading of the race (before the opening), `block <address> <bytes>` traces one more RAM block, `autopilot <frames>` has the original game drive the car along its racing line.
+Each scenario replays the Time Attack menu navigation (car, transmission, course), or the 2 players VS one (`setup two_players`, the second player's buttons prefixed `2.`), then its inputs; the trace keeps, frame by frame from the start, the state of the player's car and the game's global variables. A `poke <address> <word>` line writes to the game's RAM (the car placed before the pits or the finish line, damage); the comparison then starts again from the traced state. A `from load` line records from the loading of the race (before the opening), `block <address> <bytes>` traces one more RAM block, `autopilot <frames>` has the original game drive the car along its racing line.
 
 ## Physics comparison
 
@@ -71,6 +71,15 @@ node bench/compareRace.js race_big_forest --show 1-30  # the detail of chosen ti
 ```
 
 Replays a whole race (start, laps, checkpoints, pit stop, finish) and compares tick by tick what the player sees and hears: start signs, lights, mechanics, messages, checkpoint gaps, pit stop, blinds, race sounds, lap times and the arrival of the results. The recorded races cover the five courses and a race with a pit stop; all must come out `identical`.
+
+## Car against car comparison
+
+```bash
+node bench/compareCars.js             # the 2 players VS scenarios, tick by tick
+node bench/compareCars.js --rate 3    # also the variable step physics, 3 steps a tick
+```
+
+Replays both cars of the 2 players VS mode and their contacts (pushed apart, speeds exchanged with a shock, a hit far faster than the other car): every tick must come out `identical` to the original game. With `--rate`, the variable step physics runs each tick of both cars, then the contact test, and the gap to the exact physics is measured.
 
 ## Pit crew models
 

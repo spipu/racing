@@ -75,7 +75,10 @@ class PhysicsComparator {
 
     run() {
         const names = ((this._names.length > 0) ? this._names
-            : BenchScenario.names().filter((name) => (!NOT_PHYSICS.includes(name) && !new BenchScenario(name).fromLoad)));
+            : BenchScenario.names().filter((name) => {
+                const scenario = new BenchScenario(name);
+                return (!NOT_PHYSICS.includes(name) && !scenario.fromLoad && (scenario.players === 1));
+            }));
         let failures = 0;
         for (const name of names) {
             failures += this._compare(new BenchScenario(name));
@@ -217,29 +220,23 @@ class PhysicsComparator {
                 this._traceRun(Physics, car, gearbox, course, ticks, t);
             }
             const path    = (Math.hypot((physics.x - reference.x), (physics.z - reference.z)) / UNITS_PER_METRE);
-            const turn    = (((physics.heading - reference.heading) % 65536) + 98304) % 65536 - 32768;
+            const turn    = BenchTrace.headingGap(physics.heading, reference.heading);
             const traced  = reference.speed;
             gaps.path.push(path);
-            gaps.heading.push(Math.abs((turn * 360) / 65536));
+            gaps.heading.push(turn);
             gaps.speed.push(Math.abs(physics.speed - traced) / Math.max(traced, DRIFT_SPEED_FLOOR));
             if (path > worst.path) {
                 worst = {path, at: t};
             }
-            if (Math.abs(turn) > worstTurn.heading) {
-                worstTurn = {heading: Math.abs(turn), at: t};
+            if (turn > worstTurn.heading) {
+                worstTurn = {heading: turn, at: t};
             }
         }
-        const stat = (values, scale, unit) => {
-            const sorted = values.slice().sort((a, b) => (a - b));
-            const at     = (share) => (sorted[Math.min((sorted.length - 1), Math.floor(share * sorted.length))] * scale);
-
-            return 'median ' + at(0.5).toFixed(2) + ', 95 % ' + at(0.95).toFixed(2) + ', max ' + at(1).toFixed(2) + ' ' + unit;
-        };
         process.stdout.write(name + ' (' + car + ', ' + gearbox + ', ' + courseCode + ', ' + this._resync + ' ticks at ' + this._rate + ' steps a tick, '
             + gaps.path.length + ' starts)\n'
-            + '  path:    ' + stat(gaps.path, 1, 'm') + ' (worst from tick ' + worst.at + ')\n'
-            + '  heading: ' + stat(gaps.heading, 1, '°') + ' (worst from tick ' + worstTurn.at + ')\n'
-            + '  speed:   ' + stat(gaps.speed, 100, '%') + '\n');
+            + '  path:    ' + BenchTrace.spread(gaps.path, 1, 'm') + ' (worst from tick ' + worst.at + ')\n'
+            + '  heading: ' + BenchTrace.spread(gaps.heading, 1, '°') + ' (worst from tick ' + worstTurn.at + ')\n'
+            + '  speed:   ' + BenchTrace.spread(gaps.speed, 100, '%') + '\n');
 
         return 0;
     }

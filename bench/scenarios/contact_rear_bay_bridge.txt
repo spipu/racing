@@ -1,0 +1,8 @@
+# Two players: the second car set right behind the first (pokes), the first braking: a rear hit past $C8CE of shown speed
+setup two_players formula automatic automatic bay_bridge
+120 B+2.B
+poke FF9F30 F324
+poke FF9F34 0027
+60 B+2.B
+90 A+2.B
+120 B+2.B

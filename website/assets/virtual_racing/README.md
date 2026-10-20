@@ -23,8 +23,22 @@ only (see `LICENSE.md`).
 | `sounds.json`, `sounds/dac_XX.wav` | The 49 Z80 DAC samples (unsigned 8-bit mono; rate computed from the Z80 loop timing, not measured) and, per sound effect id `$A0-$D2`, the samples its script plays and when (`timeline`, frames at 60 Hz), the life of its track (`frames`) its priority in the sound driver and, for an FM effect (`type: fm`, no sample), its YM2612 voice (`voice`: algorithm, feedback, and by operator S1-S4 detune, multiple, attack, decays, sustain level, release, total level) and the detune word of its track (`detune`) |
 | `jingles.json`, `jingles/XX.mp3` | The FM music of the Time Attack race, which is not stored as samples: recorded from the emulated game by `tools/export/recordJingles.js` (each command played alone, silence cut, mono MP3): start, lap done (`laps`: command by laps done), new lap record, pits, results (looping), start beeps of the lights |
 | `sounds/pwm_jingle.wav` | The only 32X PWM sample (stereo, 22 kHz), played on game mode transitions |
-| `physics.json` | Tables of the player car physics: gear ratios and shift points, torque curves, sine quarter wave, crash recovery; per car: parameters (named after the RAM variables they are loaded into), gears, drag tables and maximum speeds by gearbox, wheel probe offsets, hitbox, camera view transitions (playback order) |
+| `physics.json` | Tables of the player car physics: gear ratios and shift points, torque curves, sine quarter wave, crash recovery, the byte pairs the car against car test reads past its tables (`contactStrayPairs`, a bug of the original); per car: parameters (named after the RAM variables they are loaded into), gears, drag tables and maximum speeds by gearbox, wheel probe offsets (also the corners of the car against car test), hitbox, camera view transitions (playback order) |
 | `race.json` | Start grids (per car, group demo / race / two_players, course: 18 `[x, y, z, heading]`), per-course section tables and lap time corrections at the line and the checkpoints, the music command after a checkpoint by laps done (`checkpointJingles`, mode Virtua Racing), the pit (`pit`: where the 4 mechanics stand by course and car, the pit boxes, the approach to the box) |
+
+## Multiplayer start grids (`multiplayer_grids.json`)
+
+Not exported: built once from the grids of `race.json`, checked in the emulated game, and now its own source (no
+tool rebuilds it). `grids.<course>.<car>`: the 8 places of a race of up to 8 players, pole first, as
+`[x, height, z, heading]` (entity units, height on the road under the car, heading in 1/65536 turn).
+
+- Bay Bridge, Acropolis, Highland, Sand Park: places 1 to 8 of the original's Virtua Racing grid (`race.json` group
+  `race`, the same for the three cars), two staggered columns past the line; the original puts its 15 opponents
+  there and the player last, at place 0.
+- Big Forest: the original has no grid there (its player starts in the pit box, its opponents rolling along the
+  track): the first place is player 1's of the two-player mode (group `two_players`, 16 units further back for the
+  Prototype), the others follow in its two columns, staggered as the other grids, 160 units apart, on the straight
+  behind the line.
 
 ## Pit crew models (`models/`)
 

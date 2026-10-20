@@ -4,7 +4,8 @@ const zlib = require('zlib');
 
 /**
  * A scenario of bench/scenarios/ and its trace in bench/traces/. The source starts with
- * "setup <car> <transmission> <course>" and may hold:
+ * "setup <car> <transmission> <course>" (Time Attack), or "setup two_players <car> <transmission> <transmission> <course>"
+ * (the 2 players VS mode, a transmission by player, the second player's buttons prefixed "2."), and may hold:
  *   - "pad 3": a 3-button pad instead of the 6-button one;
  *   - "from load": the trace starts as the race loads, before its opening, instead of on the grid after the start;
  *   - "block <address> <bytes>": a RAM block traced besides the recorder's usual ones;
@@ -24,12 +25,20 @@ class BenchScenario {
         this.name   = name;
         this.source = fs.readFileSync(file, 'utf8');
         const setup = this.source.match(/^\s*setup\s+(\S+)\s+(\S+)\s+(\S+)\s*$/m);
-        if (setup === null) {
-            throw new Error(name + ': missing "setup <car> <transmission> <course>" line');
+        const two   = this.source.match(/^\s*setup\s+two_players\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s*$/m);
+        if ((setup === null) && (two === null)) {
+            throw new Error(name + ': missing "setup <car> <transmission> <course>" or "setup two_players <car> <transmission> <transmission> <course>" line');
         }
-        [, this.car, this.transmission, this.course] = setup;
-        if (!BenchScenario.CARS.includes(this.car) || !BenchScenario.TRANSMISSIONS.includes(this.transmission) || !BenchScenario.COURSES.includes(this.course)) {
-            throw new Error(name + ': unknown setup ' + [this.car, this.transmission, this.course].join(' '));
+        this.players = ((two !== null) ? 2 : 1);
+        if (two !== null) {
+            [, this.car, this.transmission, this.transmission2, this.course] = two;
+        } else {
+            [, this.car, this.transmission, this.course] = setup;
+            this.transmission2 = null;
+        }
+        const transmissions = [this.transmission, this.transmission2].filter((transmission) => (transmission !== null));
+        if (!BenchScenario.CARS.includes(this.car) || !transmissions.every((t) => BenchScenario.TRANSMISSIONS.includes(t)) || !BenchScenario.COURSES.includes(this.course)) {
+            throw new Error(name + ': unknown setup ' + [this.car, ...transmissions, this.course].join(' '));
         }
         const pad = this.source.match(/^\s*pad\s+(\d+)\s*$/m);
         this.pad  = ((pad !== null) ? pad[1] : BenchScenario.DEFAULT_PAD);

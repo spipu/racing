@@ -1,11 +1,12 @@
 {
-    "version": "v1.0195",
+    "version": "v1.0198",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
             "/assets/virtual_racing/palettes.json",
             "/assets/virtual_racing/cars.json",
             "/assets/virtual_racing/race.json",
+            "/assets/virtual_racing/multiplayer_grids.json",
             "/assets/virtual_racing/physics.json",
             "/assets/virtual_racing/models/pit_mechanic.gltf",
             "/assets/virtual_racing/models/pit_mechanic.bin",

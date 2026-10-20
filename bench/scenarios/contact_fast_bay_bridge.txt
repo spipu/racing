@@ -1,0 +1,8 @@
+# Two players: the second car standing on the grid, the first set behind it at speed, 12 units aside (pokes; two cars
+# in line pass through each other: the corners stand 1 unit outside the box): the first faster past $C8D0 of shown speed
+setup two_players formula automatic automatic bay_bridge
+30 -
+poke FF9030 F3AC
+poke FF9034 FE84
+poke FF9006 044C
+90 B

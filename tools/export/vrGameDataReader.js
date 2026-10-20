@@ -21,18 +21,19 @@ class VrGameDataReader {
     readPhysics() {
         const map = this._map;
         return {
-            gearRatios:    this._table(map.gearRatios, false),
-            upshiftRpm:    this._table(map.upshiftRpm, true),
-            downshiftRpm:  this._table(map.downshiftRpm, true),
-            torque:        {automatic: this._table(map.torqueAutomatic, false), manual: this._table(map.torqueManual, false)},
-            sinQuarter:    this._table(map.sinTable, true),
-            atanLow:       this._table(map.atanLow, true),
-            atanHigh:      this._table(map.atanHigh, true),
-            rollTable:     this._table(map.rollTable, true),
-            pitchTable:    this._table(map.pitchTable, true),
-            crashRecovery: this._chunks(this._table(map.crashRecovery, true), map.crashRecovery.chunk),
-            shakeTable:    this._table(map.shakeTable, true),
-            cars:          this._carIndexes().map((car) => this._car(car)),
+            gearRatios:        this._table(map.gearRatios, false),
+            upshiftRpm:        this._table(map.upshiftRpm, true),
+            downshiftRpm:      this._table(map.downshiftRpm, true),
+            torque:            {automatic: this._table(map.torqueAutomatic, false), manual: this._table(map.torqueManual, false)},
+            sinQuarter:        this._table(map.sinTable, true),
+            atanLow:           this._table(map.atanLow, true),
+            atanHigh:          this._table(map.atanHigh, true),
+            rollTable:         this._table(map.rollTable, true),
+            pitchTable:        this._table(map.pitchTable, true),
+            crashRecovery:     this._chunks(this._table(map.crashRecovery, true), map.crashRecovery.chunk),
+            shakeTable:        this._table(map.shakeTable, true),
+            contactStrayPairs: this._contactStrayPairs(),
+            cars:              this._carIndexes().map((car) => this._car(car)),
         };
     }
 
@@ -110,6 +111,16 @@ class VrGameDataReader {
                 played.push(this._rom.words(frames + (entry * VrGameDataReader.POINTER_SIZE), 2, true));
             }
             return played;
+        });
+    }
+
+    // The (dx, dz) pairs the corners after a hit read past the stray pointer, one page after another.
+    _contactStrayPairs() {
+        const map   = this._map;
+        const start = this._rom.fileFrom68k(map.contactStrayPairs.address);
+        return Array.from({length: map.contactStrayPairs.count}, (unused, n) => {
+            const bytes = this._rom.getBytes((start + ((n + 1) * map.probePageBytes)), 2);
+            return [this._signedByte(bytes[0]), this._signedByte(bytes[1])];
         });
     }
 

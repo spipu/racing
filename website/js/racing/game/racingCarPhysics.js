@@ -24,6 +24,8 @@ class RacingCarPhysics {
         this._carIndex   = Object.keys(physics.cars).indexOf(car);
         this._sin        = physics.sinQuarter;
         this._probePages = data.probeOffsets;
+        this._hitbox     = data.hitbox;
+        this._strayPairs = physics.contactStrayPairs;
         this._course     = course;
 
         this.displaySpeed = 0;      // +$04, km/h of the HUD
@@ -142,6 +144,7 @@ class RacingCarPhysics {
         this.lastSound    = null;
         this.squealTicks  = 0;
         this._mailbox     = null;
+        this.contact      = 0;      // +$88: corners in the other car at the last contact test (bit n = probe page n)
         this.respawnTicks = 0;      // $C02C
         this.respawnStep  = [0, 0, 0]; // +$4E, +$50, +$52: x, z, heading per tick
         // Probe results kept between ticks, as the entity keeps its polygon pointers.
@@ -1547,6 +1550,115 @@ class RacingCarPhysics {
         return this;
     }
 
+    /**
+     * $AF18, two-player mode: two cars touching after both ticks. Within $C8CE of shown speed they push each other
+     * 16 units apart on x and z. Past it the faster takes 3/8 of their speeds' sum and the slower 3/4, both bounded,
+     * with a shock each, the side of a's corners choosing which; past $C8D0 a keeps its speed and both get bit 11.
+     *
+     * @param {RacingCarPhysics} a - the first player's car ($FF9000)
+     * @param {RacingCarPhysics} b - the second player's ($FF9F00), whose corner tables and box the test reads
+     */
+    static collide(a, b) {
+        const w = RacingCarPhysics._w;
+        a.contact = 0;
+        b.contact = 0;
+        if ((w(a.shakeTimer + b.shakeTimer + a.crashRecovery + b.crashRecovery) !== 0)
+            || (Math.abs(w(b.height - a.height)) >= RacingCarPhysics.CONTACT_HEIGHT) || !RacingCarPhysics._touches(a, b)) {
+            return;
+        }
+        if (Math.abs(w(a.displaySpeed - b.displaySpeed)) <= a._params.C8CE) {
+            RacingCarPhysics._pushApart(a, b);
+            RacingCarPhysics._contactSound(a, b, RacingCarPhysics.SOUND_CONTACT);
+            return;
+        }
+        const sum     = w(a.speed + b.speed);
+        const quarter = (sum >> 2);
+        let toB       = Math.min(w((sum >> 1) + quarter), RacingCarPhysics.CONTACT_SPEED_MAX);
+        let toA       = Math.min(w(quarter + (quarter >> 1)), RacingCarPhysics.CONTACT_SPEED_MAX);
+        // EXG at $AFA0 (read AND by the disassembly): the faster car takes the smaller share.
+        if (b.speed > a.speed) {
+            const share = toA;
+            toA         = toB;
+            toB         = share;
+        }
+        b.speed = toB;
+        if (w(a.displaySpeed - b.displaySpeed) > a._params.C8D0) {
+            a.flags |= RacingCarPhysics.FLAG_CONTACT_FAST;
+            b.flags |= RacingCarPhysics.FLAG_CONTACT_FAST;
+            RacingCarPhysics._contactSound(a, b, RacingCarPhysics.SOUND_CONTACT);
+            return;
+        }
+        a.speed = toA;
+        const left = ((a.contact & RacingCarPhysics.CONTACT_LEFT_CORNERS) !== 0);
+        a.flags |= ((left) ? RacingCarPhysics.FLAG_SHOCK : RacingCarPhysics.FLAG_SHOCK_HARD);
+        b.flags |= ((left) ? RacingCarPhysics.FLAG_SHOCK_HARD : RacingCarPhysics.FLAG_SHOCK);
+        RacingCarPhysics._contactSound(a, b, RacingCarPhysics.SOUND_SPIN);
+    }
+
+    /**
+     * $AE0A: a's corners against b's box, then b's corners against its other words; each car keeps the corners found
+     * in its contact bits.
+     * Once a corner of b hits, the next ones of b read the stray pairs (the bug of the original).
+     *
+     * @returns {boolean} whether a corner of a is in b
+     */
+    static _touches(a, b) {
+        RacingCarPhysics._cornersIn(a, b, b, (b.heading - a.shownHeading), null, RacingCarPhysics.CONTACT_BOX_FIRST);
+        RacingCarPhysics._cornersIn(b, a, b, (a.heading - b.heading), b._strayPairs, RacingCarPhysics.CONTACT_BOX_SECOND);
+
+        return (a.contact !== 0);
+    }
+
+    /**
+     * The corners of `car` around `other`, from the probe pages at the gap of headings, into car's contact bits.
+     *
+     * @param {RacingCarPhysics} second - the second player's car, whose probe pages and hitbox both tests read
+     * @param {int[][]|null}     strays - the pairs read once a corner hits, by corner after it; null: none
+     * @param {int[]}            bounds - the indexes in the hitbox of x min, x max, z min, z max
+     */
+    static _cornersIn(car, other, second, headingGap, strays, bounds) {
+        const w     = RacingCarPhysics._w;
+        const index = ((((w(headingGap) >> RacingCarPhysics.CONTACT_ANGLE_SHIFT) + RacingCarPhysics.CONTACT_ANGLE_BASE)
+            & RacingCarPhysics.CONTACT_ANGLE_MASK) >> 1);
+        const dx    = w(car.x - other.x);
+        const dz    = w(car.z - other.z);
+        const box   = second._hitbox;
+        let strayAt = null;
+        for (let corner = 0; corner < RacingCarPhysics.PROBES; corner++) {
+            const pair = ((strayAt === null) ? second._probePages[corner][index] : strays[strayAt]);
+            const x    = w(pair[0] + dx);
+            const z    = w(pair[1] + dz);
+            const hit  = ((x >= box[bounds[0]]) && (x <= box[bounds[1]]) && (z >= box[bounds[2]]) && (z <= box[bounds[3]]));
+            if (hit) {
+                car.contact |= (1 << corner);
+            }
+            if ((strays !== null) && hit) {
+                strayAt = 0;
+            } else if (strayAt !== null) {
+                strayAt++;
+            }
+        }
+    }
+
+    // $AFFE: 16 units apart on x and on z.
+    static _pushApart(a, b) {
+        const w  = RacingCarPhysics._w;
+        const dx = ((a.x > b.x) ? RacingCarPhysics.CONTACT_PUSH : -RacingCarPhysics.CONTACT_PUSH);
+        const dz = ((a.z > b.z) ? RacingCarPhysics.CONTACT_PUSH : -RacingCarPhysics.CONTACT_PUSH);
+        a.x = w(a.x + dx);
+        b.x = w(b.x - dx);
+        a.z = w(a.z + dz);
+        b.z = w(b.z - dz);
+    }
+
+    // The original's single mailbox ($C8A4, $B8 then $B2 over it): here each car sends it.
+    static _contactSound(a, b, command) {
+        a._sound(command);
+        a._sendSound();
+        b._sound(command);
+        b._sendSound();
+    }
+
     // Slid along the wall, away from the side of the road point, by an angle from the gap to the road heading.
     _startDeflection(angle) {
         const w  = RacingCarPhysics._w;
@@ -1862,6 +1974,19 @@ RacingCarPhysics.FLAG_PIT         = 0x0200;
 // +$02 bit 14: a split to show (a line crossed, a checkpoint, a pit stop left), taken by $825C.
 RacingCarPhysics.FLAG_SPLIT       = 0x4000;
 RacingCarPhysics.FLAG_SHOCK_HARD  = 0x2000;
+// +$02 bit 11: a contact faster than $C8D0 ($AFB4), read by nothing in the physics ported.
+RacingCarPhysics.FLAG_CONTACT_FAST = 0x0800;
+// Two-player contact ($AF18, $AE0A): height gap, push, speed bound, the angle into the corner tables.
+RacingCarPhysics.CONTACT_HEIGHT       = 0x200;
+RacingCarPhysics.CONTACT_PUSH         = 16;
+RacingCarPhysics.CONTACT_SPEED_MAX    = 0x4DC;
+RacingCarPhysics.CONTACT_ANGLE_SHIFT  = 5;
+RacingCarPhysics.CONTACT_ANGLE_BASE   = 0x800;
+RacingCarPhysics.CONTACT_ANGLE_MASK   = 0x7FE;
+// The second car's hitbox words the corners are tested against (x min, x max, z min, z max): the first car's, then
+// its own.
+RacingCarPhysics.CONTACT_BOX_FIRST    = [0, 2, 3, 1];
+RacingCarPhysics.CONTACT_BOX_SECOND   = [4, 5, 6, 7];
 RacingCarPhysics.SHOCK_TICKS      = 30;
 // Wheel probes (+$56..+$59); the heights are kept for the 3 first.
 RacingCarPhysics.PROBES            = 4;
@@ -1870,6 +1995,7 @@ RacingCarPhysics.PROBE_FRONT_LEFT  = 0;
 RacingCarPhysics.PROBE_FRONT_RIGHT = 1;
 RacingCarPhysics.PROBE_REAR_LEFT   = 2;
 RacingCarPhysics.PROBE_REAR_RIGHT  = 3;
+RacingCarPhysics.CONTACT_LEFT_CORNERS = ((1 << RacingCarPhysics.PROBE_FRONT_LEFT) | (1 << RacingCarPhysics.PROBE_REAR_LEFT));
 RacingCarPhysics.CODE_WALL        = 0x01;
 RacingCarPhysics.CODE_ROAD        = 0x02;
 RacingCarPhysics.CODE_VERGE       = 0x04;
@@ -1960,6 +2086,7 @@ RacingCarPhysics.FINISH_AUTOPILOT        = 2;
 RacingCarPhysics.SOUND_CRASH             = 'B0';
 RacingCarPhysics.SOUND_SKID              = 'B1';
 RacingCarPhysics.SOUND_SPIN              = 'B2';
+RacingCarPhysics.SOUND_CONTACT           = 'B8';
 RacingCarPhysics.SOUND_WHEELSPIN         = 'B4';
 RacingCarPhysics.SOUND_WALL              = 'B5';
 RacingCarPhysics.SOUND_SPARKS            = 'B7';

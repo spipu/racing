@@ -1,0 +1,7 @@
+# Two players side by side, the second steering into the first, then away
+setup two_players formula automatic automatic bay_bridge
+150 B+2.B
+60 B+2.B+2.LEFT
+120 B+2.B
+60 B+2.B+2.RIGHT
+120 B+2.B

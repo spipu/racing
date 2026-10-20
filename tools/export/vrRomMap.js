@@ -174,6 +174,9 @@ const VR_ROM_MAP = {
         probePageBytes:  0x800,
         hitboxBounds:    0x9305D6, // pointers by car to hitboxWords words
         hitboxWords:     8,
+        // Car against car ($AE0A): once a corner of the second car hits, its table pointer is set to $AE06 (LEA ...(PC),
+        // a bug of the original) and the next corners read the (dx, dz) byte pairs of the code there, probePageBytes apart.
+        contactStrayPairs: {address: 0x88AE06, count: 3},
         viewTransitions: 16, // old view x 4 + new view
         viewTransitionFrames: 20,
         startGrids:      0x9382BA, // pointers by car to 3 groups x 6 courses of pointers to 18 records {x, y, z, heading}
