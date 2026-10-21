@@ -1537,6 +1537,14 @@ class RacingCarPhysics {
         return (this.drivenBackOnTrack || (this.mode === RacingCarPhysics.MODE_FINISH));
     }
 
+    /**
+     * @returns {boolean} the car drives itself: after the finish ($6B04), to the pit box ($A972), back to its line ($A470)
+     */
+    isDrivenAutomatically() {
+        return ((this.mode === RacingCarPhysics.MODE_FINISH) || (this.pitState === RacingCarPhysics.PIT_DRIVEN)
+            || ((this.backOnTrack > 0) && this._drivenBack()));
+    }
+
     // The car tumbles to the section of the crash table while it slows down.
     _frontalCrash() {
         const crash = (((this.progress + RacingCarPhysics.PATH_AHEAD) << 1) + (this._onSideLane() ? 1 : 0));

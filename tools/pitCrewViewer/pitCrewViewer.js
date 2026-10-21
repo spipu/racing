@@ -125,7 +125,7 @@ class PitCrewViewer {
 
     // The car still on the box, as the game places it at the pit start.
     _placeCar() {
-        this._scene.view.setDamage(0).setEffects(null, true, null).animate(0, 0, 0, 0).place(this._box, 0, 0, 0, PitCrewViewer.STILL_POSE);
+        this._scene.view.setDamage(0).setEffects(null, true, null).animate(0, 0, 0, 0, 0, false).place(this._box, 0, 0, 0, PitCrewViewer.STILL_POSE);
     }
 
     _note(text) {

@@ -1,5 +1,5 @@
 {
-    "version": "v1.5",
+    "version": "v1.7",
     "files": {
         "assets": [],
         "css": [],
@@ -89,9 +89,11 @@
             "/website/js/racing/racingPalette.js",
             "/website/js/racing/game/racingModelConverter.js",
             "/website/js/racing/game/racingWheelModels.js",
+            "/website/js/racing/game/racingCarPhysics.js",
             "/website/js/racing/game/racingCarView.js",
             "/website/js/racing/game/racingPitCrewSchedule.js",
             "/website/js/racing/game/racingPitCrew.js",
+            "/website/js/racing/game/racingPlayer.js",
             "/website/js/racing/game/racingGame.js",
             "/tools/pitCrewViewer/pitCrewViewer.js"
         ]

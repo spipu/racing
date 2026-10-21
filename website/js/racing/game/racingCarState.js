@@ -19,6 +19,7 @@ class RacingCarState {
         this.crashLift    = 0;      // +$9C
         this.steer        = 0;
         this.yawRate      = 0;
+        this.autoDriven   = false;
         this.displaySpeed = 0;
         this.maxSpeed     = 0;
         this.rpm          = 0;
@@ -51,6 +52,7 @@ class RacingCarState {
         this.crashLift    = physics.crashPose[0];
         this.steer        = physics.steer;
         this.yawRate      = physics.yawRate;
+        this.autoDriven   = physics.isDrivenAutomatically();
         this.displaySpeed = physics.displaySpeed;
         this.maxSpeed     = physics.maxSpeed;
         this.rpm          = physics.rpm;

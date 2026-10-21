@@ -19,6 +19,9 @@
  * moves its smoke towards the side it slides to. On the courses with damage,
  * a crash bends the body ($2A86: one crash, two and more) and the cockpit
  * shell; during the pit work the mechanics take the wheels off, one by one.
+ * While the car drives itself, the original leaves its front wheels straight
+ * (+$90 at 0, or within 2 degrees in the pits): here they steer by the turn
+ * the car makes (user request), as far as the driver's steering would to turn so.
  * The cars of the other players are seen from outside only: they have no cockpit.
  */
 class RacingCarView {
@@ -43,6 +46,7 @@ class RacingCarView {
         this._wheelSpin = 0;
         this._steering  = 0;
         this._wheelTurn = 0;
+        this._heading   = null;     // as animated last, to read the turn of a car driving itself
         this._frames    = null;
         this._shadowOn  = true;
         this._damage    = 0;
@@ -193,13 +197,16 @@ class RacingCarView {
     /**
      * The wheels turn by the speed, the steering wheel goes halfway to the steering each tick.
      *
-     * @param {number} ticks        - time elapsed, in original ticks
-     * @param {number} displaySpeed - km/h (+$04)
-     * @param {number} steer        - +$8E
-     * @param {number} turnRate     - +$90, the front wheels' angle in 1/65536 turn
+     * @param {number}  ticks        - time elapsed, in original ticks
+     * @param {number}  displaySpeed - km/h (+$04)
+     * @param {number}  steer        - +$8E
+     * @param {number}  turnRate     - +$90, the front wheels' angle in 1/65536 turn
+     * @param {number}  heading      - 1/65536 turn
+     * @param {boolean} driven       - the car drives itself: the front wheels steer by its turn
      */
-    animate(ticks, displaySpeed, steer, turnRate) {
-        this._wheelTurn = turnRate;
+    animate(ticks, displaySpeed, steer, turnRate, heading, driven) {
+        this._wheelTurn = ((driven) ? this._drivenTurn(ticks, displaySpeed, heading) : turnRate);
+        this._heading   = heading;
         let spin = (Math.max(0, displaySpeed) * RacingCarView.SPIN_PER_KMH);
         if (spin >= RacingCarView.SPIN_FAST) {
             spin *= RacingCarView.SPIN_FAST_FACTOR;
@@ -211,6 +218,24 @@ class RacingCarView {
         this._steering += ((steer - this._steering) * (1 - Math.pow(0.5, ticks)));
 
         return this;
+    }
+
+    // The +$90 the driver's steering would give for the turn of the car since the last frame, $9688 turned back at its
+    // nominal gain (+$76 = $100): a tick turns the heading by 1.5 x ((+$90 x +$04) >> 10). Within the largest +$90, it
+    // goes halfway to it each tick, as the steering wheel does.
+    _drivenTurn(ticks, displaySpeed, heading) {
+        if ((ticks <= 0) || (this._heading === null)) {
+            return this._wheelTurn;
+        }
+        const half   = (RacingCarView.TURN / 2);
+        const turned = ((((heading - this._heading) % RacingCarView.TURN) + RacingCarView.TURN + half) % RacingCarView.TURN) - half;
+        let target   = 0;
+        if (displaySpeed >= RacingCarView.DRIVEN_MIN_KMH) {
+            target = (((turned / ticks) * RacingCarView.YAW_SPEED_SCALE) / (RacingCarView.YAW_HEADING_SHARE * displaySpeed));
+            target = Math.max(-RacingCarView.DRIVEN_TURN_MAX, Math.min(RacingCarView.DRIVEN_TURN_MAX, target));
+        }
+
+        return (this._wheelTurn + ((target - this._wheelTurn) * (1 - Math.pow(0.5, ticks))));
     }
 
     /**
@@ -367,6 +392,12 @@ RacingCarView.SPIN_FAST_FACTOR = 4;
 RacingCarView.SPIN_LIMIT       = 0x7000;
 RacingCarView.SPIN_MAX         = 0x7080;
 RacingCarView.STEERING_TURN    = 8192;
+// A car driving itself: below this speed (km/h) its wheels go straight; at most +$90 at full lock standing ($9688: twice
+// +$8E >> 4); the yaw of a tick, (+$90 x +$04) >> 10, turns the heading by 1.5 times itself.
+RacingCarView.DRIVEN_MIN_KMH    = 1;
+RacingCarView.DRIVEN_TURN_MAX   = (((RacingCarPhysics.STEER_SPEED_MAX << 8) >> 4) * 2);
+RacingCarView.YAW_SPEED_SCALE   = 1024;
+RacingCarView.YAW_HEADING_SHARE = 1.5;
 // A left wheel is the right one turned half round the vertical.
 RacingCarView.HALF_TURN        = [0, 1, 0, 0];
 RacingCarView.NO_TURN          = [0, 0, 0, 1];

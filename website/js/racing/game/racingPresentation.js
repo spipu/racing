@@ -369,7 +369,7 @@ class RacingPresentation {
         view.setCockpit(viewed && this._camera.isCockpitShown())
             .setDamage(state.damage)
             .setEffects(state.effectFrames, (state.crashRecovery === 0), state.smokeX)
-            .animate(ticks, state.displaySpeed, state.steer, state.yawRate)
+            .animate(ticks, state.displaySpeed, state.steer, state.yawRate, state.heading, state.autoDriven)
             .place(position, yaw, pitch, roll, pose);
         if (viewed) {
             this._camera.follow(ticks, position, yaw, pitch, roll, pose, this._cockpitLean(ticks, state, side));
