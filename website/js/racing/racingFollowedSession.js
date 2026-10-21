@@ -1,8 +1,8 @@
 /**
  * The session a sub follows, as DoomFollowedSession, but held by the menus (RacingMenuNavigator), as the main's
  * RacingHostedSession: a race is one RacingGame, so it outlives them. It builds each race the main sends — one build
- * at a time, the last race sent winning —, the race before it torn down, and takes the device back to the
- * Multiplayer screen when the session ends — once the build is over, when the end comes during one, or at once
+ * at a time, the last race sent winning —, the race before it torn down, back to the lobby when the main picks the
+ * next course, and takes the device back to the Multiplayer screen when the session ends — once the build is over, when the end comes during one, or at once
  * otherwise —, or when the race could not be built.
  */
 class RacingFollowedSession {
@@ -48,7 +48,7 @@ class RacingFollowedSession {
         const game      = new RacingGame(this._navigator, selection, null, this);
         game.getRole().prepareLevel(level);
         game.getRole().follow((event) => game.getPresentation().playTurnEvent(event), (next) => this.join(next),
-            (notice) => game.getPresentation().setNotice(notice), (reason) => this._onEnd(reason));
+            (notice) => game.getPresentation().setNotice(notice), (reason) => this._onEnd(reason), () => this._toLobby());
         game.getPresentation().setPingSource(() => this._session.getHostPing());
         let failure = null;
         try {
@@ -92,6 +92,16 @@ class RacingFollowedSession {
         this._game = null;
         this._session.setCycle(null).leave();
         this._navigator.leftFollowedSessionOnError(error);
+    }
+
+    // The race is over, the main picks the next course: the lobby again, until its next race.
+    _toLobby() {
+        if (this._joining || (this._game === null)) {
+            return;
+        }
+        this._game.leaveRace();
+        this._game = null;
+        this._navigator.followedSessionToLobby(this._session);
     }
 
     // The main stopped, removed this sub, or the link is lost. During a build, the build's end handles it.

@@ -1,16 +1,18 @@
 /**
  * Writes a decoded turn state into the race a sub built, on its own, without any previous state, as
  * DoomReplicaApplier: each car's drawable state (RacingCarState) and the display of its race (RacingRaceView), a car
- * gone from the state taken off the track, then the turn's events played. The sub simulates nothing: its race is only
- * ever posed.
+ * gone from the state taken off the track, the end of the race (RacingRaceOutcome), then the turn's events played. The
+ * sub simulates nothing: its race is only ever posed.
  */
 class RacingReplicaApplier {
     /**
      * @param {RacingPlayerRoster} roster
-     * @param {function(object)}   playEvent - RacingPresentation.playTurnEvent
+     * @param {RacingRaceOutcome}  outcome
+     * @param {function(object)}   playEvent - RacingPresentation.playTurnEvent, the lap records included
      */
-    constructor(roster, playEvent) {
+    constructor(roster, outcome, playEvent) {
         this._roster    = roster;
+        this._outcome   = outcome;
         this._playEvent = playEvent;
     }
 
@@ -34,6 +36,7 @@ class RacingReplicaApplier {
                 this._roster.remove(player.getId());
             }
         }
+        Object.assign(this._outcome, snapshot.outcome);
         for (const event of snapshot.events) {
             this._playEvent(this._event(event));
         }

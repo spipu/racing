@@ -26,6 +26,7 @@ class RacingMainRole extends AbstractRacingRole {
         this._ticks      = 0;           // of the turn being simulated, sent with its state
         this._paused     = new Set();   // player ids of the players in their pause, the main's included
         this._onPausedBy = null;
+        this._nicknames  = new Map();   // player id → nickname of the players of the race hosted
     }
 
     // Each device hears of the finish and the records of its own player alone.
@@ -44,6 +45,15 @@ class RacingMainRole extends AbstractRacingRole {
         for (const player of players) {
             this._simulation.addPlayer(player, ((player === this._roster.getLocal()) ? record : null));
         }
+    }
+
+    getOutcome() {
+        return this._simulation.getOutcome();
+    }
+
+    // The players of the race keep their nicknames once gone: the results name the abandons.
+    getNickname(id) {
+        return (this._nicknames.get(id) ?? '');
     }
 
     // The race is shown: the subs build it too, once the session hosts it.
@@ -69,6 +79,7 @@ class RacingMainRole extends AbstractRacingRole {
         this._cycle      = new RacingNetTurnCycle(session).setOnWaiting(onWaiting)
             .setOnPlayerGone((id) => this.removePlayer(id))
             .setOnSubPause((id, paused) => this._pauseOf(id, paused))
+            .setOnRecord((id, record) => this._recordOf(id, record))
             .setHoldsLevelStart(true);
         this._hostRace();
         session.setCycle(this._cycle);
@@ -87,14 +98,40 @@ class RacingMainRole extends AbstractRacingRole {
     _hostRace() {
         this._detachRecorder();
         const recorder = new RacingNetEvents();
-        const capture  = new RacingNetStateCapture(this._roster, recorder);
+        const capture  = new RacingNetStateCapture(this._roster, this._simulation.getOutcome(), recorder);
         this._recorder = recorder;
         this._events.addListener(recorder.getListener());
-        const slots = this._roster.getAll().map((player) => player.getId()).sort((a, b) => (a - b));
-        this._cycle.levelStarted(Object.assign({slots: slots}, this._race), {
+        const ids = this._roster.getAll().map((player) => player.getId()).sort((a, b) => (a - b));
+        for (const id of ids) {
+            this._nicknames.set(id, this._nicknameOf(id));
+        }
+        const players = ids.map((id) => ({id: id, nickname: this._nicknames.get(id)}));
+        this._cycle.levelStarted(Object.assign({players: players}, this._race), {
             encode: (turn) => RacingNetStateCodec.encode(capture.capture(turn, this._ticks)),
             drain:  () => recorder.drain()
         });
+    }
+
+    // A record sent by a sub's device, before its race starts; one of another shape is ignored.
+    _recordOf(id, record) {
+        const player = this._roster.getById(id);
+        const valid  = ((typeof record.lapMs === 'number') && Number.isFinite(record.lapMs) && Array.isArray(record.checkpointsMs)
+            && (record.checkpointsMs.length === RacingNetStateCodec.CHECKPOINTS)
+            && record.checkpointsMs.every((ms) => ((ms === null) || ((typeof ms === 'number') && Number.isFinite(ms)))));
+        if ((player !== null) && (player.getRace() !== null) && valid) {
+            this._simulation.setRecord(player, record);
+        }
+    }
+
+    /**
+     * A phase without turns opens on the subs (the return to the lobby).
+     *
+     * @param {object} message - its RacingNetProtocol control message
+     */
+    announcePhase(message) {
+        if (this._cycle !== null) {
+            this._cycle.announcePhase(message);
+        }
     }
 
     _detachRecorder() {

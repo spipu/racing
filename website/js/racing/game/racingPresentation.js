@@ -39,6 +39,7 @@ class RacingPresentation {
         this._controls       = null;
         this._viewWasDown    = true;       // a view button held as the race starts does not switch the view
         this._pingSource     = null;       // () => round trip in ms or null, during a session
+        this._outcome        = null;       // RacingRaceOutcome: the time left after the first finish
         this._noticeText     = null;       // message of the session over the race, null = none
         this._noticeEl       = null;
     }
@@ -173,6 +174,15 @@ class RacingPresentation {
         this._screen.destroyContainer();
         this._buildDisplay();
         this._controls.bindDisplay(this._screen.getDisplay());
+    }
+
+    /**
+     * @param {RacingRaceOutcome} outcome - the end of the race, its countdown on the HUD
+     */
+    setOutcome(outcome) {
+        this._outcome = outcome;
+
+        return this;
     }
 
     /**
@@ -321,7 +331,7 @@ class RacingPresentation {
             course: ((selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
             manual: (selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL),
             map:    this._hudMap
-        }).bindPingSource(this._pingSource);
+        }).bindPingSource(this._pingSource).bindOutcome(this._outcome);
         this._screen.bindHud(this._hud);
         this._noticeEl = null;
         this.setNotice(this._noticeText);

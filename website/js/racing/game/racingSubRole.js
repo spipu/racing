@@ -3,8 +3,9 @@
  * the main sends, it applies it at once (RacingReplicaApplier) and answers with its command for the next turn before
  * the next frame draws — sampled from what its controls collected since the previous one. Its frames present the
  * main's time: the ticks of the states that came since the previous frame, none while no state comes. Its pause stops
- * the race for everyone (user decision): the main is told, and its command is neutral meanwhile. It tells the game
- * when the main starts another race and when the session ends.
+ * the race for everyone (user decision): the main is told, and its command is neutral meanwhile. The records of its
+ * device go to the main with the race built, its player's new lap records and its results come back with the states.
+ * It tells the game when the main starts another race, goes back to the lobby, and when the session ends.
  */
 class RacingSubRole extends AbstractRacingRole {
     /**
@@ -26,6 +27,13 @@ class RacingSubRole extends AbstractRacingRole {
         this._localPaused = false;
         this._playEvent   = null;
         this._onLevelLoad = null;
+        this._onLobby     = null;
+        this._onFinish    = null;
+        this._onRecord    = null;
+        this._record      = null;    // this device's, sent to the main with the race built
+        this._outcome     = new RacingRaceOutcome();
+        this._nicknames   = new Map();
+        this._finished    = false;   // the results of this device's player are shown
     }
 
     /**
@@ -33,10 +41,12 @@ class RacingSubRole extends AbstractRacingRole {
      * @param {function(object)}      onLevelLoad - the main started a race: its levelLoad message
      * @param {function(string|null)} onNotice    - the message to show over the race, null for none
      * @param {function(string)}      onEnd       - the session ended, with its NetGameProtocol.END_* reason
+     * @param {function}              onLobby     - the main went back to the lobby to pick the next course
      */
-    follow(playEvent, onLevelLoad, onNotice, onEnd) {
+    follow(playEvent, onLevelLoad, onNotice, onEnd, onLobby) {
         this._playEvent   = playEvent;
         this._onLevelLoad = onLevelLoad;
+        this._onLobby     = onLobby;
         this._notice.setOnNotice(onNotice);
         this._session.setCycle(this).setOnEnd(onEnd);
 
@@ -49,8 +59,9 @@ class RacingSubRole extends AbstractRacingRole {
      * @param {object} level - its levelLoad message
      */
     prepareLevel(level) {
-        this._levelSeq = level.seq;
-        this._applier  = null;
+        this._levelSeq  = level.seq;
+        this._nicknames = new Map(level.players.map((player) => [player.id, player.nickname]));
+        this._applier   = null;
         this._notice.clear();
         this._session.setLivenessSuspended(true);
     }
@@ -59,13 +70,24 @@ class RacingSubRole extends AbstractRacingRole {
         return this._notice;
     }
 
-    // The main's race reports the finish and the records: nothing here.
-    adoptRace(data) {
-        this._data = data;
+    // The finish and the records of this device's player come with the main's states.
+    adoptRace(data, onFinish, onRecord) {
+        this._data     = data;
+        this._onFinish = onFinish;
+        this._onRecord = onRecord;
     }
 
-    // Each car on its place of the grid until the main's first state; no record races here.
-    enterRace() {
+    getOutcome() {
+        return this._outcome;
+    }
+
+    getNickname(id) {
+        return (this._nicknames.get(id) ?? '');
+    }
+
+    // Each car on its place of the grid until the main's first state; the record of this device goes to the main.
+    enterRace(record) {
+        this._record = record;
         for (const player of this._roster.getAll()) {
             const [x, height, z, heading] = RacingSimulation.startPlace(this._data, player.getId());
             const state = player.getCarState();
@@ -75,14 +97,14 @@ class RacingSubRole extends AbstractRacingRole {
             state.heading = heading;
             player.enterRace(null, new RacingRaceView(this._data.laps));
         }
-        this._applier = new RacingReplicaApplier(this._roster, this._playEvent);
+        this._applier = new RacingReplicaApplier(this._roster, this._outcome, (event) => this._playTurnEvent(event));
     }
 
     // The race is shown: the sub joins the turn cycle with the next state.
     levelStarted() {
         this._lastStateAt = null;
         this._session.setLivenessSuspended(false);
-        this._session.sendControl({type: RacingNetProtocol.LEVEL_READY, seq: this._levelSeq});
+        this._session.sendControl({type: RacingNetProtocol.LEVEL_READY, seq: this._levelSeq, record: this._record});
     }
 
     // The main is told: the race stops for everyone.
@@ -125,6 +147,17 @@ class RacingSubRole extends AbstractRacingRole {
         this._session.setCycle(null).leave();
     }
 
+    // A lap record of this device's player is kept here; the presentation plays the rest.
+    _playTurnEvent(event) {
+        if (event.type !== RacingTurnEvents.LAP_RECORD) {
+            this._playEvent(event);
+            return;
+        }
+        if (event.playerId === this._roster.getLocal().getId()) {
+            this._onRecord({lapMs: event.lapMs, checkpointsMs: event.checkpointsMs});
+        }
+    }
+
     // --- Session cycle ---
 
     levelLoad(message) {
@@ -146,6 +179,10 @@ class RacingSubRole extends AbstractRacingRole {
 
     // No state comes during a pause: it ends with the next state. This device's own pause is its menu's.
     phase(message) {
+        if (message.type === RacingNetProtocol.LOBBY_RETURN) {
+            this._onLobby();
+            return;
+        }
         if (message.type !== RacingNetProtocol.PAUSE) {
             return;
         }
@@ -168,6 +205,11 @@ class RacingSubRole extends AbstractRacingRole {
         }
         this._applier.apply(snapshot);
         this._ticks += snapshot.ticks;
+        const race = this._roster.getLocal().getRace();
+        if (race.resultsDue && !this._finished) {
+            this._finished = true;
+            this._onFinish(race.result());
+        }
         // Sampled even when paused: what the menu took must not reach the race on resuming.
         const sampled = ((this._sampler !== null) ? this._sampler.sample() : null);
         const command = (((sampled === null) || this._localPaused) ? RacingSimulation.NEUTRAL_COMMAND : sampled);

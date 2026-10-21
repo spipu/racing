@@ -25,6 +25,21 @@ class AbstractRacingRole {
     }
 
     /**
+     * @returns {RacingRaceOutcome} the end of a race of several players, as this device shows it
+     */
+    getOutcome() {
+        throw new Error('AbstractRacingRole: getOutcome not implemented');
+    }
+
+    /**
+     * @param {int} id - a player of the race, still there or not
+     * @returns {string} its nickname in the session, '' outside one
+     */
+    getNickname(id) {
+        throw new Error('AbstractRacingRole: getNickname not implemented');
+    }
+
+    /**
      * The race is shown.
      *
      * @param {object} level - {course, mirror, car, gearbox, laps}

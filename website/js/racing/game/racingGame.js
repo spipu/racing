@@ -70,15 +70,15 @@ class RacingGame {
         const laps        = ((level !== null) ? level.laps : ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps()));
         const slots       = ((multiplayer) ? Array.from({length: RacingHostedSession.CAPACITY}, (unused, i) => (i + RacingPlayer.MAIN_ID)) : [RacingGame.LOCAL_PLAYER_ID]);
         // A sub holds every player of the main's race, posed by its states.
-        for (const slot of ((level !== null) ? level.slots : [])) {
-            if (this._roster.getById(slot) === null) {
-                this._roster.add(new RacingPlayer(slot));
+        for (const player of ((level !== null) ? level.players : [])) {
+            if (this._roster.getById(player.id) === null) {
+                this._roster.add(new RacingPlayer(player.id));
             }
         }
         this._level = {course: selection.course, mirror: selection.mirror, car: selection.car, gearbox: selection.gearbox, laps: laps};
         loader.reset();
         loader.beginBatch();
-        this._presentation.build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
+        this._presentation.setOutcome(this._role.getOutcome()).build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
         this._role.adoptRace({course, race, physics, multiplayerGrids, selection, multiplayer, laps, lapJingles: racingSound.laps},
             (result) => this._guard(this._finish, result), (lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs));
         this._role.enterRace(((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
@@ -249,13 +249,20 @@ class RacingGame {
 
     // --- Finish ---
 
-    // The records of this device, the results over the race that goes on, without the touch controls.
+    // The records of this device, the results over the race that goes on, without the touch controls. A race of
+    // several players shows the standings, filled until it is over; a race stopped before the last lap makes no record.
     _finish(result) {
         this._presentation.showResults();
         this._controls.setVirtualPadVisible(false);
+        const multiplayer = ((this._hosted !== null) || (this._followed !== null));
+        const saved = ((result.classified !== false) ? this._saveRecord(null, result.raceMs, null) : Promise.resolve({newLap: false, newRace: false}));
         // The best lap was saved when it was done: the records shown are those of the race.
-        this._saveRecord(null, result.raceMs, null).then((records) => {
+        saved.then((records) => {
             if (!this._running) {
+                return;
+            }
+            if (multiplayer) {
+                this._showStandings();
                 return;
             }
             this._resultsDisplay = new AppMenuDisplay('screen').init(true);
@@ -268,6 +275,55 @@ class RacingGame {
                 .setOnQuit(() => this.quit())
                 .show(this._resultsTitle(), result, {newLap: result.newRecord, newRace: records.newRace});
         });
+    }
+
+    // The main presses on once the race is over; a sub waits for it.
+    _showStandings() {
+        this._resultsDisplay = new AppMenuDisplay('screen').init(true);
+        this._results = new RacingStandingsModal(this._resultsDisplay);
+        if (this._followed === null) {
+            this._results.setActions(() => this._restart(), () => this._toCourses(), () => this.quit());
+        }
+        this._results.show(this._resultsTitle(), () => this._standings());
+    }
+
+    // The standings as the modal shows them, from what every device has: the races, the end of the race, the lobby.
+    _standings() {
+        const outcome = this._role.getOutcome();
+        const onTrack = this._roster.getAll().filter((player) => (player.getRace() !== null));
+        const rows    = outcome.standings(onTrack).map((entry, index) => {
+            const race     = entry.race;
+            const finished = ((race !== null) && race.finished && !race.stopped);
+            let status     = RacingStandingsModal.RACING;
+            if (race === null) {
+                status = RacingStandingsModal.ABANDON;
+            } else if (finished) {
+                status = RacingStandingsModal.FINISHED;
+            } else if (race.stopped) {
+                status = RacingStandingsModal.STOPPED;
+            }
+            return {
+                place:     ((race !== null) ? (index + 1) : null),
+                nickname:  this._role.getNickname(entry.id),
+                color:     RacingCarColors.cssOfSlot(entry.id),
+                status:    status,
+                raceMs:    ((race !== null) ? RacingRaceOutcome.raceMs(race) : null),
+                bestLapMs: (((race !== null) && (race.lapTimes.length > 0)) ? Math.min(...race.lapTimes) : null),
+                laps:      ((race !== null) ? race.lapTimes.length : 0),
+                own:       (entry.id === this._roster.getLocal().getId())
+            };
+        });
+
+        return {rows: rows, over: outcome.over};
+    }
+
+    // The subs wait in the lobby while the main picks the next course.
+    _toCourses() {
+        if (this._hosted !== null) {
+            this._role.announcePhase({type: RacingNetProtocol.LOBBY_RETURN});
+        }
+        this._teardown();
+        this._navigator.endRaceToCourses();
     }
 
     // Into the best times of this device: a lap as soon as it beats the record, the race time at the finish.
@@ -366,6 +422,9 @@ class RacingGame {
         this._commandSampler.collect();
         this._presentation.readViewToggles();
         this._presentation.present(this._role.advance(ticks, this._commandSampler, timestamp), (this._results !== null));
+        if (this._results instanceof RacingStandingsModal) {
+            this._results.refresh();
+        }
 
         requestAnimationFrame(this._animateCallback);
     }

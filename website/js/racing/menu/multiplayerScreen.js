@@ -34,6 +34,15 @@ class MultiplayerScreen extends AbstractRacingMenuScreen {
         }
     }
 
+    /**
+     * A followed session back in its lobby (the main picks the next course).
+     *
+     * @param {NetGameSubSession} session
+     */
+    showLobby(session) {
+        this._join.showLobby(session);
+    }
+
     _onBack() {
         this._navigator.showMainMenu();
     }

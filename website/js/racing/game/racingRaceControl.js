@@ -48,6 +48,9 @@ class RacingRaceControl {
         this.lapMs      = 0;            // $C806, from the start
         this.started    = false;
         this.finished   = false;
+        this.stopped    = false;        // a race of several players ended before this car's last lap: unclassified
+        this.resultsDue = false;        // the results of this car's race are shown (its finish 51 ticks behind)
+        this.place      = 0;            // in a race of several players, 1 = leading (RacingSimulation)
         // Display: start (3, 2, 1, 'go', 'ready'), lights of the READY gantry (LIGHTS_*), messages.
         this.startSign  = null;
         this.lights     = null;
@@ -160,6 +163,7 @@ class RacingRaceControl {
         this._messages();
         this._delayedSounds();
         if ((this._finishTick !== null) && ((this._tickCount - this._finishTick) === RacingRaceControl.RESULTS_TICKS)) {
+            this.resultsDue = true;
             this._onFinish(this.result());
         }
     }
@@ -289,6 +293,10 @@ class RacingRaceControl {
 
     // $34E8 state 4 / $B2E4: the lap time less the time past the line, against the best lap of the race and the record.
     _lap(event, tick) {
+        // A race stopped before the last lap counts no more lap.
+        if (this.stopped) {
+            return;
+        }
         // Whole milliseconds: the time is summed by shares of ticks.
         const lapMs = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.lineCorrection)));
         this.lapTimes.push(lapMs);
@@ -415,6 +423,29 @@ class RacingRaceControl {
     }
 
     /**
+     * A race of several players is over before this car's last lap (30 s after the first finish): the car drives
+     * itself as after the finish, its laps count no more, its results come as after a finish.
+     */
+    stop() {
+        if (this.finished) {
+            return;
+        }
+        this.finished    = true;
+        this.stopped     = true;
+        this._finishTick = this._tickCount;
+        this._physics.endRace();
+    }
+
+    /**
+     * The record this car races against, known once the race is built (a sub's device sends its own).
+     *
+     * @param {{lapMs: number, checkpointsMs: (number|null)[]}} record
+     */
+    setRecord(record) {
+        this.record = {lapMs: record.lapMs, checkpointsMs: record.checkpointsMs.slice()};
+    }
+
+    /**
      * @returns {int} the counter the blinking reads (RacingRaceView replicates it)
      */
     getBlink() {
@@ -422,7 +453,7 @@ class RacingRaceControl {
     }
 
     /**
-     * @returns {{raceMs: number, lapsMs: number[], bestLapMs: number, record: object, newRecord: boolean}}
+     * @returns {{raceMs: number, lapsMs: number[], bestLapMs: number, record: object, newRecord: boolean, classified: boolean}}
      */
     result() {
         return {
@@ -431,6 +462,7 @@ class RacingRaceControl {
             bestLapMs: this.bestLapMs,
             record:    this.record,
             newRecord: this.newRecord,
+            classified: !this.stopped,
         };
     }
 }

@@ -30,6 +30,7 @@ class RacingHud extends AbstractHud {
         this._manual  = false;
         this._map     = null;
         this._ping    = null;   // () => round trip in ms or null, during a session
+        this._outcome = null;   // RacingRaceOutcome of a race of several players
         this._els     = {};
         this._shown   = {};
         this._lapsShown = -1;
@@ -58,6 +59,17 @@ class RacingHud extends AbstractHud {
      */
     bindPingSource(source) {
         this._ping = source;
+
+        return this;
+    }
+
+    /**
+     * The time left after the first finish, shown to a player still racing (user decision).
+     *
+     * @param {RacingRaceOutcome|null} outcome
+     */
+    bindOutcome(outcome) {
+        this._outcome = outcome;
 
         return this;
     }
@@ -117,6 +129,7 @@ class RacingHud extends AbstractHud {
             return Array.from({length: RacingHud.LAMPS}, () => this._add(row, 'racing-hud-lamp'));
         });
         els.notice   = this._add(centre, 'racing-hud-notice');
+        els.finishIn = this._add(centre, 'racing-hud-finish-in');
         els.pitStart = this._add(root, 'racing-hud-pit-start', appTranslator.get('hud.start.pitStart'));
         els.message  = this._add(centre, 'racing-hud-message');
         els.messageLabel = this._add(els.message, 'racing-hud-message-label');
@@ -179,6 +192,11 @@ class RacingHud extends AbstractHud {
         }
         this._text('notice', (notice ?? ''));
         this._display('notice', (notice !== null));
+        const countdown = (((this._outcome !== null) && !race.finished) ? this._outcome.countdownMs : null);
+        this._display('finishIn', (countdown !== null));
+        if (countdown !== null) {
+            this._text('finishIn', appTranslator.get('hud.finishIn', {seconds: Math.ceil(countdown / RacingGame.MS_PER_SECOND)}));
+        }
 
         const message = race.message;
         this._display('message', ((message !== null) && message.shown));

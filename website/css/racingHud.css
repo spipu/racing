@@ -297,6 +297,16 @@
     color: #FFD21E;
 }
 
+.racing-hud-finish-in {
+    font-size: 5cqh;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #FFF;
+    -webkit-text-stroke: 0.2cqh #C41818;
+}
+
 .racing-hud-message {
     display: flex;
     flex-direction: column;

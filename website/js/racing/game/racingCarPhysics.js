@@ -434,9 +434,21 @@ class RacingCarPhysics {
         }
     }
 
+    /**
+     * The race is over before the car's last lap (a race of several players): it ends as at the finish, the car
+     * driving itself from the next tick.
+     */
+    endRace() {
+        this.raceFlags |= RacingCarPhysics.RACE_FINISHED;
+
+        return this;
+    }
+
     // $6BEA: once finished, the timers stop and the car drives itself from the next tick.
+    // A race ended during a pit stop (endRace) waits for the car to leave its box.
     _raceEnd() {
-        if (((this.raceFlags & RacingCarPhysics.RACE_FINISHED) === 0) || ((this.raceFlags & RacingCarPhysics.RACE_STARTED) === 0)) {
+        if (((this.raceFlags & RacingCarPhysics.RACE_FINISHED) === 0) || ((this.raceFlags & RacingCarPhysics.RACE_STARTED) === 0)
+            || (this.mode === RacingCarPhysics.MODE_PIT)) {
             return;
         }
         this.raceFlags &= ~RacingCarPhysics.RACE_STARTED;

@@ -1,5 +1,5 @@
 {
-    "version": "v1.0220",
+    "version": "v1.0221",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -241,6 +241,7 @@
             "/js/racing/racingPalette.js",
             "/js/racing/racingCarColors.js",
             "/js/racing/net/racingNetProtocol.js",
+            "/js/racing/net/racingNetSubSession.js",
             "/js/racing/racingHostedSession.js",
             "/js/racing/racingBestTimes.js",
             "/js/racing/racingTime.js",
@@ -256,6 +257,7 @@
             "/js/racing/game/racingPitCrewSchedule.js",
             "/js/racing/game/racingPitCrew.js",
             "/js/racing/game/racingRaceControl.js",
+            "/js/racing/game/racingRaceOutcome.js",
             "/js/racing/game/racingRaceView.js",
             "/js/racing/game/racingControls.js",
             "/js/racing/game/racingCamera.js",
@@ -294,6 +296,7 @@
             "/js/racing/menu/racingMultiplayerModal.js",
             "/js/racing/menu/racingPauseModal.js",
             "/js/racing/menu/racingResultsModal.js",
+            "/js/racing/menu/racingStandingsModal.js",
             "/js/racing/menu/racingMenuNavigator.js",
             "/js/main.js"
         ]

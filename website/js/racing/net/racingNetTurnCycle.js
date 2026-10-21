@@ -1,6 +1,7 @@
 /**
- * The main's turn cycle of a race (NetTurnCycle), which also hears a sub's pause: in a race, the pause of any player
- * stops it for everyone (user decision, an écart to doom_js where a sub's pause only opens its menu).
+ * The main's turn cycle of a race (NetTurnCycle), which also hears a sub's pause — in a race, the pause of any player
+ * stops it for everyone (user decision, an écart to doom_js where a sub's pause only opens its menu) — and the record
+ * its levelReady carries.
  */
 class RacingNetTurnCycle extends NetTurnCycle {
     /**
@@ -10,6 +11,16 @@ class RacingNetTurnCycle extends NetTurnCycle {
         super(session, RacingNetCommandCodec);
 
         this._onSubPause = null;
+        this._onRecord   = null;
+    }
+
+    /**
+     * @param {function(int, object)} callback - the player id of a sub that built the race, and its device's record
+     */
+    setOnRecord(callback) {
+        this._onRecord = callback;
+
+        return this;
     }
 
     /**
@@ -22,6 +33,10 @@ class RacingNetTurnCycle extends NetTurnCycle {
     }
 
     control(peer, message) {
+        if ((message.type === RacingNetProtocol.LEVEL_READY) && (message.record !== null) && (message.record !== undefined)
+            && (this._onRecord !== null) && this._subs.has(peer.getId()) && (message.seq === this._levelSeq)) {
+            this._onRecord(this._session.playerIdOf(peer), message.record);
+        }
         if (message.type !== RacingNetProtocol.SUB_PAUSE) {
             super.control(peer, message);
             return;

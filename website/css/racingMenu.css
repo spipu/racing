@@ -317,6 +317,40 @@
     font-style: italic;
 }
 
+/* --- Standings of a race of several players: place, player in its slot's colour, race time, best lap --- */
+.racing-standings-table {
+    margin-bottom: 1em;
+}
+
+.racing-standings-row {
+    display: grid;
+    grid-template-columns: 2em 1fr auto auto;
+    gap: 1em;
+    align-items: baseline;
+    color: #24306E;
+    font-size: 1.1em;
+}
+
+.racing-standings-head {
+    font-size: 0.85em;
+    font-style: italic;
+    color: #5A6496;
+}
+
+.racing-standings-place {
+    text-align: right;
+}
+
+.racing-standings-name::before {
+    content: '';
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    margin-right: 0.5em;
+    border-radius: 50%;
+    background-color: var(--racing-slot-color, transparent);
+}
+
 /* --- Best laps: a column per car, the reset cross at the end of the row --- */
 .racing-best-laps-row {
     display: grid;

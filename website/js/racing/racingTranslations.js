@@ -62,6 +62,42 @@ class RacingTranslations {
                 it: 'Interrompere il multigiocatore?\nTutti i giocatori saranno disconnessi.',
                 es: '¿Detener el multijugador?\nTodos los jugadores serán desconectados.'
             },
+            'race.standings.racing': {
+                fr: 'En course',
+                en: 'Racing',
+                it: 'In gara',
+                es: 'En carrera'
+            },
+            'race.standings.laps': {
+                fr: '{laps} tours',
+                en: '{laps} laps',
+                it: '{laps} giri',
+                es: '{laps} vueltas'
+            },
+            'race.standings.abandon': {
+                fr: 'Abandon',
+                en: 'Retired',
+                it: 'Ritirato',
+                es: 'Abandono'
+            },
+            'race.standings.inProgress': {
+                fr: 'Course en cours…',
+                en: 'Race in progress…',
+                it: 'Gara in corso…',
+                es: 'Carrera en curso…'
+            },
+            'race.standings.waitingHost': {
+                fr: 'En attente de l\'hôte',
+                en: 'Waiting for the host',
+                it: 'In attesa dell\'host',
+                es: 'Esperando al anfitrión'
+            },
+            'hud.finishIn': {
+                fr: 'Fin dans {seconds}',
+                en: 'Finish in {seconds}',
+                it: 'Fine tra {seconds}',
+                es: 'Fin en {seconds}'
+            },
             'multiplayer.pausedBy': {
                 fr: 'Course en pause par {nickname}',
                 en: 'Race paused by {nickname}',

@@ -5,8 +5,8 @@
  * flags and codes; the sound commands travel as ASCII. Decoding is fail-fast: the whole message is read before it is
  * handed over, and a read that does not end exactly on its last byte is refused.
  *
- * Layout: type, turn, ticks; then the cars (id, car state, race display), then the events — each section behind its
- * count.
+ * Layout: type, turn, ticks; then the cars (id, car state, race display), the end of the race (time left, over, the
+ * abandons), then the events — each section behind its count.
  */
 class RacingNetStateCodec {
     /**
@@ -21,6 +21,12 @@ class RacingNetStateCodec {
             w.u8(car.id);
             RacingNetStateCodec._writeCar(w, car.car);
             RacingNetStateCodec._writeRace(w, car.race);
+        }
+        const outcome = snapshot.outcome;
+        w.u8(((outcome.countdownMs !== null) ? RacingNetStateCodec.OUTCOME_COUNTDOWN : 0) | ((outcome.over) ? RacingNetStateCodec.OUTCOME_OVER : 0))
+            .f32(outcome.countdownMs ?? 0).u8(outcome.abandons.length);
+        for (const id of outcome.abandons) {
+            w.u8(id);
         }
         w.u16(snapshot.events.length);
         for (const event of snapshot.events) {
@@ -46,6 +52,14 @@ class RacingNetStateCodec {
         for (let i = 0; i < cars; i++) {
             snapshot.cars.push({id: r.u8(), car: RacingNetStateCodec._readCar(r), race: RacingNetStateCodec._readRace(r)});
         }
+        const flags     = r.u8();
+        const countdown = r.f32();
+        const abandons  = r.u8();
+        snapshot.outcome = {
+            countdownMs: (((flags & RacingNetStateCodec.OUTCOME_COUNTDOWN) !== 0) ? countdown : null),
+            over:        ((flags & RacingNetStateCodec.OUTCOME_OVER) !== 0),
+            abandons:    Array.from({length: abandons}, () => r.u8())
+        };
         const events = r.u16();
         for (let i = 0; i < events; i++) {
             snapshot.events.push(RacingNetStateCodec._readEvent(r));
@@ -93,7 +107,9 @@ class RacingNetStateCodec {
         for (const lapMs of race.lapTimes) {
             w.f32(lapMs);
         }
-        w.f32(race.lapMs).f32(race.blinds).u32(race.blink);
+        w.f32(race.lapMs).f32(race.blinds).u32(race.blink).u8(race.place);
+        w.u8(((race.stopped) ? RacingNetStateCodec.RACE_STOPPED : 0) | ((race.resultsDue) ? RacingNetStateCodec.RACE_RESULTS_DUE : 0)
+            | ((race.newRecord) ? RacingNetStateCodec.RACE_NEW_RECORD : 0));
         const flags = ((race.started) ? RacingNetStateCodec.RACE_STARTED : 0)
             | ((race.finished) ? RacingNetStateCodec.RACE_FINISHED : 0)
             | ((race.pitStartSign) ? RacingNetStateCodec.RACE_PIT_START_SIGN : 0)
@@ -123,6 +139,11 @@ class RacingNetStateCodec {
         race.lapMs  = r.f32();
         race.blinds = r.f32();
         race.blink  = r.u32();
+        race.place  = r.u8();
+        const end   = r.u8();
+        race.stopped    = ((end & RacingNetStateCodec.RACE_STOPPED) !== 0);
+        race.resultsDue = ((end & RacingNetStateCodec.RACE_RESULTS_DUE) !== 0);
+        race.newRecord  = ((end & RacingNetStateCodec.RACE_NEW_RECORD) !== 0);
         const flags = r.u8();
         race.started      = ((flags & RacingNetStateCodec.RACE_STARTED) !== 0);
         race.finished     = ((flags & RacingNetStateCodec.RACE_FINISHED) !== 0);
@@ -148,6 +169,14 @@ class RacingNetStateCodec {
             w.ascii(event.command);
             return;
         }
+        if (event.type === RacingTurnEvents.LAP_RECORD) {
+            // A split the lap went without (a checkpoint missed) travels as NaN.
+            w.f32(event.lapMs);
+            for (const ms of event.checkpointsMs) {
+                w.f32(ms ?? NaN);
+            }
+            return;
+        }
         for (const value of [...event.delays, ...event.speeds]) {
             w.f32(value);
         }
@@ -158,6 +187,12 @@ class RacingNetStateCodec {
         const playerId = r.u8();
         if (type === RacingTurnEvents.SOUND) {
             return {type: type, playerId: playerId, command: r.ascii()};
+        }
+        if (type === RacingTurnEvents.LAP_RECORD) {
+            const lapMs  = r.f32();
+            const splits = Array.from({length: RacingNetStateCodec.CHECKPOINTS}, () => r.f32());
+
+            return {type: type, playerId: playerId, lapMs: lapMs, checkpointsMs: splits.map((ms) => (Number.isNaN(ms) ? null : ms))};
         }
         const count  = RacingPitCrewSchedule.MECHANICS;
         const delays = Array.from({length: count}, () => r.f32());
@@ -193,9 +228,16 @@ RacingNetStateCodec.RACE_PIT_WORK       = 16;
 RacingNetStateCodec.RACE_RECORD         = 32;
 RacingNetStateCodec.RACE_MESSAGE        = 64;
 RacingNetStateCodec.RACE_SPLIT          = 128;
+RacingNetStateCodec.RACE_STOPPED        = 1;
+RacingNetStateCodec.RACE_RESULTS_DUE    = 2;
+RacingNetStateCodec.RACE_NEW_RECORD     = 4;
+RacingNetStateCodec.OUTCOME_COUNTDOWN   = 1;
+RacingNetStateCodec.OUTCOME_OVER        = 2;
+// The splits of a lap record: the checkpoints of a lap (RacingRaceControl).
+RacingNetStateCodec.CHECKPOINTS         = 2;
 
 // The code byte of each value: its rank in the table, fixed.
 RacingNetStateCodec.START_SIGNS   = [null, 3, 2, 1, RacingRaceControl.SIGN_GO, RacingRaceControl.SIGN_READY];
 RacingNetStateCodec.LIGHTS        = [null, RacingRaceControl.LIGHTS_OFF, RacingRaceControl.LIGHTS_RED, RacingRaceControl.LIGHTS_GREEN];
 RacingNetStateCodec.MESSAGE_KINDS = ['lapTime', 'bestLap', 'fastestLap'];
-RacingNetStateCodec.EVENT_TYPES   = [RacingTurnEvents.SOUND, RacingTurnEvents.CREW_STARTED];
+RacingNetStateCodec.EVENT_TYPES   = [RacingTurnEvents.SOUND, RacingTurnEvents.CREW_STARTED, RacingTurnEvents.LAP_RECORD];

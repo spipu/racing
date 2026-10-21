@@ -178,6 +178,17 @@ class RacingMenuNavigator {
         }
     }
 
+    /**
+     * The main of the followed session picks the next course: its lobby, until the next race.
+     *
+     * @param {NetGameSubSession} session
+     */
+    followedSessionToLobby(session) {
+        this._display.init();
+        this.openMultiplayer();
+        this._multiplayerScreen.showLobby(session);
+    }
+
     // The main's race could not be built or stopped on an error: the session is left, with the error.
     leftFollowedSessionOnError(error) {
         this._display.init();

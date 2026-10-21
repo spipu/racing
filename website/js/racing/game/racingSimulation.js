@@ -11,6 +11,10 @@
  * its pair after both ticks ($87E2 then $AF18), the cars are ranked and every pair close enough is tested, from the
  * leading car to the last, the car ahead as the first player (user decision).
  *
+ * In a race of several players, the first finish leaves the others RacingRaceOutcome.FINISH_WINDOW_MS: then their races
+ * stop; the cars are placed at the end of each step, and a player whose car leaves the track after the start
+ * abandoned (RacingRaceOutcome).
+ *
  * The physics runs on the unmirrored course: on a mirrored one, the steering of the commands is turned back, as the
  * original swaps the left and right bits of the pad before the steering ($950A).
  */
@@ -31,6 +35,8 @@ class RacingSimulation {
         this._previous  = new Map();    // player id → its command of the previous step, the presses derived from it
         this._input     = {accelerate: false, brake: false, steer: 0, steerAxis: null, gearUp: false, gearDown: false};
         this._clock     = 0;            // original ticks since the race was built: the end of a tick tests the contacts
+        this._outcome   = new RacingRaceOutcome();
+        this._endTick   = null;         // the clock the race of several players ends at, once a car finished
         this._onFinish  = null;
         this._onRecord  = null;
     }
@@ -91,7 +97,10 @@ class RacingSimulation {
             this._data.lapJingles, race.checkpointJingles)
             .setOnSound((command) => this._events.sound(id, command))
             .setCrewSoundsByClips(true)
-            .setOnRecord((lap) => this._onRecord(player, lap))
+            .setOnRecord((lap) => {
+                this._events.lapRecord(id, lap);
+                this._onRecord(player, lap);
+            })
             .setOnFinish((result) => this._onFinish(player, result));
         player.enterRace(physics, raceControl);
         player.getCarState().capture(physics);
@@ -106,11 +115,33 @@ class RacingSimulation {
      * @param {RacingPlayer} player
      */
     removePlayer(player) {
+        if (this._data.multiplayer && (this._clock > 0) && !this._outcome.over && (player.getRace() !== null)) {
+            this._outcome.abandons.push(player.getId());
+        }
         this._pitWork.delete(player.getId());
         this._previous.delete(player.getId());
         player.leaveRace();
 
         return this;
+    }
+
+    /**
+     * The record a player's car races against, known once the race is built (a sub's device sends its own).
+     *
+     * @param {RacingPlayer} player
+     * @param {{lapMs: number, checkpointsMs: (number|null)[]}} record
+     */
+    setRecord(player, record) {
+        player.getRace().setRecord(record);
+
+        return this;
+    }
+
+    /**
+     * @returns {RacingRaceOutcome} the end of a race of several players
+     */
+    getOutcome() {
+        return this._outcome;
     }
 
     /**
@@ -163,9 +194,40 @@ class RacingSimulation {
                 this._collide(players);
             }
         }
+        if (this._data.multiplayer) {
+            this._updateOutcome(players);
+        }
         for (const player of players) {
             player.getCarState().capture(player.getPhysics());
         }
+    }
+
+    // The window after the first finish, the races stopped once it ran out, the places, the end of the race.
+    _updateOutcome(players) {
+        const outcome = this._outcome;
+        const races   = players.map((player) => player.getRace());
+        if ((this._endTick === null) && races.some((race) => race.finished)) {
+            this._endTick = (this._clock + (RacingRaceOutcome.FINISH_WINDOW_MS / RacingRaceControl.TICK_MS));
+        }
+        if (this._endTick !== null) {
+            outcome.countdownMs = (Math.max(0, (this._endTick - this._clock)) * RacingRaceControl.TICK_MS);
+            if (this._clock >= this._endTick) {
+                races.forEach((race) => race.stop());
+            }
+        }
+        const finished = (player) => (player.getRace().finished && !player.getRace().stopped);
+        players.slice().sort((a, b) => {
+            if (finished(a) && finished(b)) {
+                return (RacingRaceOutcome.raceMs(a.getRace()) - RacingRaceOutcome.raceMs(b.getRace()));
+            }
+            if (finished(a) || finished(b)) {
+                return ((finished(a)) ? -1 : 1);
+            }
+            return RacingSimulation.rankOrder(a.getPhysics(), b.getPhysics());
+        }).forEach((player, index) => {
+            player.getRace().place = (index + 1);
+        });
+        outcome.over = ((races.length > 0) && races.every((race) => race.finished));
     }
 
     // A command acts once: its presses on the first part of the step only. The race sends its sounds as it updates,

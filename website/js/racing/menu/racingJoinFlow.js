@@ -19,15 +19,20 @@ class RacingJoinFlow {
 
     start() {
         AppMenuNetGate.enter(this._display, () => this._availability.unavailableReason(), racingSettings, (nickname) => {
-            this._pair(new NetGameSubSession(this._links, nickname));
+            this._pair(new RacingNetSubSession(this._links, nickname));
         });
     }
 
     _pair(session) {
-        new AppMenuPairingModal(this._display).openForSub(session, () => this._showLobby(session), () => session.dispose());
+        new AppMenuPairingModal(this._display).openForSub(session, () => this.showLobby(session), () => session.dispose());
     }
 
-    _showLobby(session) {
+    /**
+     * The lobby of the session, after the pairing or back from a race: it waits for the main's race.
+     *
+     * @param {NetGameSubSession} session
+     */
+    showLobby(session) {
         const lobby = new AppMenuLobbyModal(this._display);
         session.setOnEnd((reason) => {
             lobby.close();

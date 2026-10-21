@@ -1,7 +1,8 @@
 /**
  * The one-shot events of a turn as the turn message carries them, as DoomNetEvents: a listener of RacingTurnEvents
  * that keeps each event as plain data — a sound command by its player, the start of a crew's passage with the delays
- * and speeds of its mechanics. An event says what happens, never how a device perceives it.
+ * and speeds of its mechanics, a lap record with its splits. An event says what happens, never how a device
+ * perceives it.
  */
 class RacingNetEvents {
     constructor() {
@@ -27,6 +28,10 @@ class RacingNetEvents {
     _record(event) {
         if (event.type === RacingTurnEvents.SOUND) {
             this._events.push({type: event.type, playerId: event.playerId, command: event.command});
+            return;
+        }
+        if (event.type === RacingTurnEvents.LAP_RECORD) {
+            this._events.push({type: event.type, playerId: event.playerId, lapMs: event.lapMs, checkpointsMs: event.checkpointsMs.slice()});
             return;
         }
         const count = RacingPitCrewSchedule.MECHANICS;
