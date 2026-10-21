@@ -1,5 +1,5 @@
 {
-    "version": "v1.0210",
+    "version": "v1.0215",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -251,6 +251,7 @@
             "/js/racing/game/racingPitWork.js",
             "/js/racing/game/racingPlayer.js",
             "/js/racing/game/racingPlayerRoster.js",
+            "/js/racing/game/racingPitBoxes.js",
             "/js/racing/game/racingSimulation.js",
             "/js/racing/game/abstractRacingRole.js",
             "/js/racing/game/racingMainRole.js",

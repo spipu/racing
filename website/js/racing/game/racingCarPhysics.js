@@ -128,8 +128,11 @@ class RacingCarPhysics {
         // original's 120 ticks, repaired at frame 20 (the reference of the benches).
         this.pitWorkByCrew = false;
         this._pitReleased  = false;
-        // Several cars share the one pit box ($C05C[+$AE], +$AE always 0): another car in its stop holds it.
-        this.pitBoxTaken   = false;
+        // The boxes of the course (the original's one alone, or two in a race of several players: course.pit.boxes), the
+        // one of the car's stop, and the one free for its next stop, -1 when another car holds each (set by the race).
+        this._pitBoxes     = (course.pit.boxes ?? [course.pit.box]);
+        this.pitBox        = 0;
+        this.freePitBox    = 0;
         this.raceFlags    = 0;      // $C30E, set by the race: bit 4 started, bit 5 finished (bits 5 and 0 close the pits)
         // Laps ($7F50): laps done +$2C, line crossings +$2E, best progress of the lap +$28, progress of the tick
         // before +$26, laps of the race $C310; distance past the section point along the road +$E2 ($764E).
@@ -480,8 +483,8 @@ class RacingCarPhysics {
         }
     }
 
-    // $AC3E: the mechanics leave 60 ticks after the stop; the band across the pit lane (surface $0D) starts a stop,
-    // unless the race closed the pits, the car is already in one or goes the wrong way.
+    // $AC3E: the mechanics leave 60 ticks after the stop; the band across the pit lane (surface $0D) starts a stop at
+    // the free box, unless the race closed the pits, the car is already in one, no box is free or it goes the wrong way.
     _pitEntry() {
         if (this.pitCrewAway > 0) {
             this.pitCrewAway = this._countDown(this.pitCrewAway);
@@ -490,9 +493,10 @@ class RacingCarPhysics {
             }
         }
         if (((this.centerSurface & RacingCarPhysics.SURFACE_CLASS) !== RacingCarPhysics.SURFACE_PIT) || ((this.raceFlags & RacingCarPhysics.RACE_PITS_CLOSED) !== 0) || (this.pitState !== RacingCarPhysics.PIT_FREE)
-            || this.pitBoxTaken || (this.wrongWay !== 0)) {
+            || (this.freePitBox < 0) || (this.wrongWay !== 0)) {
             return;
         }
+        this.pitBox   = this.freePitBox;
         this.pitState = RacingCarPhysics.PIT_DRIVEN;
         this.mode     = RacingCarPhysics.MODE_PIT;
         this.flags   |= RacingCarPhysics.FLAG_PIT;
@@ -520,7 +524,7 @@ class RacingCarPhysics {
     _pitApproach() {
         const w   = RacingCarPhysics._w;
         const pit = this._course.pit;
-        const [boxX, boxZ] = pit.box;
+        const [boxX, boxZ] = this._pitBoxes[this.pitBox];
         this.pitCrewFrame = 0;
         // Gap, aim and turn are those of the car as the tick began: a share of a tick does not cross a threshold early.
         const fromX = this._lastTick('x');
@@ -617,7 +621,8 @@ class RacingCarPhysics {
     }
 
     /**
-     * The pit of the player's place on a course (race.json pit): its box and the x offset of the approach.
+     * The pit of the player's place on a course (race.json pit): its box and the x offset of the approach; a race of
+     * several players adds the list of its boxes (boxes).
      *
      * @returns {{box: int[], approachX: int}}
      */

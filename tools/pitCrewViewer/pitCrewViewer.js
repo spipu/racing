@@ -39,7 +39,7 @@ class PitCrewViewer {
             this._scenes.set(car.code, {
                 car:  car,
                 view: new RacingCarView(converter, cars, car, wheels, PitCrewViewer.METRES, false, false),
-                crew: new RacingPitCrew(PitCrewViewer.DATA, converter, wheels, race.pit, car, PitCrewViewer.COURSE, PitCrewViewer.METRES, false),
+                crew: new RacingPitCrew(PitCrewViewer.DATA, converter, wheels, race.pit, car, race.pit.mechanicBases[PitCrewViewer.COURSE], PitCrewViewer.METRES, false),
             });
         }
         loader.objects().loadFromData('ground', this._groundData());

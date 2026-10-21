@@ -30,6 +30,7 @@ class RacingCarState {
         this.crashRecovery = 0;
         this.roadFlags    = 0;
         this.pitCrewFrame = -1;     // $C026: the crew stands at the box from 0 on
+        this.pitBox       = 0;      // the box of the car's stop (RacingPitBoxes)
         this.effectFrames = {smoke: -1, flames: -1, sparks: -1, grass: [-1, -1], sand: [-1, -1]};
         this.smokeX       = null;
     }
@@ -64,6 +65,7 @@ class RacingCarState {
         this.crashRecovery = physics.crashRecovery;
         this.roadFlags    = physics.roadFlags;
         this.pitCrewFrame = physics.pitCrewFrame;
+        this.pitBox       = physics.pitBox;
         this.smokeX       = physics.smokeX;
         const from = physics.effectFrames;
         const to   = this.effectFrames;

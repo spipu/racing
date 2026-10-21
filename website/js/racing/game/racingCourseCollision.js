@@ -91,6 +91,19 @@ class RacingCourseCollision {
     }
 
     /**
+     * The height of the road at a position, as the car's probe reads it: the plane of the first polygon there.
+     *
+     * @returns {int|null} 1/8 scenery unit, null off every polygon
+     */
+    heightAt(x, z, layer) {
+        const lx      = RacingCourseCollision.local(x);
+        const lz      = RacingCourseCollision.local(z);
+        const polygon = this.find(this.record(x, z, layer), lx, lz);
+
+        return ((polygon === null) ? null : this.height(polygon, lx, lz));
+    }
+
+    /**
      * $75E0: height of the polygon plane at the local position.
      */
     height(polygon, lx, lz) {

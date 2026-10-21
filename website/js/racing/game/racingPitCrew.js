@@ -1,8 +1,8 @@
 /**
- * The 4 mechanics of the pit box (race.json pit), animated by skeleton
+ * The 4 mechanics of a pit box (race.json pit), animated by skeleton
  * (models/pit_mechanic.gltf, converted once from the original's frames): each
- * stands at its place around the box of the first place ($3C7E: base of the
- * course, x + dx and z - dz by car, angles 0) and plays its own clip. By the
+ * stands at its place around the box ($3C7E: base of the box, the course's for
+ * the first place, x + dx and z - dz by car, angles 0) and plays its own clip. By the
  * clip's events it handles its wheel gun and the car's wheel of its place
  * (RacingWheelModels): the wheel it takes off leaves the car's hub as the car
  * hides its own, the new one goes back onto the hub as the car shows its own
@@ -18,16 +18,16 @@ class RacingPitCrew {
      * @param {RacingWheelModels}    wheels    - the car's wheels
      * @param {object}  pit      - race.json pit
      * @param {object}  car      - entry of cars.json cars
-     * @param {string}  course   - course code
+     * @param {int[]}   base     - [x, height, z] of the box, entity units (RacingPitBoxes)
      * @param {number}  carScale - metres per car model unit
      * @param {boolean} mirror
      */
-    constructor(assets, converter, wheels, pit, car, course, carScale, mirror) {
+    constructor(assets, converter, wheels, pit, car, base, carScale, mirror) {
         this._converter  = converter;
         this._wheels     = wheels;
         this._pit        = pit;
         this._car        = car;
-        this._course     = course;
+        this._base       = base;
         this._carScale   = carScale;
         this._mirror     = mirror;
         this._mechanics  = [];
@@ -56,7 +56,7 @@ class RacingPitCrew {
         const materialColor = (material) => converter.materialColor(material);
         const wrenchData    = loader.staticModels().get(this._wrenchId).toObjectData(materialColor, mirror);
         const hubs          = this._car.wheels.flatMap((wheel) => this._wheels.wheelsOf(wheel.model, wheel.offset));
-        const [x, y, z]     = this._pit.mechanicBases[this._course];
+        const [x, y, z]     = this._base;
         this._mechanics = RacingPitCrew.CLIPS.map((name, n) => {
             const [dx, dz] = this._pit.mechanicOffsets[this._car.code][n];
             const wheel    = RacingPitCrew.WHEEL_OF[n];

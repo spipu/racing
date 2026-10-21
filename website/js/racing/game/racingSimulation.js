@@ -21,16 +21,18 @@ class RacingSimulation {
      * @param {function(): number} random - uniform in [0, 1[, the pit stops' draw
      */
     constructor(roster, events, random) {
-        this._roster   = roster;
-        this._events   = events;
-        this._random   = random;
-        this._data     = null;
-        this._pitWork  = new Map();     // player id → RacingPitWork of its car
-        this._previous = new Map();     // player id → its command of the previous step, the presses derived from it
-        this._input    = {accelerate: false, brake: false, steer: 0, steerAxis: null, gearUp: false, gearDown: false};
-        this._clock    = 0;             // original ticks since the race was built: the end of a tick tests the contacts
-        this._onFinish = null;
-        this._onRecord = null;
+        this._roster    = roster;
+        this._events    = events;
+        this._random    = random;
+        this._data      = null;
+        this._collision = null;         // of the course, shared by the cars
+        this._pitBoxes  = null;         // RacingPitBoxes.of: two in a race of several players
+        this._pitWork   = new Map();    // player id → RacingPitWork of its car
+        this._previous  = new Map();    // player id → its command of the previous step, the presses derived from it
+        this._input     = {accelerate: false, brake: false, steer: 0, steerAxis: null, gearUp: false, gearDown: false};
+        this._clock     = 0;            // original ticks since the race was built: the end of a tick tests the contacts
+        this._onFinish  = null;
+        this._onRecord  = null;
     }
 
     /**
@@ -50,9 +52,11 @@ class RacingSimulation {
      *                                                   {lapMs, checkpointsMs}
      */
     adoptRace(data, onFinish, onRecord) {
-        this._data     = data;
-        this._onFinish = onFinish;
-        this._onRecord = onRecord;
+        this._data      = data;
+        this._collision = new RacingCourseCollision(data.course.collision);
+        this._pitBoxes  = RacingPitBoxes.of(data.race, data.selection.course, this._collision, data.multiplayer);
+        this._onFinish  = onFinish;
+        this._onRecord  = onRecord;
 
         return this;
     }
@@ -64,12 +68,12 @@ class RacingSimulation {
      * @param {{lapMs: number, checkpointsMs: (number|null)[]}|null} record - null before any lap
      */
     addPlayer(player, record) {
-        const {physics: physicsData, race, course, selection, multiplayer} = this._data;
+        const {physics: physicsData, race, selection, multiplayer} = this._data;
         const physics = new RacingCarContinuousPhysics(physicsData, selection.car, (selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL), {
             index:     racingCatalog.getCourseIndex(selection.course),
-            collision: new RacingCourseCollision(course.collision),
+            collision: this._collision,
             ...race.courses[selection.course],
-            pit:       RacingCarPhysics.coursePit(race, selection.course),
+            pit:       {...RacingCarPhysics.coursePit(race, selection.course), boxes: this._pitBoxes.map((box) => [box.x, box.z])},
         });
         physics.laps = this._data.laps;
         // Damage on every course (user decision: the original damages the cars on Acropolis and Highland only, $D19C).
@@ -149,7 +153,7 @@ class RacingSimulation {
     _stepPlayer(player, command, step, first) {
         const id      = player.getId();
         const physics = player.getPhysics();
-        physics.pitBoxTaken = this._pitBoxTaken(player);
+        physics.freePitBox = this._freePitBox(player);
         physics.step(this._physicsInput(command, ((first) ? (this._previous.get(id) ?? null) : command)), step);
         if (first) {
             this._previous.set(id, command);
@@ -159,10 +163,12 @@ class RacingSimulation {
         this._pitWork.get(id).update(step);
     }
 
-    // The one pit box is held while another car is in its stop.
-    _pitBoxTaken(player) {
-        return this._roster.getAll().some((other) => ((other !== player) && (other.getPhysics() !== null)
-            && (other.getPhysics().pitState !== RacingCarPhysics.PIT_FREE)));
+    // The first box no other car holds in its stop (the original's first), -1 when each is held.
+    _freePitBox(player) {
+        const held = (box) => this._roster.getAll().some((other) => ((other !== player) && (other.getPhysics() !== null)
+            && (other.getPhysics().pitState !== RacingCarPhysics.PIT_FREE) && (other.getPhysics().pitBox === box)));
+
+        return this._pitBoxes.findIndex((box, index) => !held(index));
     }
 
     _collide(players) {

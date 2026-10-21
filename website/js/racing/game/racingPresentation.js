@@ -7,8 +7,8 @@
  * are emitted.
  *
  * In a race of several players, each car wears the colour of its player's slot (RacingCarColors); the other players'
- * cars are seen from outside. The crew works on the car whose stop started last. A mirrored race flips the scene along
- * x.
+ * cars are seen from outside. Each pit box has its crew (RacingPitBoxes: a second box in a race of several players),
+ * which works on the car whose stop at that box started last. A mirrored race flips the scene along x.
  */
 class RacingPresentation {
     /**
@@ -23,11 +23,10 @@ class RacingPresentation {
         this._car          = null;      // the viewed player's car
         this._cars         = new Map(); // player id → RacingCarView, the viewed one included
         this._players      = [];
-        this._crewPlayer   = null;      // the player whose car the crew works on
         this._objects      = null;
-        this._crew         = null;
-        this._crewVoice    = null;
-        this._crewSchedule = null;      // of a passage started this step, until the car is placed
+        // By pit box: its index, its crew, the player whose car it works on, the schedule of a passage started this step
+        // (until the car is placed), the voice of its gun's burst this frame.
+        this._crews        = [];
         this._engineSound  = null;
         this._hud          = null;
         this._hudMap       = null;
@@ -88,7 +87,14 @@ class RacingPresentation {
         }
         this._car     = this._cars.get(data.viewed.getId());
         this._objects = new RacingCourseObjects(converter, data.course, carScale, mirror);
-        this._crew    = new RacingPitCrew(RacingGame.ASSETS, converter, wheels, data.race.pit, car, selection.course, carScale, mirror);
+        const boxes   = RacingPitBoxes.of(data.race, selection.course, new RacingCourseCollision(data.course.collision), data.multiplayer);
+        this._crews   = boxes.map((box, index) => ({
+            index:    index,
+            crew:     new RacingPitCrew(RacingGame.ASSETS, converter, wheels, data.race.pit, car, box.base, carScale, mirror),
+            player:   data.viewed,
+            schedule: null,
+            voice:    null,
+        }));
         this._camera  = new RacingCamera(data.physics.cars[selection.car].viewTransitions, racingSettings.getStartView());
         this._hudMap  = new RacingHudMap(data.course.map, data.race.courses[selection.course].racePath, data.course.collision.toScenery, mirror);
     }
@@ -102,22 +108,24 @@ class RacingPresentation {
     showRace(skyId, player) {
         this._skyId  = skyId;
         this._player = player;
-        this._crewPlayer = player;
         this._buildDisplay();
         for (const view of this._cars.values()) {
             view.bind();
         }
         this._objects.bind();
-        this._crew.bind()
-            .setOnWheel((wheel, off) => this._crewCar().setWheelOff(wheel, off))
-            .setOnWrench((mechanic) => {
-                this._crewVoice ??= (RacingPresentation.CREW_VOICE + mechanic);
-            });
+        for (const box of this._crews) {
+            box.crew.bind()
+                .setOnWheel((wheel, off) => this._cars.get(box.player.getId()).setWheelOff(wheel, off))
+                .setOnWrench((mechanic) => {
+                    box.voice ??= (RacingPresentation.CREW_VOICE + mechanic);
+                });
+        }
         if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
         }
         const cars      = Array.from(this._cars.values()).flatMap((view) => view.getAllInstances());
-        const parts     = new Set([...cars, ...this._objects.getAllInstances(), ...this._crew.getAllInstances()]);
+        const crews     = this._crews.flatMap((box) => box.crew.getAllInstances());
+        const parts     = new Set([...cars, ...this._objects.getAllInstances(), ...crews]);
         this._instances = loader.instances().getAll().filter((instance) => ((instance !== undefined) && !parts.has(instance)));
         this._placeCars(0);
     }
@@ -209,9 +217,13 @@ class RacingPresentation {
         if (this._engineSound !== null) {
             this._engineSound.update(ticks, state.rpm, ((state.roadFlags & RacingPresentation.ROAD_TUNNEL) !== 0));
         }
-        this._updateCrew(ticks);
+        for (const box of this._crews) {
+            this._updateCrew(box, ticks);
+        }
         this._placeCars(ticks);
-        this._startCrew();
+        for (const box of this._crews) {
+            this._startCrew(box);
+        }
         this._objects.animate(ticks);
         this._draw();
     }
@@ -222,15 +234,17 @@ class RacingPresentation {
     }
 
     /**
-     * Played as the simulation emits them: the sounds of the viewed car at once, in the step's order; a crew's start,
-     * on whichever car, once the cars are placed.
+     * Played as the simulation emits them: the sounds of the viewed car at once, in the step's order; the start of the
+     * crew of a car's box, whichever car, once the cars are placed.
      *
      * @param {object} event - see RacingTurnEvents
      */
     playTurnEvent(event) {
         if (event.type === RacingTurnEvents.CREW_STARTED) {
-            this._crewSchedule = event.schedule;
-            this._crewPlayer   = this._players.find((player) => (player.getId() === event.playerId));
+            const player = this._players.find((candidate) => (candidate.getId() === event.playerId));
+            const box    = this._crews[player.getCarState().pitBox];
+            box.schedule = event.schedule;
+            box.player   = player;
         } else if ((event.type === RacingTurnEvents.SOUND) && (event.playerId === this._player.getId())) {
             racingSound.send(event.command);
         }
@@ -264,7 +278,9 @@ class RacingPresentation {
         engine.drawInit();
         this._drawInstances(this._instances);
         this._drawInstances(this._objects.getInstances());
-        this._drawInstances(this._crew.getInstances());
+        for (const box of this._crews) {
+            this._drawInstances(box.crew.getInstances());
+        }
         for (const view of this._cars.values()) {
             if (view !== this._car) {
                 this._drawInstances(view.getInstances());
@@ -292,32 +308,30 @@ class RacingPresentation {
         }
     }
 
-    // The crew stands at the box while the original shows it ($C026 not -1) for the car it works on, its wheels and
-    // bursts as its clips go: the bursts of one frame make one sound (the mechanics in step would add up), heard on the
-    // viewed car only. Away, it is back to its first pose.
-    _updateCrew(ticks) {
-        const shown = (this._crewPlayer.getCarState().pitCrewFrame >= 0);
-        if (!shown && this._crew.isStarted()) {
-            this._crew.reset();
+    // The crew stands at the box while the original shows it ($C026 not -1) for the car it works on, stopped at that
+    // box, its wheels and bursts as its clips go: the bursts of one frame make one sound (the mechanics in step would
+    // add up), heard on the viewed car only. Away, it is back to its first pose.
+    _updateCrew(box, ticks) {
+        const state = box.player.getCarState();
+        const shown = ((state.pitCrewFrame >= 0) && (state.pitBox === box.index));
+        if (!shown && box.crew.isStarted()) {
+            box.crew.reset();
         }
-        this._crewVoice = null;
-        this._crew.show(shown).update(ticks);
-        if ((this._crewVoice !== null) && (this._crewPlayer === this._player)) {
-            racingSound.send(RacingRaceControl.SOUND_WRENCH, this._crewVoice);
+        box.voice = null;
+        box.crew.show(shown).update(ticks);
+        if ((box.voice !== null) && (box.player === this._player)) {
+            racingSound.send(RacingRaceControl.SOUND_WRENCH, box.voice);
         }
     }
 
     // A passage of the crew starts its mechanics as the simulation scheduled them, on the car's wheels as just placed.
-    _startCrew() {
-        if (this._crewSchedule === null) {
+    _startCrew(box) {
+        if (box.schedule === null) {
             return;
         }
-        this._crew.start(this._crewSchedule, RacingPresentation.WHEELS.map((wheel) => this._crewCar().hubMatrix(wheel, Mat4.create())));
-        this._crewSchedule = null;
-    }
-
-    _crewCar() {
-        return this._cars.get(this._crewPlayer.getId());
+        const car = this._cars.get(box.player.getId());
+        box.crew.start(box.schedule, RacingPresentation.WHEELS.map((wheel) => car.hubMatrix(wheel, Mat4.create())));
+        box.schedule = null;
     }
 
     // The panorama wraps once around the horizon, as wide in angle as high: its horizon row sits at elevation 0.

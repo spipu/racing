@@ -166,7 +166,7 @@ class PitCrewBench {
         this.loader.reset();
         this.loader.beginBatch();
         const view = new this.RacingCarView(converter, data.cars, car, wheels, CAR_SCALE, mirror);
-        const crew = new this.RacingPitCrew(('/' + DATA), converter, wheels, data.race.pit, car, COURSE, CAR_SCALE, mirror);
+        const crew = new this.RacingPitCrew(('/' + DATA), converter, wheels, data.race.pit, car, data.race.pit.mechanicBases[COURSE], CAR_SCALE, mirror);
         await new Promise((resolve) => {
             this.loader.setCallback(resolve);
             this.loader.endBatch();
