@@ -5,6 +5,7 @@
  *   node bench/compareCars.js [scenario...]
  *   node bench/compareCars.js scenario --show from-to
  *   node bench/compareCars.js --rate n
+ *   node bench/compareCars.js --ranked
  *
  * Without a scenario, every two-player one ("setup two_players"). The original runs each player in its own phase of
  * the 3-frame cycle ($C87E: phase 4 the first car, $FF9000; phase 8 the second, $FF9F00, then the contact test $AF18)
@@ -21,6 +22,10 @@
  * --rate n also runs each cycle with the variable step physics of the game (RacingCarContinuousPhysics), n steps a
  * tick for each car, the contact test at the end of the tick, and measures both cars against the exact ones: path,
  * heading, speed, and the ticks whose contact corners differ.
+ *
+ * --ranked runs the contacts of each cycle as the race of the game does (RacingSimulation.collideCars: the cars
+ * ranked, the pairs within reach, the car ahead first): identical while the first player leads; the cycles where the
+ * second leads, the original still testing it as the second car, are counted apart.
  */
 const fs   = require('fs');
 const path = require('path');
@@ -31,7 +36,8 @@ const {BenchTrace}    = require('./benchTrace');
 
 const ROOT_DIR    = path.resolve(__dirname, '..');
 const WEBSITE_DIR = path.join(ROOT_DIR, 'website');
-const SOURCES     = ['js/racing/game/racingCourseCollision.js', 'js/racing/game/racingCarPhysics.js', 'js/racing/game/racingCarContinuousPhysics.js'];
+const SOURCES     = ['js/racing/game/racingCourseCollision.js', 'js/racing/game/racingCarPhysics.js', 'js/racing/game/racingCarContinuousPhysics.js',
+    'js/racing/game/racingCommand.js', 'js/racing/game/racingSimulation.js'];
 // Collision units: 1/16 m. Below the floor the relative speed gap means nothing (as comparePhysics).
 const UNITS_PER_METRE   = 16;
 const DRIFT_SPEED_FLOOR = 100;
@@ -52,16 +58,18 @@ const CONTACT = ['contact', ENTITY, 0x88, 2];
 
 class CarsComparator {
     constructor(args) {
-        this._show  = (args.includes('--show') ? args[args.indexOf('--show') + 1].split('-').map(Number) : null);
-        this._rate  = (args.includes('--rate') ? Number(args[args.indexOf('--rate') + 1]) : 0);
-        this._names = args.filter((arg, i) => (!arg.startsWith('--') && !['--show', '--rate'].includes(args[i - 1])));
-        this._ctx   = vm.createContext({console, Math});
+        this._show   = (args.includes('--show') ? args[args.indexOf('--show') + 1].split('-').map(Number) : null);
+        this._rate   = (args.includes('--rate') ? Number(args[args.indexOf('--rate') + 1]) : 0);
+        this._ranked = args.includes('--ranked');
+        this._names  = args.filter((arg, i) => (!arg.startsWith('--') && !['--show', '--rate'].includes(args[i - 1])));
+        this._ctx    = vm.createContext({console, Math});
         for (const file of SOURCES) {
             vm.runInContext(fs.readFileSync(path.join(WEBSITE_DIR, file), 'utf8'), this._ctx, {filename: file});
         }
         this._Physics    = vm.runInContext('RacingCarPhysics', this._ctx);
         this._Continuous = vm.runInContext('RacingCarContinuousPhysics', this._ctx);
         this._Collision  = vm.runInContext('RacingCourseCollision', this._ctx);
+        this._Simulation = vm.runInContext('RacingSimulation', this._ctx);
         this._physics    = this._asset('physics.json');
         this._race       = this._asset('race.json');
         this._fields     = [...BenchTrace.FIELDS.filter((field) => !INPUT_ONLY.includes(field[0])), CONTACT];
@@ -89,6 +97,7 @@ class CarsComparator {
         const gaps        = {path: [], heading: [], speed: [], contacts: 0};
         let second = null;
         let ticks  = 0;
+        let led    = 0;     // cycles of contact the second car leads (--ranked)
         for (let k = 0; (k + 1) < whole.length; k++) {
             const from = whole[k];
             // A cycle with a poke (cars placed by the scenario) starts again from the traced state.
@@ -104,7 +113,15 @@ class CarsComparator {
             const steps  = ((this._rate > 0) ? this._stepped(scenario, course, frames[from], second, inputs) : null);
             first.tick(inputs[0]);
             second.tick(inputs[1]);
-            this._Physics.collide(first, second);
+            if (this._ranked) {
+                const secondAhead = (this._Simulation.rankOrder(first, second) > 0);
+                this._Simulation.collideCars([first, second]);
+                if (secondAhead && ((first.contact !== 0) || (second.contact !== 0))) {
+                    led++;
+                }
+            } else {
+                this._Physics.collide(first, second);
+            }
             if (steps !== null) {
                 this._measure(gaps, steps, [first, second]);
             }
@@ -126,7 +143,8 @@ class CarsComparator {
         if (this._rate > 0) {
             this._report(scenario, gaps);
         }
-        const head = scenario.name + ' (' + scenario.car + ', ' + scenario.course + ', ' + ticks + ' ticks): ';
+        const head = scenario.name + ' (' + scenario.car + ', ' + scenario.course + ', ' + ticks + ' ticks'
+            + ((this._ranked) ? (', ' + led + ' with the second car leading in contact') : '') + '): ';
         if (differences.size === 0) {
             process.stdout.write(head + 'identical\n');
             return 0;

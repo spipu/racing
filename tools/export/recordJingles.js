@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * Records the FM jingles of the Time Attack race from the emulated game, run from the repository root:
+ * Records the FM jingles of the races from the emulated game, run from the repository root:
  *
- *   node tools/export/recordJingles.js
+ *   node tools/export/recordJingles.js           every jingle
+ *   node tools/export/recordJingles.js 98 A6     only these commands, the others kept as recorded
  *
  * The music of the YM2612 is not stored as samples: each jingle (VR_ROM_MAP.jingles) is played by the original
  * itself, in a race on the grid of Bay Bridge (bench/recorder, PicoDrive libretro core, ROM USA): every voice
@@ -20,6 +21,13 @@ const {VrModelEncoder}           = require('./vrModelEncoder');
 const {TraceRecorder, RECORDER_DIR, RECORDER_PATH, CORE_PATH, ROM_PATH} = require('../../bench/recordTraces');
 
 class JingleRecorder {
+    /**
+     * @param {string[]} codes - the commands to record (hex), none for all
+     */
+    constructor(codes) {
+        this._codes = codes.map((code) => code.toUpperCase());
+    }
+
     run() {
         const recorder = new TraceRecorder([]);
         recorder.checkRom();
@@ -30,18 +38,21 @@ class JingleRecorder {
         const map   = VR_ROM_MAP.jingles;
         const rom   = new VrRom(ROM_PATH);
         const laps  = Array.from(rom.getBytes(rom.fileFrom68k(map.laps.table), map.laps.count));
-        const roles = new Map([[map.start, 'start'], [map.record, 'record'], [map.pitIn, 'pit_in'], [map.pitOut, 'pit_out'],
-            [map.results, 'results'], ...map.beeps.map((id, i) => [id, 'beep_' + (i + 1)])]);
+        const roles = new Map([[map.start, 'start'], [map.startTwoPlayers, 'start_two_players'], [map.record, 'record'],
+            [map.pitIn, 'pit_in'], [map.pitOut, 'pit_out'], [map.results, 'results'], ...map.beeps.map((id, i) => [id, 'beep_' + (i + 1)])]);
         for (const id of laps) {
             if (!roles.has(id)) {
                 roles.set(id, 'lap');
             }
         }
         const menu     = recorder.menuInputs(JingleRecorder.SETUP);
-        const jingles  = {};
+        const jingles  = ((this._codes.length > 0) ? this._recorded() : {});
         for (const [id, role] of roles) {
             const code = VrModelEncoder.hex(id, JingleRecorder.ID_DIGITS);
             const loop = (id === map.results);
+            if ((this._codes.length > 0) && !this._codes.includes(code)) {
+                continue;
+            }
             jingles[code] = {role: role, file: (code + '.mp3'), loop: loop, ms: this._record(menu, id, code, loop)};
             process.stdout.write('jingle ' + code + ' (' + role + '): ' + jingles[code].ms + ' ms\n');
         }
@@ -50,7 +61,12 @@ class JingleRecorder {
             jingles: jingles,
             laps:    laps.map((id) => VrModelEncoder.hex(id, JingleRecorder.ID_DIGITS)),
         };
-        fs.writeFileSync(path.join(JingleRecorder.OUTPUT_DIR, '..', 'jingles.json'), JSON.stringify(output) + '\n');
+        fs.writeFileSync(JingleRecorder.INDEX_PATH, JSON.stringify(output) + '\n');
+    }
+
+    // The jingles already recorded, kept when only some are recorded again.
+    _recorded() {
+        return JSON.parse(fs.readFileSync(JingleRecorder.INDEX_PATH, 'utf8')).jingles;
     }
 
     // One run of the game: the jingle alone, recorded, trimmed and encoded.
@@ -109,6 +125,7 @@ class JingleRecorder {
 JingleRecorder.ROOT_DIR          = path.resolve(__dirname, '..', '..');
 JingleRecorder.WORK_DIR          = path.join(JingleRecorder.ROOT_DIR, '.tmp.claude', 'jingles');
 JingleRecorder.OUTPUT_DIR        = path.join(JingleRecorder.ROOT_DIR, 'website', 'assets', 'virtual_racing', 'jingles');
+JingleRecorder.INDEX_PATH        = path.join(JingleRecorder.OUTPUT_DIR, '..', 'jingles.json');
 JingleRecorder.FORMAT            = 1;
 JingleRecorder.ID_DIGITS         = 2;
 // A race of the Formula on the grid of Bay Bridge, its start over (its own jingle and beeps gone).
@@ -126,7 +143,7 @@ JingleRecorder.RATE              = 32000;
 JingleRecorder.BITRATE           = '80k';
 
 try {
-    new JingleRecorder().run();
+    new JingleRecorder(process.argv.slice(2)).run();
 } catch (error) {
     process.stderr.write(String(error.stack ?? error) + '\n');
     process.exitCode = 1;

@@ -27,6 +27,8 @@ class RacingCarPhysics {
         this._hitbox     = data.hitbox;
         this._strayPairs = physics.contactStrayPairs;
         this._course     = course;
+        // No corner of the contact test ($AE0A) reaches farther than this from the other car, on x or on z.
+        this._contactReach = RacingCarPhysics._contactReach(data, physics.contactStrayPairs);
 
         this.displaySpeed = 0;      // +$04, km/h of the HUD
         this.speed        = 0;      // +$06
@@ -126,6 +128,8 @@ class RacingCarPhysics {
         // original's 120 ticks, repaired at frame 20 (the reference of the benches).
         this.pitWorkByCrew = false;
         this._pitReleased  = false;
+        // Several cars share the one pit box ($C05C[+$AE], +$AE always 0): another car in its stop holds it.
+        this.pitBoxTaken   = false;
         this.raceFlags    = 0;      // $C30E, set by the race: bit 4 started, bit 5 finished (bits 5 and 0 close the pits)
         // Laps ($7F50): laps done +$2C, line crossings +$2E, best progress of the lap +$28, progress of the tick
         // before +$26, laps of the race $C310; distance past the section point along the road +$E2 ($764E).
@@ -165,6 +169,17 @@ class RacingCarPhysics {
         this.shownHeading = heading;
 
         return this.settle();
+    }
+
+    /**
+     * The laps of a car on a start place behind the line: its first crossing brings them to 0 ($CE3C writes -1 to +$2C
+     * and +$2E for the cars of the mode Virtua Racing at Big Forest).
+     */
+    startBehindLine() {
+        this.lap     = -1;
+        this.lapLine = -1;
+
+        return this;
     }
 
     /**
@@ -397,6 +412,10 @@ class RacingCarPhysics {
         }
         this.lap++;
         this.lapProgress = 0;
+        // A car that started behind the line crosses it into its first lap (user decision: the original counts a lap).
+        if (this.lap === 0) {
+            return;
+        }
         const throughPits = (this.section > RacingCarPhysics.LINE_LAST_SECTION);
         if (!throughPits) {
             this.flags |= RacingCarPhysics.FLAG_SPLIT;
@@ -471,7 +490,7 @@ class RacingCarPhysics {
             }
         }
         if (((this.centerSurface & RacingCarPhysics.SURFACE_CLASS) !== RacingCarPhysics.SURFACE_PIT) || ((this.raceFlags & RacingCarPhysics.RACE_PITS_CLOSED) !== 0) || (this.pitState !== RacingCarPhysics.PIT_FREE)
-            || (this.wrongWay !== 0)) {
+            || this.pitBoxTaken || (this.wrongWay !== 0)) {
             return;
         }
         this.pitState = RacingCarPhysics.PIT_DRIVEN;
@@ -1596,6 +1615,43 @@ class RacingCarPhysics {
     }
 
     /**
+     * $87E2: the car's place in the race, line crossings then progress, compared as a word.
+     */
+    rankKey() {
+        return RacingCarPhysics._w((this.lapLine << 8) + this.progress);
+    }
+
+    /**
+     * $87E2 at equal keys: the position projected on the heading of the car's road, the greater ahead.
+     */
+    rankProjection() {
+        const heading = -this.roadHeading;
+
+        return (((this._sinOf(heading) >> RacingCarPhysics.RANK_SHIFT) * this.x) + ((this._cosOf(heading) >> RacingCarPhysics.RANK_SHIFT) * this.z));
+    }
+
+    /**
+     * Whether a and b are close enough for any corner of the contact test to touch: collide finds nothing otherwise.
+     *
+     * @param {RacingCarPhysics} a
+     * @param {RacingCarPhysics} b - whose corner tables and box the test reads
+     */
+    static inReach(a, b) {
+        const w = RacingCarPhysics._w;
+
+        return ((Math.abs(w(a.x - b.x)) <= b._contactReach) && (Math.abs(w(a.z - b.z)) <= b._contactReach));
+    }
+
+    // The farthest a corner reaches: its offset from the car (the probe pages, or a stray pair) plus the box around the
+    // other car.
+    static _contactReach(car, strayPairs) {
+        const largest = (values) => Math.max(...values.map(Math.abs));
+        const corners = largest([...car.probeOffsets.flat(2), ...strayPairs.flat()]);
+
+        return (corners + largest(car.hitbox));
+    }
+
+    /**
      * $AE0A: a's corners against b's box, then b's corners against its other words; each car keeps the corners found
      * in its contact bits.
      * Once a corner of b hits, the next ones of b read the stray pairs (the bug of the original).
@@ -1996,6 +2052,8 @@ RacingCarPhysics.PROBE_FRONT_RIGHT = 1;
 RacingCarPhysics.PROBE_REAR_LEFT   = 2;
 RacingCarPhysics.PROBE_REAR_RIGHT  = 3;
 RacingCarPhysics.CONTACT_LEFT_CORNERS = ((1 << RacingCarPhysics.PROBE_FRONT_LEFT) | (1 << RacingCarPhysics.PROBE_REAR_LEFT));
+// $87E2: the sine and cosine of the road heading shifted before the projection of the rank.
+RacingCarPhysics.RANK_SHIFT           = 4;
 RacingCarPhysics.CODE_WALL        = 0x01;
 RacingCarPhysics.CODE_ROAD        = 0x02;
 RacingCarPhysics.CODE_VERGE       = 0x04;

@@ -56,7 +56,8 @@ class RacingCarState {
         this.rpm          = physics.rpm;
         this.smoothRpm    = physics.smoothRpm;
         this.gear         = physics.gear;
-        this.lap          = physics.lap;
+        // A car that starts behind the line shows its first lap before crossing it (user decision).
+        this.lap          = Math.max(physics.lap, 0);
         this.damage       = physics.damage;
         this.crashRecovery = physics.crashRecovery;
         this.roadFlags    = physics.roadFlags;

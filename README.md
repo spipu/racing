@@ -77,6 +77,7 @@ Replays a whole race (start, laps, checkpoints, pit stop, finish) and compares t
 ```bash
 node bench/compareCars.js             # the 2 players VS scenarios, tick by tick
 node bench/compareCars.js --rate 3    # also the variable step physics, 3 steps a tick
+node bench/compareCars.js --ranked    # the contacts in the order of the race of the game, by rank
 ```
 
 Replays both cars of the 2 players VS mode and their contacts (pushed apart, speeds exchanged with a shock, a hit far faster than the other car): every tick must come out `identical` to the original game. With `--rate`, the variable step physics runs each tick of both cars, then the contact test, and the gap to the exact physics is measured.
@@ -97,6 +98,7 @@ The mechanics and their wheel gun are glTF files of `website/assets/virtual_raci
 ```bash
 node tools/export/exportVirtualRacing.js     # USA ROM in .source/, see website/assets/virtual_racing/README.md
 node tools/export/recordJingles.js           # FM jingles recorded from the emulated game (PicoDrive core and ffmpeg needed)
+node tools/export/recordJingles.js 98        # only the jingles named, the others kept
 ```
 
 ## Icons

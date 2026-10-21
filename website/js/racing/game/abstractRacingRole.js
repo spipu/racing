@@ -16,7 +16,7 @@ class AbstractRacingRole {
     }
 
     /**
-     * The local player's car enters the race.
+     * The players' cars enter the race, on the places of their slots.
      *
      * @param {{lapMs: number, checkpointsMs: (number|null)[]}|null} record - this device's, null before any lap
      */

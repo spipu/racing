@@ -27,8 +27,12 @@ class RacingMainRole extends AbstractRacingRole {
         this._simulation.adoptRace(data, local(onFinish), local(onRecord));
     }
 
+    // The records are this device's: the other players' cars race against none.
     enterRace(record) {
-        this._simulation.addPlayer(this._roster.getLocal(), record);
+        const players = this._roster.getAll().sort((a, b) => (a.getId() - b.getId()));
+        for (const player of players) {
+            this._simulation.addPlayer(player, ((player === this._roster.getLocal()) ? record : null));
+        }
     }
 
     /**

@@ -19,6 +19,7 @@
  * moves its smoke towards the side it slides to. On the courses with damage,
  * a crash bends the body ($2A86: one crash, two and more) and the cockpit
  * shell; during the pit work the mechanics take the wheels off, one by one.
+ * The cars of the other players are seen from outside only: they have no cockpit.
  */
 class RacingCarView {
     /**
@@ -28,8 +29,9 @@ class RacingCarView {
      * @param {RacingWheelModels} wheels - the car's wheels
      * @param {number}  scale  - metres per model unit
      * @param {boolean} mirror
+     * @param {boolean} cockpit - the cockpit view is built too: the viewed player's car
      */
-    constructor(converter, cars, car, wheels, scale, mirror) {
+    constructor(converter, cars, car, wheels, scale, mirror, cockpit) {
         this._side      = ((mirror) ? -1 : 1);
         this._scale     = scale;
         this._outside   = [];
@@ -94,10 +96,14 @@ class RacingCarView {
         addEffect('sand', RacingCarView.LEFT, RacingCarView.LEFT, cars.effects.dirt, false);
         addEffect('sand', RacingCarView.RIGHT, RacingCarView.RIGHT, cars.effects.dirt, false);
 
+        this._shells        = [];
+        this._cockpitWheels = [];
+        if (!cockpit) {
+            return;
+        }
         const [shell, left, right] = car.cockpit;
         this._shells = [shell, car.damagedCockpit].map((code) => this._addPart(model(code, mirror), [0, 0, 0], null));
         this._cockpit.push(this._shells[0]);
-        this._cockpitWheels = [];
         if (car.cockpitWheels) {
             this._cockpitWheels = [left, right].map((code, i) => this._addPart(converter.toObjectData(wheels.replace(code, car.wheels[i].offset), scale, mirror), offset(car.wheels[i].offset), 'front'));
             this._cockpit.push(...this._cockpitWheels);

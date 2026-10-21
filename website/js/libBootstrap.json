@@ -1,5 +1,5 @@
 {
-    "version": "v1.0202",
+    "version": "v1.0206",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -89,6 +89,7 @@
             "/assets/virtual_racing/jingles/91.mp3",
             "/assets/virtual_racing/jingles/93.mp3",
             "/assets/virtual_racing/jingles/97.mp3",
+            "/assets/virtual_racing/jingles/98.mp3",
             "/assets/virtual_racing/jingles/A6.mp3",
             "/assets/virtual_racing/jingles/A7.mp3",
             "/lib/zxing-wasm/zxing_full.wasm"
@@ -224,6 +225,7 @@
             "/js/racing/racingTranslations.js",
             "/js/racing/racingCatalog.js",
             "/js/racing/racingPalette.js",
+            "/js/racing/racingCarColors.js",
             "/js/racing/racingBestTimes.js",
             "/js/racing/racingTime.js",
             "/js/racing/racingSound.js",

@@ -38,21 +38,25 @@ class RacingGame {
         // The record of this device, none before a first lap (no record of the original: user decision).
         const stored = (racingBestTimes.isReady() ? racingBestTimes.get(selection.course, selection.mirror, selection.car).catch(() => null) : Promise.resolve(null));
         // The sky is checked here: the texture loader has no error path, a missing image would hang the race.
-        const [course, cars, palettes, race, physics, , best] = await Promise.all([
+        const [course, cars, palettes, race, physics, multiplayerGrids, , best] = await Promise.all([
             appBootstrap.fetchJsonAsync(base + 'courses/' + selection.course + '.json'),
             appBootstrap.fetchJsonAsync(base + 'cars.json'),
             appBootstrap.fetchJsonAsync(base + 'palettes.json'),
             appBootstrap.fetchJsonAsync(base + 'race.json'),
             appBootstrap.fetchJsonAsync(base + 'physics.json'),
+            appBootstrap.fetchJsonAsync(base + 'multiplayer_grids.json'),
             appBootstrap.fetchAsync(sky),
             stored,
             racingSound.loadAsync()
         ]);
 
+        const players     = this._roster.getAll();
+        const multiplayer = (players.length > 1);
+        const laps        = ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps());
         loader.reset();
         loader.beginBatch();
-        this._presentation.build({course, cars, palettes, race, physics});
-        this._role.adoptRace({course, race, physics, selection, laps: racingSettings.getSoloLaps(), lapJingles: racingSound.laps},
+        this._presentation.build({course, cars, palettes, race, physics, players, viewed: this._roster.getLocal(), multiplayer});
+        this._role.adoptRace({course, race, physics, multiplayerGrids, selection, multiplayer, laps, lapJingles: racingSound.laps},
             (result) => this._guard(this._finish, result), (lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs));
         this._role.enterRace(((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
 

@@ -26,6 +26,28 @@ class RacingPalette {
     }
 
     /**
+     * The livery of the car painted in another colour: each ramp keeps its shades and its whiteness, its brightest
+     * shade at the full brightness of the colour.
+     *
+     * @param {int[][]} ramps - [first, last] palette indexes (RacingCarColors.liveryOf)
+     * @param {int[]}   color - [r, g, b] 0..255
+     */
+    paintLivery(ramps, color) {
+        for (const [first, last] of ramps) {
+            const shades = this._rgb.slice(first, (last + 1));
+            const top    = Math.max(...shades.map((rgb) => Math.max(...rgb)));
+            shades.forEach((rgb, i) => {
+                const value = Math.max(...rgb);
+                const tint  = ((value === 0) ? 0 : (1 - (Math.min(...rgb) / value)));
+                const scale = ((top === 0) ? 0 : (value / top));
+                this._rgb[first + i] = color.map((channel) => Math.round(scale * (((1 - tint) * RacingPalette.CHANNEL_MAX) + (tint * channel))));
+            });
+        }
+
+        return this;
+    }
+
+    /**
      * @param {int} index - palette index of a face
      * @returns {int[]} [r, g, b] 0..255
      */
@@ -35,3 +57,4 @@ class RacingPalette {
 }
 
 RacingPalette.CHANNEL_MASK = 0x1F;
+RacingPalette.CHANNEL_MAX  = 255;

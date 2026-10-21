@@ -1,11 +1,14 @@
 /**
  * What a device shows and plays of the race, through the car of one player: the scene in the engine (one instance
- * per scenery cell, the car, the course's moving objects, the pit crew, the sky panorama), the camera views of the
- * original (RacingCamera), the HUD and its map, the sound effects (racingSound) and the engine note
- * (RacingEngineSound). As DoomPresentation, it never knows the simulation: it reads only the state every device has,
- * the car's (RacingCarState) and its race's display, and plays the one-shot events as they are emitted.
+ * per scenery cell, the players' cars, the course's moving objects, the pit crew, the sky panorama), the camera views
+ * of the original (RacingCamera), the HUD and its map, the sound effects (racingSound) and the engine note
+ * (RacingEngineSound) of the viewed car. As DoomPresentation, it never knows the simulation: it reads only the state
+ * every device has, the cars' (RacingCarState) and the viewed race's display, and plays the one-shot events as they
+ * are emitted.
  *
- * A mirrored race flips the scene along x.
+ * In a race of several players, each car wears the colour of its player's slot (RacingCarColors); the other players'
+ * cars are seen from outside. The crew works on the car whose stop started last. A mirrored race flips the scene along
+ * x.
  */
 class RacingPresentation {
     /**
@@ -17,7 +20,10 @@ class RacingPresentation {
         this._screen       = null;
         this._engine       = null;
         this._camera       = null;
-        this._car          = null;
+        this._car          = null;      // the viewed player's car
+        this._cars         = new Map(); // player id → RacingCarView, the viewed one included
+        this._players      = [];
+        this._crewPlayer   = null;      // the player whose car the crew works on
         this._objects      = null;
         this._crew         = null;
         this._crewVoice    = null;
@@ -44,9 +50,17 @@ class RacingPresentation {
     }
 
     /**
-     * Inside the loader batch: the scenery, the car, the course's objects, the crew, the camera and the map.
+     * Inside the loader batch: the scenery, the players' cars, the course's objects, the crew, the camera and the map.
      *
-     * @param {object} data - {course, cars, palettes, race, physics}: the exports of the course and of the game
+     * @param {object}         data             - the exports of the course and of the game, and the race's players
+     * @param {object}         data.course
+     * @param {object}         data.cars
+     * @param {object}         data.palettes
+     * @param {object}         data.race
+     * @param {object}         data.physics
+     * @param {RacingPlayer[]} data.players     - in the race, the viewed one with its cockpit
+     * @param {RacingPlayer}   data.viewed
+     * @param {boolean}        data.multiplayer - the cars wear the colours of their slots
      */
     build(data) {
         const selection = this._selection;
@@ -63,7 +77,16 @@ class RacingPresentation {
             throw new Error('RacingPresentation - unknown car ' + selection.car);
         }
         const wheels  = new RacingWheelModels(data.cars, car);
-        this._car     = new RacingCarView(converter, data.cars, car, wheels, carScale, mirror);
+        this._players = data.players;
+        for (const player of data.players) {
+            const palette = new RacingPalette(data.palettes, selection.course, selection.car);
+            if (data.multiplayer) {
+                palette.paintLivery(RacingCarColors.liveryOf(selection.car), RacingCarColors.ofSlot(player.getId()));
+            }
+            const viewed = (player === data.viewed);
+            this._cars.set(player.getId(), new RacingCarView(new RacingModelConverter(palette), data.cars, car, wheels, carScale, mirror, viewed));
+        }
+        this._car     = this._cars.get(data.viewed.getId());
         this._objects = new RacingCourseObjects(converter, data.course, carScale, mirror);
         this._crew    = new RacingPitCrew(RacingGame.ASSETS, converter, wheels, data.race.pit, car, selection.course, carScale, mirror);
         this._camera  = new RacingCamera(data.physics.cars[selection.car].viewTransitions, racingSettings.getStartView());
@@ -79,20 +102,24 @@ class RacingPresentation {
     showRace(skyId, player) {
         this._skyId  = skyId;
         this._player = player;
+        this._crewPlayer = player;
         this._buildDisplay();
-        this._car.bind();
+        for (const view of this._cars.values()) {
+            view.bind();
+        }
         this._objects.bind();
         this._crew.bind()
-            .setOnWheel((wheel, off) => this._car.setWheelOff(wheel, off))
+            .setOnWheel((wheel, off) => this._crewCar().setWheelOff(wheel, off))
             .setOnWrench((mechanic) => {
                 this._crewVoice ??= (RacingPresentation.CREW_VOICE + mechanic);
             });
         if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
         }
-        const parts     = new Set([...this._car.getAllInstances(), ...this._objects.getAllInstances(), ...this._crew.getAllInstances()]);
+        const cars      = Array.from(this._cars.values()).flatMap((view) => view.getAllInstances());
+        const parts     = new Set([...cars, ...this._objects.getAllInstances(), ...this._crew.getAllInstances()]);
         this._instances = loader.instances().getAll().filter((instance) => ((instance !== undefined) && !parts.has(instance)));
-        this._placeCar(0);
+        this._placeCars(0);
     }
 
     getEngine() {
@@ -170,7 +197,7 @@ class RacingPresentation {
     }
 
     /**
-     * A live frame, after the step: the engine note, the crew, the car placed, the scene drawn.
+     * A live frame, after the step: the engine note, the crew, the cars placed, the scene drawn.
      *
      * @param {number}  ticks    - time elapsed, in original ticks
      * @param {boolean} menuOpen - a menu covers the screen (the results run over live frames)
@@ -182,8 +209,8 @@ class RacingPresentation {
         if (this._engineSound !== null) {
             this._engineSound.update(ticks, state.rpm, ((state.roadFlags & RacingPresentation.ROAD_TUNNEL) !== 0));
         }
-        this._updateCrew(state, ticks);
-        this._placeCar(ticks);
+        this._updateCrew(ticks);
+        this._placeCars(ticks);
         this._startCrew();
         this._objects.animate(ticks);
         this._draw();
@@ -195,19 +222,17 @@ class RacingPresentation {
     }
 
     /**
-     * Played as the simulation emits them: the sounds of the viewed car at once, in the step's order; a crew's start
-     * once the car is placed.
+     * Played as the simulation emits them: the sounds of the viewed car at once, in the step's order; a crew's start,
+     * on whichever car, once the cars are placed.
      *
      * @param {object} event - see RacingTurnEvents
      */
     playTurnEvent(event) {
-        if (event.playerId !== this._player.getId()) {
-            return;
-        }
-        if (event.type === RacingTurnEvents.SOUND) {
-            racingSound.send(event.command);
-        } else if (event.type === RacingTurnEvents.CREW_STARTED) {
+        if (event.type === RacingTurnEvents.CREW_STARTED) {
             this._crewSchedule = event.schedule;
+            this._crewPlayer   = this._players.find((player) => (player.getId() === event.playerId));
+        } else if ((event.type === RacingTurnEvents.SOUND) && (event.playerId === this._player.getId())) {
+            racingSound.send(event.command);
         }
     }
 
@@ -240,6 +265,11 @@ class RacingPresentation {
         this._drawInstances(this._instances);
         this._drawInstances(this._objects.getInstances());
         this._drawInstances(this._crew.getInstances());
+        for (const view of this._cars.values()) {
+            if (view !== this._car) {
+                this._drawInstances(view.getInstances());
+            }
+        }
         // The original has no depth buffer and paints the cockpit last: it stays over the road it dips into. In its own
         // depth layer, the cockpit gets a near plane close enough for the roof right above the eye.
         const cockpit = this._camera.isCockpitShown();
@@ -262,16 +292,17 @@ class RacingPresentation {
         }
     }
 
-    // The crew stands at the box while the original shows it ($C026 not -1), its wheels and bursts as its clips go:
-    // the bursts of one frame make one sound (the mechanics in step would add up). Away, it is back to its first pose.
-    _updateCrew(state, ticks) {
-        const shown = (state.pitCrewFrame >= 0);
+    // The crew stands at the box while the original shows it ($C026 not -1) for the car it works on, its wheels and
+    // bursts as its clips go: the bursts of one frame make one sound (the mechanics in step would add up), heard on the
+    // viewed car only. Away, it is back to its first pose.
+    _updateCrew(ticks) {
+        const shown = (this._crewPlayer.getCarState().pitCrewFrame >= 0);
         if (!shown && this._crew.isStarted()) {
             this._crew.reset();
         }
         this._crewVoice = null;
         this._crew.show(shown).update(ticks);
-        if (this._crewVoice !== null) {
+        if ((this._crewVoice !== null) && (this._crewPlayer === this._player)) {
             racingSound.send(RacingRaceControl.SOUND_WRENCH, this._crewVoice);
         }
     }
@@ -281,8 +312,12 @@ class RacingPresentation {
         if (this._crewSchedule === null) {
             return;
         }
-        this._crew.start(this._crewSchedule, RacingPresentation.WHEELS.map((wheel) => this._car.hubMatrix(wheel, Mat4.create())));
+        this._crew.start(this._crewSchedule, RacingPresentation.WHEELS.map((wheel) => this._crewCar().hubMatrix(wheel, Mat4.create())));
         this._crewSchedule = null;
+    }
+
+    _crewCar() {
+        return this._cars.get(this._crewPlayer.getId());
     }
 
     // The panorama wraps once around the horizon, as wide in angle as high: its horizon row sits at elevation 0.
@@ -307,12 +342,18 @@ class RacingPresentation {
         return ((Math.atan((RacingGame.VIRTUAL_WIDTH / RacingGame.VIRTUAL_HEIGHT) * Math.tan(vertical)) * 180) / Math.PI);
     }
 
+    _placeCars(ticks) {
+        for (const player of this._players) {
+            this._placeCar(ticks, player.getCarState(), this._cars.get(player.getId()), (player === this._player));
+        }
+    }
+
     // Entity units: x / z in collision units (2 scenery units), height in 1/8 scenery unit; the original moves
     // along (sin(-h), cos(-h)), the engine's yaw along (sin(yaw), cos(yaw)).
     // The height, smoothed by half a tick, lags up to a metre under a steep climb at full speed: the original paints the
-    // car over the road, the depth buffer would hide it, so it is drawn on the road (user decision).
-    _placeCar(ticks) {
-        const state    = this._player.getCarState();
+    // car over the road, the depth buffer would hide it, so it is drawn on the road (user decision). The camera follows
+    // the viewed car.
+    _placeCar(ticks, state, view, viewed) {
         const side     = this._side;
         const position = [
             (state.x * RacingGame.METRES_PER_ENTITY_UNIT * side),
@@ -325,12 +366,14 @@ class RacingPresentation {
         const pitch = RacingPresentation._degrees(state.pitch);
         const roll  = (RacingPresentation._degrees(state.roll) * side);
         const pose  = this._bodyPose(state, side);
-        this._car.setCockpit(this._camera.isCockpitShown())
+        view.setCockpit(viewed && this._camera.isCockpitShown())
             .setDamage(state.damage)
             .setEffects(state.effectFrames, (state.crashRecovery === 0), state.smokeX)
             .animate(ticks, state.displaySpeed, state.steer, state.yawRate)
             .place(position, yaw, pitch, roll, pose);
-        this._camera.follow(ticks, position, yaw, pitch, roll, pose, this._cockpitLean(ticks, state, side));
+        if (viewed) {
+            this._camera.follow(ticks, position, yaw, pitch, roll, pose, this._cockpitLean(ticks, state, side));
+        }
     }
 
     // Not in the original (user decision): the cockpit eye leans into the turn like on a motorbike, by the steering

@@ -5,7 +5,9 @@
  *     "PIT START" over the mechanics (60 ticks), "3", "2", "1" (20 ticks each,
  *     voices $C0-$C2), "GO!" ($C3, 60 ticks); elsewhere the "READY" lights,
  *     red after 21 ticks (beep $A6), green 21 ticks later = the start ($A7),
- *     gone 41 ticks later ($9EC0, $3D5A);
+ *     gone 41 ticks later ($9EC0, $3D5A); a race of several players starts as
+ *     the 2 players VS mode on every course: "3" two ticks after the opening,
+ *     "2", "1", "GO!" 21 ticks apart, its own jingle ($98, $3E58-$3F2A);
  *   - the lap and race times from the start, a lap taken off by the time
  *     past the line ($B2E4), the lap message (LAP TIME, BEST LAP of the race,
  *     FASTEST LAP over the record: 80 ticks blinking 4 on / 4 off, $34E8), the
@@ -23,17 +25,18 @@ class RacingRaceControl {
      * @param {object} course - race.json course (records, lineCorrection, checkpointCorrections)
      * @param {{lapMs: number, checkpointsMs: (number|null)[]}|null} record - the record of the course and car, null
      *        before any lap: the first lap makes it
-     * @param {boolean} pitStart - the start in the pit box with the mechanics (Big Forest)
+     * @param {string} start - START_PIT (Big Forest, in the pit box with the mechanics), START_LIGHTS, START_TWO_PLAYERS
      * @param {string[]} lapJingles - music command of the lap done, by laps done ($8989EE)
      * @param {string[]} checkpointJingles - music command after a checkpoint, by laps done ($8256, mode Virtua Racing)
      */
-    constructor(physics, course, record, pitStart, lapJingles, checkpointJingles) {
+    constructor(physics, course, record, start, lapJingles, checkpointJingles) {
         this._lapJingles = lapJingles;
         this._checkpointJingles = checkpointJingles;
         this._sounds     = [];          // {tick, command}: sounds the race sends some ticks later
         this._physics   = physics;
         this._course    = course;
-        this._pitStart  = pitStart;
+        this._sequence  = RacingRaceControl.SEQUENCES[start];
+        this._pitStart  = (start === RacingRaceControl.START_PIT);
         this._onSound   = () => {};
         this._onFinish  = () => {};
         this._onRecord  = () => {};
@@ -69,9 +72,9 @@ class RacingRaceControl {
         this._splitsMs  = [null, null]; // $C270 / $C274 of the lap
         this._finishTick = null;        // the tick the last lap ends
         physics.mode = RacingCarPhysics.MODE_INTRO;
-        if (pitStart) {
+        if (this._pitStart) {
             physics.pitCrewFrame = 0;
-        } else {
+        } else if (start === RacingRaceControl.START_LIGHTS) {
             this.startSign = RacingRaceControl.SIGN_READY;
             this.lights    = RacingRaceControl.LIGHTS_OFF;
         }
@@ -161,7 +164,7 @@ class RacingRaceControl {
         }
     }
 
-    // $9EC0 (Big Forest) / $3D5A (the lights), after the opening of 20 ticks ($6A3A).
+    // $9EC0 (Big Forest, several players) / $3D5A (the lights), after the opening of 20 ticks ($6A3A).
     _start() {
         const physics = this._physics;
         const ticks   = this._stepTicks;
@@ -169,7 +172,7 @@ class RacingRaceControl {
             case RacingRaceControl.STEP_INTRO:
                 if (ticks >= RacingRaceControl.INTRO_TICKS) {
                     physics.mode = RacingCarPhysics.MODE_GRID;
-                    this._next(this._pitStart ? RacingRaceControl.STEP_PIT_START : RacingRaceControl.STEP_LIGHTS);
+                    this._next(this._sequence.firstStep);
                     this.pitStartSign = this._pitStart;
                     if (this._pitStart) {
                         this._crew();
@@ -182,11 +185,16 @@ class RacingRaceControl {
                     this._count(3, RacingRaceControl.STEP_THREE, 'C0');
                 }
                 break;
+            case RacingRaceControl.STEP_TWO_PLAYERS:
+                if (ticks >= RacingRaceControl.TWO_PLAYERS_SETUP) {
+                    this._count(3, RacingRaceControl.STEP_THREE, 'C0');
+                }
+                break;
             case RacingRaceControl.STEP_THREE:
             case RacingRaceControl.STEP_TWO:
             case RacingRaceControl.STEP_ONE:
                 this._crew();
-                if (ticks >= RacingRaceControl.COUNT_TICKS) {
+                if (ticks >= this._sequence.countTicks) {
                     if (this._step === RacingRaceControl.STEP_THREE) {
                         this._count(2, RacingRaceControl.STEP_TWO, 'C1');
                     } else if (this._step === RacingRaceControl.STEP_TWO) {
@@ -202,9 +210,11 @@ class RacingRaceControl {
                 this._crew();
                 if (ticks >= RacingRaceControl.GO_TICKS) {
                     // $A04E: the crew goes.
-                    physics.pitCrewFrame = -1;
-                    this.crewRunning     = false;
-                    this.startSign       = null;
+                    if (this._pitStart) {
+                        physics.pitCrewFrame = -1;
+                        this.crewRunning     = false;
+                    }
+                    this.startSign = null;
                     this._next(RacingRaceControl.STEP_RACE);
                 }
                 break;
@@ -251,13 +261,14 @@ class RacingRaceControl {
     _go() {
         this._physics.raceFlags |= RacingCarPhysics.RACE_STARTED;
         this.started  = true;
-        // The start jingle (it chains the DAC $C6): 5 ticks after GO ($9FBC), 10 after the green light ($3E08).
-        this._later(this._tickCount, (this._pitStart ? RacingRaceControl.START_JINGLE_PIT_TICKS : RacingRaceControl.START_JINGLE_LIGHTS_TICKS),
-            RacingRaceControl.JINGLE_START);
+        this._later(this._tickCount, this._sequence.jingleTicks, this._sequence.jingle);
     }
 
     // $A034: the crew of the pit start, frame = ticks x 7 / 30 from the last tick of the opening.
     _crew() {
+        if (!this._pitStart) {
+            return;
+        }
         this._physics.pitCrewFrame = RacingCarPhysics.crewFrame(this._crewTicks);
         this._crewTicks++;
         this.crewRunning = true;
@@ -428,10 +439,12 @@ RacingRaceControl.STEP_GO                = 24;
 RacingRaceControl.STEP_LIGHTS            = 36;
 RacingRaceControl.STEP_RED               = 40;
 RacingRaceControl.STEP_GREEN             = 44;
+RacingRaceControl.STEP_TWO_PLAYERS       = 48;
 RacingRaceControl.STEP_RACE              = 28;
 RacingRaceControl.INTRO_TICKS            = 21;
 RacingRaceControl.PIT_START_TICKS        = 60;
-RacingRaceControl.COUNT_TICKS            = 20;
+// Several players: the step $3E58 a tick, then "3" ($3E64).
+RacingRaceControl.TWO_PLAYERS_SETUP      = 2;
 RacingRaceControl.GO_TICKS               = 60;
 // The lights after the opening: red at tick 42, green at 63, gone at 104 ($3D9A, then > 20, > 20, > 40).
 RacingRaceControl.RED_TICKS              = 21;
@@ -445,8 +458,6 @@ RacingRaceControl.BLINDS_EIGHTHS         = 8;
 RacingRaceControl.BLINDS_OPENING         = [8, 7, 6, 5, 4, 3, 2, 1, 1, 0];
 // The 40 ticks of the finish drive and the 10 of the blinds closing ($476A).
 RacingRaceControl.RESULTS_TICKS          = 51;
-RacingRaceControl.START_JINGLE_PIT_TICKS    = 5;
-RacingRaceControl.START_JINGLE_LIGHTS_TICKS = 10;
 RacingRaceControl.LAP_JINGLE_TICKS          = 7;
 RacingRaceControl.LAST_LAP_JINGLE_TICKS     = 15;
 RacingRaceControl.LINE_CORRECTION_MAX    = 50;
@@ -461,5 +472,15 @@ RacingRaceControl.SOUND_BEEP_LOW         = 'A6';
 RacingRaceControl.SOUND_WRENCH           = 'BA';
 RacingRaceControl.CREW_WRENCH_FRAMES     = [4, 22];
 RacingRaceControl.SOUND_BEEP_HIGH        = 'A7';
-RacingRaceControl.JINGLE_START           = '93';
+RacingRaceControl.START_PIT              = 'pit';
+RacingRaceControl.START_LIGHTS           = 'lights';
+RacingRaceControl.START_TWO_PLAYERS      = 'twoPlayers';
+// The start sequence of each kind: its first step after the opening, the ticks between "3", "2", "1" and "GO!"
+// ($9F4A tests BLT 20, $3E7E BLE 20), its jingle and the ticks after the start it plays ($9FBC, $3E08, $3EF6; the Time
+// Attack's chains the DAC $C6).
+RacingRaceControl.SEQUENCES = {
+    [RacingRaceControl.START_PIT]:         {firstStep: RacingRaceControl.STEP_PIT_START,   countTicks: 20, jingle: '93', jingleTicks: 5},
+    [RacingRaceControl.START_LIGHTS]:      {firstStep: RacingRaceControl.STEP_LIGHTS,      countTicks: 20, jingle: '93', jingleTicks: 10},
+    [RacingRaceControl.START_TWO_PLAYERS]: {firstStep: RacingRaceControl.STEP_TWO_PLAYERS, countTicks: 21, jingle: '98', jingleTicks: 5},
+};
 RacingRaceControl.JINGLE_RECORD          = '97';

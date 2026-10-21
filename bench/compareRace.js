@@ -140,11 +140,11 @@ class RaceComparator {
         physics.settle();
         BenchTrace.load(physics, ticks[1].frame);
         physics.laps = this._byte(ticks[1].frame, LAP_COUNT.block, LAP_COUNT.offset);
-        const pitStart = PIT_START_COURSES.includes(courseCode);
+        const start    = (PIT_START_COURSES.includes(courseCode) ? this._Control.START_PIT : this._Control.START_LIGHTS);
         const sounds   = [];
         let finishTick = null;
         const record   = this._record(ticks[0].frame, scenario);
-        const control  = new this._Control(physics, this._race.courses[courseCode], record, pitStart,
+        const control  = new this._Control(physics, this._race.courses[courseCode], record, start,
             this._lapJingles, this._race.checkpointJingles)
             .setOnSound((command) => sounds.push(command))
             .setOnFinish(() => {
@@ -178,8 +178,8 @@ class RaceComparator {
                 this._check(mismatches, 'splitMs', t, ticks, control.split.ms, splitMs);
             }
             shownSplit = control.split;
-            const traced   = this._traced(frames, ticks, t, pitStart);
-            const computed = this._computed(physics, control, sounds, pitStart);
+            const traced   = this._traced(frames, ticks, t, (start === this._Control.START_PIT));
+            const computed = this._computed(physics, control, sounds, (start === this._Control.START_PIT));
             sounds.length  = 0;
             // After the line, the game keeps the blinds open under its results (user decision).
             if (control.finished) {

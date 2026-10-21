@@ -38,7 +38,7 @@ class PitCrewViewer {
             const wheels    = new RacingWheelModels(cars, car);
             this._scenes.set(car.code, {
                 car:  car,
-                view: new RacingCarView(converter, cars, car, wheels, PitCrewViewer.METRES, false),
+                view: new RacingCarView(converter, cars, car, wheels, PitCrewViewer.METRES, false, false),
                 crew: new RacingPitCrew(PitCrewViewer.DATA, converter, wheels, race.pit, car, PitCrewViewer.COURSE, PitCrewViewer.METRES, false),
             });
         }
