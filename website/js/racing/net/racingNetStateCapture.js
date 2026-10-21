@@ -11,10 +11,10 @@ class RacingNetStateCapture {
      * @param {RacingNetEvents}    events
      */
     constructor(roster, outcome, events) {
-        this._roster  = roster;
-        this._outcome = outcome;
-        this._events  = events;
-        this._races   = new Map();   // player id → the RacingRaceView its race is captured into
+        this._roster    = roster;
+        this._outcome   = outcome;
+        this._events    = events;
+        this._raceViews = new Map();   // player id → the RacingRaceView its race is captured into
     }
 
     /**
@@ -36,10 +36,10 @@ class RacingNetStateCapture {
     }
 
     _race(player) {
-        let view = this._races.get(player.getId());
+        let view = this._raceViews.get(player.getId());
         if (view === undefined) {
             view = new RacingRaceView(player.getRace().laps);
-            this._races.set(player.getId(), view);
+            this._raceViews.set(player.getId(), view);
         }
 
         return view.capture(player.getRace());

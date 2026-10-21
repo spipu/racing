@@ -235,7 +235,7 @@ class RacingCarView {
             target = Math.max(-RacingCarView.DRIVEN_TURN_MAX, Math.min(RacingCarView.DRIVEN_TURN_MAX, target));
         }
 
-        return (this._wheelTurn + ((target - this._wheelTurn) * (1 - Math.pow(0.5, ticks))));
+        return (this._wheelTurn + ((target - this._wheelTurn) * (1 - Math.pow(RacingCarView.DRIVEN_TURN_KEPT, ticks))));
     }
 
     /**
@@ -379,31 +379,33 @@ class RacingCarView {
     }
 }
 
-RacingCarView.SCREEN_ALPHA     = 0.5;
+RacingCarView.SCREEN_ALPHA      = 0.5;
 // Metres: deeper than the car ever dips into the road (painter's order of the original), short of the walls beside it.
-RacingCarView.DEPTH_BIAS       = 1.5;
+RacingCarView.DEPTH_BIAS        = 1.5;
 // Above the road, against z-fighting.
-RacingCarView.SHADOW_LIFT      = 0.02;
+RacingCarView.SHADOW_LIFT       = 0.02;
 // Wheel spin of a tick in 1/65536 turn: speed x 64, x 4 from $1900, at most $7080.
-RacingCarView.TURN             = 65536;
-RacingCarView.SPIN_PER_KMH     = 64;
-RacingCarView.SPIN_FAST        = 0x1900;
-RacingCarView.SPIN_FAST_FACTOR = 4;
-RacingCarView.SPIN_LIMIT       = 0x7000;
-RacingCarView.SPIN_MAX         = 0x7080;
-RacingCarView.STEERING_TURN    = 8192;
+RacingCarView.TURN              = 65536;
+RacingCarView.SPIN_PER_KMH      = 64;
+RacingCarView.SPIN_FAST         = 0x1900;
+RacingCarView.SPIN_FAST_FACTOR  = 4;
+RacingCarView.SPIN_LIMIT        = 0x7000;
+RacingCarView.SPIN_MAX          = 0x7080;
+RacingCarView.STEERING_TURN     = 8192;
 // A car driving itself: below this speed (km/h) its wheels go straight; at most +$90 at full lock standing ($9688: twice
 // +$8E >> 4); the yaw of a tick, (+$90 x +$04) >> 10, turns the heading by 1.5 times itself.
 RacingCarView.DRIVEN_MIN_KMH    = 1;
 RacingCarView.DRIVEN_TURN_MAX   = (((RacingCarPhysics.STEER_SPEED_MAX << 8) >> 4) * 2);
 RacingCarView.YAW_SPEED_SCALE   = 1024;
 RacingCarView.YAW_HEADING_SHARE = 1.5;
+// The wheels join the driven turn halfway each tick, as the steering wheel does.
+RacingCarView.DRIVEN_TURN_KEPT  = 0.5;
 // A left wheel is the right one turned half round the vertical.
-RacingCarView.HALF_TURN        = [0, 1, 0, 0];
-RacingCarView.NO_TURN          = [0, 0, 0, 1];
-RacingCarView.UNIT_SCALE       = [1, 1, 1];
+RacingCarView.HALF_TURN         = [0, 1, 0, 0];
+RacingCarView.NO_TURN           = [0, 0, 0, 1];
+RacingCarView.UNIT_SCALE        = [1, 1, 1];
 // Wheel of an effect pair; the left one is mirrored.
-RacingCarView.LEFT             = 0;
-RacingCarView.RIGHT            = 1;
+RacingCarView.LEFT              = 0;
+RacingCarView.RIGHT             = 1;
 // Model units per unit of the render slots.
-RacingCarView.SLOT_UNITS       = 4;
+RacingCarView.SLOT_UNITS        = 4;

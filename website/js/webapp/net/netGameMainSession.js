@@ -169,7 +169,7 @@ class NetGameMainSession {
         if (cycle !== null) {
             for (const peer of this._host.getPeers()) {
                 if (this._lobby.getPlayer(peer.getId()) !== null) {
-                    cycle.admitted(peer);
+                    cycle.admitted?.(peer);
                 }
             }
         }
@@ -319,6 +319,10 @@ class NetGameMainSession {
             return;
         }
         this._lobby.setAway(peer.getId(), away);
+        // Without a turn cycle (in the lobby), the session keeps a suspended page's link itself; a cycle sees to it.
+        if (this._cycle === null) {
+            peer.setLivenessSuspended(away);
+        }
         this._cycleCall('awayChanged', peer, away);
         this._tellOtherPlayers(peer, {type: NetGameProtocol.PLAYER_AWAY, nickname: player.nickname, away: away});
         this._changed();

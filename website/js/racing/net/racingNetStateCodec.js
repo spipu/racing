@@ -118,12 +118,14 @@ class RacingNetStateCodec {
             | ((race.record !== null) ? RacingNetStateCodec.RACE_RECORD : 0)
             | ((race.message !== null) ? RacingNetStateCodec.RACE_MESSAGE : 0)
             | ((race.split !== null) ? RacingNetStateCodec.RACE_SPLIT : 0);
-        w.u8(flags).u8(RacingNetStateCodec.START_SIGNS.indexOf(race.startSign)).u8(RacingNetStateCodec.LIGHTS.indexOf(race.lights));
+        w.u8(flags).u8(RacingNetStateCodec._index(RacingNetStateCodec.START_SIGNS, race.startSign))
+            .u8(RacingNetStateCodec._index(RacingNetStateCodec.LIGHTS, race.lights));
         if (race.record !== null) {
             w.f32(race.record.lapMs);
         }
         if (race.message !== null) {
-            w.u8(RacingNetStateCodec.MESSAGE_KINDS.indexOf(race.message.kind)).f32(race.message.ms).u8(((race.message.shown) ? 1 : 0));
+            w.u8(RacingNetStateCodec._index(RacingNetStateCodec.MESSAGE_KINDS, race.message.kind)).f32(race.message.ms)
+                .u8(((race.message.shown) ? 1 : 0));
         }
         if (race.split !== null) {
             w.f32(race.split.ms).u8(((race.split.shown) ? 1 : 0));
@@ -131,8 +133,8 @@ class RacingNetStateCodec {
     }
 
     static _readRace(r) {
-        const race    = {laps: r.u16(), lapTimes: []};
-        const count   = r.u16();
+        const race  = {laps: r.u16(), lapTimes: []};
+        const count = r.u16();
         for (let i = 0; i < count; i++) {
             race.lapTimes.push(r.f32());
         }
@@ -141,10 +143,11 @@ class RacingNetStateCodec {
         race.blink  = r.u32();
         race.place  = r.u8();
         const end   = r.u8();
-        race.stopped    = ((end & RacingNetStateCodec.RACE_STOPPED) !== 0);
-        race.resultsDue = ((end & RacingNetStateCodec.RACE_RESULTS_DUE) !== 0);
-        race.newRecord  = ((end & RacingNetStateCodec.RACE_NEW_RECORD) !== 0);
         const flags = r.u8();
+
+        race.stopped      = ((end & RacingNetStateCodec.RACE_STOPPED) !== 0);
+        race.resultsDue   = ((end & RacingNetStateCodec.RACE_RESULTS_DUE) !== 0);
+        race.newRecord    = ((end & RacingNetStateCodec.RACE_NEW_RECORD) !== 0);
         race.started      = ((flags & RacingNetStateCodec.RACE_STARTED) !== 0);
         race.finished     = ((flags & RacingNetStateCodec.RACE_FINISHED) !== 0);
         race.pitStartSign = ((flags & RacingNetStateCodec.RACE_PIT_START_SIGN) !== 0);
@@ -164,13 +167,16 @@ class RacingNetStateCodec {
     // --- Events ---
 
     static _writeEvent(w, event) {
-        w.u8(RacingNetStateCodec.EVENT_TYPES.indexOf(event.type)).u8(event.playerId);
+        w.u8(RacingNetStateCodec._index(RacingNetStateCodec.EVENT_TYPES, event.type)).u8(event.playerId);
         if (event.type === RacingTurnEvents.SOUND) {
             w.ascii(event.command);
             return;
         }
         if (event.type === RacingTurnEvents.LAP_RECORD) {
             // A split the lap went without (a checkpoint missed) travels as NaN.
+            if (event.checkpointsMs.length !== RacingRaceControl.CHECKPOINTS) {
+                throw new RangeError('A lap record has ' + RacingRaceControl.CHECKPOINTS + ' splits');
+            }
             w.f32(event.lapMs);
             for (const ms of event.checkpointsMs) {
                 w.f32(ms ?? NaN);
@@ -190,7 +196,7 @@ class RacingNetStateCodec {
         }
         if (type === RacingTurnEvents.LAP_RECORD) {
             const lapMs  = r.f32();
-            const splits = Array.from({length: RacingNetStateCodec.CHECKPOINTS}, () => r.f32());
+            const splits = Array.from({length: RacingRaceControl.CHECKPOINTS}, () => r.f32());
 
             return {type: type, playerId: playerId, lapMs: lapMs, checkpointsMs: splits.map((ms) => (Number.isNaN(ms) ? null : ms))};
         }
@@ -199,6 +205,16 @@ class RacingNetStateCodec {
         const speeds = Array.from({length: count}, () => r.f32());
 
         return {type: type, playerId: playerId, delays: delays, speeds: speeds};
+    }
+
+    // A value out of its table is a state this version cannot send.
+    static _index(table, value) {
+        const index = table.indexOf(value);
+        if (index < 0) {
+            throw new RangeError('No code for ' + value);
+        }
+
+        return index;
     }
 
     // A code out of its table is a message this version cannot read.
@@ -233,8 +249,6 @@ RacingNetStateCodec.RACE_RESULTS_DUE    = 2;
 RacingNetStateCodec.RACE_NEW_RECORD     = 4;
 RacingNetStateCodec.OUTCOME_COUNTDOWN   = 1;
 RacingNetStateCodec.OUTCOME_OVER        = 2;
-// The splits of a lap record: the checkpoints of a lap (RacingRaceControl).
-RacingNetStateCodec.CHECKPOINTS         = 2;
 
 // The code byte of each value: its rank in the table, fixed.
 RacingNetStateCodec.START_SIGNS   = [null, 3, 2, 1, RacingRaceControl.SIGN_GO, RacingRaceControl.SIGN_READY];

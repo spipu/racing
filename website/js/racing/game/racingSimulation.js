@@ -12,8 +12,8 @@
  * leading car to the last, the car ahead as the first player (user decision).
  *
  * In a race of several players, the first finish leaves the others RacingRaceOutcome.FINISH_WINDOW_MS: then their races
- * stop; the cars are placed at the end of each step, and a player whose car leaves the track after the start
- * abandoned (RacingRaceOutcome).
+ * stop; the cars are placed at the end of each step until the race is over, and a player whose car leaves the track
+ * after the start, before its finish, abandoned (RacingRaceOutcome). The split compares with the car just ahead.
  *
  * The physics runs on the unmirrored course: on a mirrored one, the steering of the commands is turned back, as the
  * original swaps the left and right bits of the pad before the steering ($950A).
@@ -25,21 +25,25 @@ class RacingSimulation {
      * @param {function(): number} random - uniform in [0, 1[, the pit stops' draw
      */
     constructor(roster, events, random) {
-        this._roster    = roster;
-        this._events    = events;
-        this._random    = random;
-        this._data      = null;
-        this._collision = null;         // of the course, shared by the cars
-        this._pitBoxes  = null;         // RacingPitBoxes.of: two in a race of several players
-        this._pitWork   = new Map();    // player id → RacingPitWork of its car
-        this._previous  = new Map();    // player id → its command of the previous step, the presses derived from it
-        this._input     = {accelerate: false, brake: false, steer: 0, steerAxis: null, gearUp: false, gearDown: false};
-        this._clock     = 0;            // original ticks since the race was built: the end of a tick tests the contacts
-        this._outcome   = new RacingRaceOutcome();
-        this._endTick   = null;         // the clock the race of several players ends at, once a car finished
-        this._places    = new Map();    // player id → its place at the end of the previous step
-        this._onFinish  = null;
-        this._onRecord  = null;
+        this._roster           = roster;
+        this._events           = events;
+        this._random           = random;
+        this._data             = null;
+        this._collision        = null;         // of the course, shared by the cars
+        this._pitBoxes         = null;         // RacingPitBoxes.of: two in a race of several players
+        this._pitWork          = new Map();    // player id → RacingPitWork of its car
+        this._previousCommands = new Map();    // player id → its previous command (presses)
+        this._input            = {accelerate: false, brake: false, steer: 0, steerAxis: null, gearUp: false, gearDown: false};
+        this._clock            = 0;            // original ticks since the race was built
+        this._outcome          = new RacingRaceOutcome();
+        this._endTick          = null;         // the clock the race of several players ends at, once a car finished
+        this._cars             = [];           // players with a car on the track, in slot order
+        this._carPhysics       = [];           // their physics, in the same order
+        this._ranking          = [];           // the cars by their standing, sorted at the end of each step
+        this._previousPlaces   = [];           // by player id: its place at the end of the previous step
+        this._byStanding       = (a, b) => this._standingOrder(a, b);
+        this._onFinish         = null;
+        this._onRecord         = null;
     }
 
     /**
@@ -104,10 +108,11 @@ class RacingSimulation {
             })
             .setOnFinish((result) => this._onFinish(player, result));
         if (multiplayer) {
-            raceControl.setSplitAgainst((pass) => this._aheadAt(player, pass));
+            raceControl.setSplitAgainst((pass) => this._aheadPassMs(player, pass));
         }
         player.enterRace(physics, raceControl);
         player.getCarState().capture(physics);
+        this._carsChanged();
         this._pitWork.set(id, new RacingPitWork(player, this._events, this._random));
 
         return this;
@@ -119,14 +124,22 @@ class RacingSimulation {
      * @param {RacingPlayer} player
      */
     removePlayer(player) {
-        if (this._data.multiplayer && (this._clock > 0) && !this._outcome.over && (player.getRace() !== null)) {
+        const race = player.getRace();
+        // Abandoned: gone after the start, before its finish (user decision); gone on the grid, it never raced.
+        if (this._data.multiplayer && (race !== null) && race.started && !race.finished) {
             this._outcome.abandons.push(player.getId());
         }
         this._pitWork.delete(player.getId());
-        this._previous.delete(player.getId());
+        this._previousCommands.delete(player.getId());
         player.leaveRace();
+        this._carsChanged();
 
         return this;
+    }
+
+    _carsChanged() {
+        this._cars       = this._roster.getAll().filter((player) => (player.getPhysics() !== null));
+        this._carPhysics = this._cars.map((player) => player.getPhysics());
     }
 
     /**
@@ -182,7 +195,7 @@ class RacingSimulation {
      * @param {Map<int, RacingCommand>} commands - by player id
      */
     tick(ticks, commands) {
-        const players = this._roster.getAll().filter((player) => (player.getPhysics() !== null));
+        const players = this._cars;
         let left  = ticks;
         let first = true;
         while (left > 0) {
@@ -198,7 +211,7 @@ class RacingSimulation {
                 this._collide(players);
             }
         }
-        if (this._data.multiplayer) {
+        if (this._data.multiplayer && !this._outcome.over) {
             this._updateOutcome(players);
         }
         for (const player of players) {
@@ -209,65 +222,84 @@ class RacingSimulation {
     // The window after the first finish, the races stopped once it ran out, the places, the end of the race.
     _updateOutcome(players) {
         const outcome = this._outcome;
-        const races   = players.map((player) => player.getRace());
-        if ((this._endTick === null) && races.some((race) => race.finished)) {
+        let finished  = 0;
+        for (const player of players) {
+            const race = player.getRace();
+            finished += ((race.finished) ? 1 : 0);
+            this._previousPlaces[player.getId()] = race.place;
+        }
+        if ((this._endTick === null) && (finished > 0)) {
             this._endTick = (this._clock + (RacingRaceOutcome.FINISH_WINDOW_MS / RacingRaceControl.TICK_MS));
         }
         if (this._endTick !== null) {
             outcome.countdownMs = (Math.max(0, (this._endTick - this._clock)) * RacingRaceControl.TICK_MS);
             if (this._clock >= this._endTick) {
-                races.forEach((race) => race.stop());
+                for (const player of players) {
+                    player.getRace().stop();
+                }
+                finished = players.length;
             }
         }
-        const finished = (player) => (player.getRace().finished && !player.getRace().stopped);
-        players.slice().sort((a, b) => {
-            if (finished(a) && finished(b)) {
-                return (RacingRaceOutcome.raceMs(a.getRace()) - RacingRaceOutcome.raceMs(b.getRace()));
-            }
-            if (finished(a) || finished(b)) {
-                return ((finished(a)) ? -1 : 1);
-            }
-            return RacingSimulation.rankOrder(a.getPhysics(), b.getPhysics());
-        }).forEach((player, index) => {
+        const ranking = this._ranking;
+        ranking.length = 0;
+        ranking.push(...players);
+        ranking.sort(this._byStanding);
+        ranking.forEach((player, index) => {
             player.getRace().place = (index + 1);
         });
-        outcome.over = ((races.length > 0) && races.every((race) => race.finished));
+        outcome.over = ((players.length > 0) && (finished === players.length));
         this._overtakes(players);
     }
 
-    // The race time at a pass of the car placed just ahead of the player, null when it leads or has not passed there.
-    _aheadAt(player, pass) {
-        const place = player.getRace().place;
-        const ahead = this._roster.getAll().find((other) => ((other.getRace() !== null) && (other.getRace().place === (place - 1))));
+    // The finished cars by their race time, the stopped ones where they were stopped, then the others by $87E2.
+    _standingOrder(a, b) {
+        const raceA = a.getRace();
+        const raceB = b.getRace();
+        const doneA = (raceA.finished && !raceA.stopped);
+        const doneB = (raceB.finished && !raceB.stopped);
+        if (doneA || doneB) {
+            return ((doneA && doneB) ? (RacingRaceControl.raceMs(raceA) - RacingRaceControl.raceMs(raceB)) : ((doneA) ? -1 : 1));
+        }
+        if (raceA.stopped && raceB.stopped) {
+            return (raceA.place - raceB.place);
+        }
 
-        return ((ahead !== undefined) ? (ahead.getRace().passesMs[pass] ?? null) : null);
+        return RacingSimulation.rankOrder(a.getPhysics(), b.getPhysics());
     }
 
-    // $87E2: a player whose place changed hears the overtaking sound, if its car and the one it swapped places with run
-    // fast at clearly different speeds (and, at Sand Park, on the same layer of road); heard by that player alone.
+    // The race time at a pass of the car placed just ahead of the player, null when it leads or has not passed there.
+    _aheadPassMs(player, pass) {
+        const place = player.getRace().place;
+        for (const other of this._cars) {
+            if (other.getRace().place === (place - 1)) {
+                return (other.getRace().passesMs[pass] ?? null);
+            }
+        }
+
+        return null;
+    }
+
+    // $87E2: a player whose place changed hears the overtaking sound when it swapped places with another car (none for a
+    // car gone) and both run fast at clearly different speeds; heard by that player alone. The original also tests, at
+    // Sand Park, its rank against the lane bits of the road under player 1 ($888A, a bug: user decision, left out).
     _overtakes(players) {
         for (const player of players) {
-            const id       = player.getId();
-            const place    = player.getRace().place;
-            const previous = (this._places.get(id) ?? place);
-            this._places.set(id, place);
-            const race = player.getRace();
-            if ((previous === place) || !race.started || race.finished) {
+            const race     = player.getRace();
+            const previous = (this._previousPlaces[player.getId()] ?? 0);
+            if ((previous === race.place) || (previous === 0) || !race.started || race.finished) {
                 continue;
             }
-            const other = players.find((candidate) => (candidate.getRace().place === previous));
-            if ((other === undefined) || !RacingSimulation._overtakeHeard(player.getPhysics(), other.getPhysics(), this._data.selection.course)) {
-                continue;
+            const other = players.find((candidate) => ((candidate.getRace().place === previous)
+                && (this._previousPlaces[candidate.getId()] === race.place)));
+            if ((other !== undefined) && RacingSimulation._overtakeHeard(player.getPhysics(), other.getPhysics())) {
+                this._events.sound(player.getId(), RacingSimulation.OVERTAKE_SOUNDS[this._data.selection.car]);
             }
-            this._events.sound(id, RacingSimulation.OVERTAKE_SOUNDS[this._data.selection.car]);
         }
     }
 
-    static _overtakeHeard(a, b, course) {
-        const speeds = ((Math.abs(a.displaySpeed - b.displaySpeed) > RacingSimulation.OVERTAKE_GAP_KMH)
+    static _overtakeHeard(a, b) {
+        return ((Math.abs(a.displaySpeed - b.displaySpeed) > RacingSimulation.OVERTAKE_GAP_KMH)
             && ((a.displaySpeed + b.displaySpeed) > RacingSimulation.OVERTAKE_SUM_KMH));
-
-        return (speeds && ((course !== RacingSimulation.LAYERED_COURSE) || (((a.roadFlags ^ b.roadFlags) & RacingSimulation.ROAD_LAYER_BITS) === 0)));
     }
 
     // A command acts once: its presses on the first part of the step only. The race sends its sounds as it updates,
@@ -276,9 +308,9 @@ class RacingSimulation {
         const id      = player.getId();
         const physics = player.getPhysics();
         physics.freePitBox = this._freePitBox(player);
-        physics.step(this._physicsInput(command, ((first) ? (this._previous.get(id) ?? null) : command)), step);
+        physics.step(this._physicsInput(command, ((first) ? (this._previousCommands.get(id) ?? null) : command)), step);
         if (first) {
-            this._previous.set(id, command);
+            this._previousCommands.set(id, command);
         }
         player.getRace().update(step);
         this._sendSounds(player);
@@ -287,14 +319,26 @@ class RacingSimulation {
 
     // The first box no other car holds in its stop (the original's first), -1 when each is held.
     _freePitBox(player) {
-        const held = (box) => this._roster.getAll().some((other) => ((other !== player) && (other.getPhysics() !== null)
-            && (other.getPhysics().pitState !== RacingCarPhysics.PIT_FREE) && (other.getPhysics().pitBox === box)));
+        let held = 0;
+        for (const physics of this._carPhysics) {
+            if ((physics !== player.getPhysics()) && (physics.pitState !== RacingCarPhysics.PIT_FREE)) {
+                held |= (1 << physics.pitBox);
+            }
+        }
+        for (let box = 0; box < this._pitBoxes.length; box++) {
+            if ((held & (1 << box)) === 0) {
+                return box;
+            }
+        }
 
-        return this._pitBoxes.findIndex((box, index) => !held(index));
+        return RacingSimulation.NO_PIT_BOX;
     }
 
     _collide(players) {
-        RacingSimulation.collideCars(players.map((player) => player.getPhysics()));
+        if (players.length < RacingSimulation.CONTACT_MIN_CARS) {
+            return;
+        }
+        RacingSimulation.collideCars(this._carPhysics);
         for (const player of players) {
             this._sendSounds(player);
         }
@@ -306,7 +350,7 @@ class RacingSimulation {
      * @param {RacingCarPhysics[]} cars - in slot order
      */
     static collideCars(cars) {
-        if (cars.length < RacingSimulation.PAIR) {
+        if (cars.length < RacingSimulation.CONTACT_MIN_CARS) {
             return;
         }
         const ranked = cars.slice().sort(RacingSimulation.rankOrder);
@@ -373,14 +417,13 @@ class RacingSimulation {
 RacingSimulation.PIT_START_COURSES = ['big_forest'];
 // A race alone starts on the first place of the race grid of the original, the Time Attack's.
 RacingSimulation.TIME_ATTACK_PLACE = 0;
-RacingSimulation.PAIR              = 2;
+RacingSimulation.CONTACT_MIN_CARS  = 2;
+// The free pit box of a car when another holds each (RacingCarPhysics.freePitBox).
+RacingSimulation.NO_PIT_BOX        = -1;
 RacingSimulation.EPSILON           = 1e-6;
 // A player without a command this step: off the pedals, wheels straight.
 RacingSimulation.NEUTRAL_COMMAND   = new RacingCommand();
-// The overtaking sound by car, and when it plays ($87E2): speeds +$04 apart by more than 20, more than 100 together; at
-// Sand Park, bits 1-2 of the road flags +$E5 equal (the same layer of road).
+// The overtaking sound by car, and when it plays ($87E2): speeds +$04 apart by more than 20, more than 100 together.
 RacingSimulation.OVERTAKE_SOUNDS   = {formula: 'B3', stock: 'CC', prototype: 'CF'};
 RacingSimulation.OVERTAKE_GAP_KMH  = 20;
 RacingSimulation.OVERTAKE_SUM_KMH  = 100;
-RacingSimulation.LAYERED_COURSE    = 'sand_park';
-RacingSimulation.ROAD_LAYER_BITS   = 0x06;

@@ -2,8 +2,9 @@
  * The role of the device that simulates the race — the only one in a race alone, the main in a session — as
  * DoomMainRole. RacingGame runs the flow every device shares and asks its role to move the race each frame; this role
  * owns the simulation (RacingSimulation) and everything only the simulating device does: the players entering the
- * race — the subs of its lobby on their places before the start (user decision: every car starts with the main's, an
- * écart to doom_js where a sub's player enters with its first command), leaving it with their link —, and, while it
+ * race — the subs of its lobby on their places before the start (user decision: every car starts with the main's, a
+ * departure from doom_js where a sub's player enters with its first command), leaving it with their link unless their
+ * race is done (user decision: a finished player keeps its result) —, and, while it
  * hosts a session, the turn cycle of the subs (RacingNetTurnCycle): no turn before every awaited sub's command for it
  * is in, the state of each turn to the subs, and the pause of any player, which holds the race for everyone (user
  * decision). A device that only follows the race holds a RacingSubRole.
@@ -19,14 +20,14 @@ class RacingMainRole extends AbstractRacingRole {
         this._roster     = roster;
         this._events     = events;
         this._simulation = new RacingSimulation(roster, events, Math.random);
-        this._race       = null;        // {course, mirror, car, gearbox, laps} of the race shown
+        this._level      = null;        // {course, mirror, car, gearbox, laps} of the race shown, as the subs build it
         this._session    = null;
         this._cycle      = null;
         this._recorder   = null;        // RacingNetEvents listening to the turn events while hosting
         this._ticks      = 0;           // of the turn being simulated, sent with its state
         this._paused     = new Set();   // player ids of the players in their pause, the main's included
         this._onPausedBy = null;
-        this._nicknames  = new Map();   // player id → nickname of the players of the race hosted
+        this._nicknames  = new Map();   // player id → nickname, kept once gone: the results name the abandons
     }
 
     // Each device hears of the finish and the records of its own player alone.
@@ -41,8 +42,7 @@ class RacingMainRole extends AbstractRacingRole {
 
     // The records are this device's: the other players' cars race against none.
     enterRace(record) {
-        const players = this._roster.getAll().sort((a, b) => (a.getId() - b.getId()));
-        for (const player of players) {
+        for (const player of this._roster.getAll()) {
             this._simulation.addPlayer(player, ((player === this._roster.getLocal()) ? record : null));
         }
     }
@@ -51,17 +51,18 @@ class RacingMainRole extends AbstractRacingRole {
         return this._simulation.getOutcome();
     }
 
-    // The players of the race keep their nicknames once gone: the results name the abandons.
     getNickname(id) {
         return (this._nicknames.get(id) ?? '');
     }
 
-    // The race is shown: the subs build it too, once the session hosts it.
+    // The race is shown: the subs build it once the session hosts it (startHosting).
     levelStarted(level) {
-        this._race = level;
-        if (this._cycle !== null) {
-            this._hostRace();
-        }
+        this._level = level;
+    }
+
+    // The main restarts its race and picks the next one.
+    restartsRace() {
+        return true;
     }
 
     // --- Hosting ---
@@ -77,9 +78,9 @@ class RacingMainRole extends AbstractRacingRole {
         this._session    = session;
         this._onPausedBy = onPausedBy;
         this._cycle      = new RacingNetTurnCycle(session).setOnWaiting(onWaiting)
-            .setOnPlayerGone((id) => this.removePlayer(id))
-            .setOnSubPause((id, paused) => this._pauseOf(id, paused))
-            .setOnRecord((id, record) => this._recordOf(id, record))
+            .setOnPlayerGone((id) => this._playerGone(id))
+            .setOnSubPause((id, paused) => this._setPaused(id, paused))
+            .setOnSubRecord((id, record) => this._adoptSubRecord(id, record))
             .setHoldsLevelStart(true);
         this._hostRace();
         session.setCycle(this._cycle);
@@ -101,33 +102,31 @@ class RacingMainRole extends AbstractRacingRole {
         const capture  = new RacingNetStateCapture(this._roster, this._simulation.getOutcome(), recorder);
         this._recorder = recorder;
         this._events.addListener(recorder.getListener());
-        const ids = this._roster.getAll().map((player) => player.getId()).sort((a, b) => (a - b));
-        for (const id of ids) {
-            this._nicknames.set(id, this._nicknameOf(id));
+        const players = this._roster.getAll().map((player) => ({
+            id:       player.getId(),
+            nickname: this._nicknameOf(player.getId())
+        }));
+        for (const player of players) {
+            this._nicknames.set(player.id, player.nickname);
         }
-        const players = ids.map((id) => ({id: id, nickname: this._nicknames.get(id)}));
-        this._cycle.levelStarted(Object.assign({players: players}, this._race), {
+        this._cycle.levelStarted(Object.assign({players: players}, this._level), {
             encode: (turn) => RacingNetStateCodec.encode(capture.capture(turn, this._ticks)),
             drain:  () => recorder.drain()
         });
     }
 
     // A record sent by a sub's device, before its race starts; one of another shape is ignored.
-    _recordOf(id, record) {
+    _adoptSubRecord(id, record) {
         const player = this._roster.getById(id);
-        const valid  = ((typeof record.lapMs === 'number') && Number.isFinite(record.lapMs) && Array.isArray(record.checkpointsMs)
-            && (record.checkpointsMs.length === RacingNetStateCodec.CHECKPOINTS)
-            && record.checkpointsMs.every((ms) => ((ms === null) || ((typeof ms === 'number') && Number.isFinite(ms)))));
+        const time   = (ms) => ((typeof ms === 'number') && Number.isFinite(ms));
+        const valid  = (time(record.lapMs) && Array.isArray(record.checkpointsMs)
+            && (record.checkpointsMs.length === RacingRaceControl.CHECKPOINTS) && record.checkpointsMs.every((ms) => ((ms === null) || time(ms))));
         if ((player !== null) && (player.getRace() !== null) && valid) {
             this._simulation.setRecord(player, record);
         }
     }
 
-    /**
-     * A phase without turns opens on the subs (the return to the lobby).
-     *
-     * @param {object} message - its RacingNetProtocol control message
-     */
+    // The subs are told, while it hosts them.
     announcePhase(message) {
         if (this._cycle !== null) {
             this._cycle.announcePhase(message);
@@ -144,15 +143,27 @@ class RacingMainRole extends AbstractRacingRole {
     /**
      * A sub of the session enters the race on its slot's place, before the start.
      *
-     * @param {int} id - its slot
+     * @param {int}    id       - its slot
+     * @param {string} nickname - shown over its car
      */
-    addPlayer(id) {
+    addPlayer(id, nickname) {
+        this._nicknames.set(id, nickname);
         if (this._roster.getById(id) !== null) {
             return;
         }
         const player = new RacingPlayer(id);
         this._roster.add(player);
         this._simulation.addPlayer(player, null);
+    }
+
+    // A sub gone during the race: its car leaves the track, unless its race is done (it keeps its result).
+    _playerGone(id) {
+        const player = this._roster.getById(id);
+        if ((player !== null) && (player.getRace() !== null) && player.getRace().finished) {
+            this._setPaused(id, false);
+            return;
+        }
+        this.removePlayer(id);
     }
 
     /**
@@ -167,22 +178,28 @@ class RacingMainRole extends AbstractRacingRole {
         }
         this._simulation.removePlayer(player);
         this._roster.remove(id);
-        this._pauseOf(id, false);
+        this._setPaused(id, false);
     }
 
     // --- Pause ---
 
     setLocalPaused(paused) {
-        this._pauseOf(this._roster.getLocal().getId(), paused);
+        this._setPaused(this._roster.getLocal().getId(), paused);
     }
 
     // Another player's pause holds the race on this device.
     isHeld() {
-        return Array.from(this._paused).some((id) => (id !== this._roster.getLocal().getId()));
+        for (const id of this._paused) {
+            if (id !== this._roster.getLocal().getId()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Every change is told to the subs; the turns run again once the last pause is over.
-    _pauseOf(id, paused) {
+    _setPaused(id, paused) {
         if (paused === this._paused.has(id)) {
             return;
         }
@@ -198,10 +215,8 @@ class RacingMainRole extends AbstractRacingRole {
             return;
         }
         if (this._paused.size > 0) {
-            this._cycle.announcePhase({type: RacingNetProtocol.PAUSE, players: Array.from(this._paused).map((player) => ({
-                id:       player,
-                nickname: this._nicknameOf(player)
-            }))});
+            const players = Array.from(this._paused).map((id) => ({id: id, nickname: this._nicknameOf(id)}));
+            this._cycle.announcePhase({type: RacingNetProtocol.PAUSE, players: players});
             return;
         }
         this._cycle.turnsResumed(performance.now());
@@ -211,10 +226,11 @@ class RacingMainRole extends AbstractRacingRole {
         return Array.from(this._paused).filter((id) => (id !== exceptId)).map((id) => this._nicknameOf(id));
     }
 
+    // The lobby's, else the one kept from the lobby before the race (a sub gone keeps its name).
     _nicknameOf(id) {
         const player = ((this._session !== null) ? this._session.getLobby().getPlayerInSlot(id) : null);
 
-        return ((player !== null) ? player.nickname : '');
+        return ((player !== null) ? player.nickname : this.getNickname(id));
     }
 
     // Nothing to leave: the main's session is stopped by the menus.

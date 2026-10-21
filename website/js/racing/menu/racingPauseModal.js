@@ -1,9 +1,9 @@
 /**
  * Pause modal, shown by the race over its own frozen frame (modelled on
- * doom_js's MenuPauseModal). Title "{course} — {car}", navigable entries
- * (back to the race / restart the race, but on a device that follows the
- * main's race / multiplayer, in a session the device hosts / options / leave
- * the race, and the session on a device that follows it) and no
+ * doom_js's MenuPauseModal). Title "{course} — {car}", navigable entries:
+ * back to the race, restart the race (not on a device that follows the main's
+ * race), multiplayer (in a session the device hosts), options, leave the race
+ * (stopping the session the device hosts, leaving the one it follows); no
  * bottom button: Backspace and the gamepad back button resume, the Escape and
  * pause toggle stays with the race, which only leaves the pause from its root:
  * the stacked options modal handles Escape itself as one step back.
@@ -16,20 +16,20 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         super(display);
 
         this._nav.setEscapeAsBack(false);
-        this._onResume      = null;
-        this._onRestart     = null;
-        this._onQuit        = null;
-        this._titleProvider = null;
-        this._options       = null;
-        this._session       = null;     // see RacingHostedSession.pauseContext, null outside a session
-        this._multiplayer   = null;
+        this._onResume       = null;
+        this._onRestart      = null;
+        this._onQuit         = null;
+        this._titleProvider  = null;
+        this._options        = null;
+        this._sessionContext = null;    // see RacingHostedSession.pauseContext, null outside a session
+        this._multiplayer    = null;
     }
 
     /**
      * @param {object|null} context - RacingHostedSession.pauseContext, null outside a session
      */
     setSessionContext(context) {
-        this._session = context;
+        this._sessionContext = context;
 
         return this;
     }
@@ -97,12 +97,12 @@ class RacingPauseModal extends AppMenuAbstractListModal {
     }
 
     _inSession() {
-        return ((this._session !== null) && (this._session.getSession() !== null));
+        return ((this._sessionContext !== null) && (this._sessionContext.getSession() !== null));
     }
 
     // Rebuilt when it closes: the session may have stopped.
     _openMultiplayer() {
-        this._multiplayer = new RacingMultiplayerModal(this._display, this._session).setOnResume(() => this._onResume()).setOnClose(() => {
+        this._multiplayer = new RacingMultiplayerModal(this._display, this._sessionContext).setOnResume(() => this._onResume()).setOnClose(() => {
             this._multiplayer = null;
             this.show();
         });

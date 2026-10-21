@@ -4,9 +4,9 @@
  * is built) and handles the navigation between the screens. It holds the
  * session this device hosts (RacingHostedSession) from "Create a race" on,
  * across the races and back through the choice of the course (user decision:
- * the session outlives a race), until the main menu or the session's stop, and
- * the session it follows (RacingFollowedSession) from the main's first race on,
- * until it ends.
+ * the session outlives a race), until the main menu or the session's stop; a
+ * session it follows (RacingFollowedSession) builds the main's races from the
+ * first one on, and comes back here when it ends.
  */
 class RacingMenuNavigator {
     constructor() {

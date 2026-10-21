@@ -18,6 +18,7 @@ class RacingSubRole extends AbstractRacingRole {
         this._roster      = roster;
         this._session     = session;
         this._notice      = new RacingSessionNotice();
+        this._codec       = new RacingNetCommandCodec();
         this._data        = null;
         this._applier     = null;
         this._sampler     = null;    // the local player's, handed over on each frame
@@ -33,7 +34,7 @@ class RacingSubRole extends AbstractRacingRole {
         this._record      = null;    // this device's, sent to the main with the race built
         this._outcome     = new RacingRaceOutcome();
         this._nicknames   = new Map();
-        this._finished    = false;   // the results of this device's player are shown
+        this._resultsShown = false;  // the results of this device's player are shown
     }
 
     /**
@@ -66,10 +67,6 @@ class RacingSubRole extends AbstractRacingRole {
         this._session.setLivenessSuspended(true);
     }
 
-    getNotice() {
-        return this._notice;
-    }
-
     // The finish and the records of this device's player come with the main's states.
     adoptRace(data, onFinish, onRecord) {
         this._data     = data;
@@ -89,12 +86,8 @@ class RacingSubRole extends AbstractRacingRole {
     enterRace(record) {
         this._record = record;
         for (const player of this._roster.getAll()) {
-            const [x, height, z, heading] = RacingSimulation.startPlace(this._data, player.getId());
             const state = player.getCarState();
-            state.x       = x;
-            state.height  = height;
-            state.z       = z;
-            state.heading = heading;
+            [state.x, state.height, state.z, state.heading] = RacingSimulation.startPlace(this._data, player.getId());
             player.enterRace(null, new RacingRaceView(this._data.laps));
         }
         this._applier = new RacingReplicaApplier(this._roster, this._outcome, (event) => this._playTurnEvent(event));
@@ -105,6 +98,15 @@ class RacingSubRole extends AbstractRacingRole {
         this._lastStateAt = null;
         this._session.setLivenessSuspended(false);
         this._session.sendControl({type: RacingNetProtocol.LEVEL_READY, seq: this._levelSeq, record: this._record});
+    }
+
+    // The main restarts its race: none here.
+    restartsRace() {
+        return false;
+    }
+
+    // Only the simulating device announces phases.
+    announcePhase() {
     }
 
     // The main is told: the race stops for everyone.
@@ -206,14 +208,14 @@ class RacingSubRole extends AbstractRacingRole {
         this._applier.apply(snapshot);
         this._ticks += snapshot.ticks;
         const race = this._roster.getLocal().getRace();
-        if (race.resultsDue && !this._finished) {
-            this._finished = true;
+        if (race.resultsDue && !this._resultsShown) {
+            this._resultsShown = true;
             this._onFinish(race.result());
         }
         // Sampled even when paused: what the menu took must not reach the race on resuming.
         const sampled = ((this._sampler !== null) ? this._sampler.sample() : null);
         const command = (((sampled === null) || this._localPaused) ? RacingSimulation.NEUTRAL_COMMAND : sampled);
-        this._session.sendBinary(RacingNetCommandCodec.encode((snapshot.turn + 1), command));
+        this._session.sendBinary(this._codec.encode((snapshot.turn + 1), command));
         this._lastStateAt = performance.now();
         this._notice.turnArrived();
     }

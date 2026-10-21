@@ -1,6 +1,7 @@
 /**
  * A player's command for one turn to and from its binary message, as DoomNetCommandCodec: the turn it answers, the
- * buttons as a bitmask in the order of BUTTONS, the steering stick (Float32). Fail-fast like the state codec.
+ * buttons as a bitmask in the order of BUTTONS, the steering stick (Float32). Fail-fast like the state codec. The
+ * buttons are the race's own (RacingCommand), where doom's are declared by the game: no list to pass in.
  */
 class RacingNetCommandCodec {
     /**
@@ -8,7 +9,7 @@ class RacingNetCommandCodec {
      * @param {RacingCommand} command
      * @returns {ArrayBuffer}
      */
-    static encode(turn, command) {
+    encode(turn, command) {
         let mask = 0;
         RacingNetCommandCodec.BUTTONS.forEach((button, bit) => {
             if (command.isPressed(button)) {
@@ -25,7 +26,7 @@ class RacingNetCommandCodec {
      * @returns {{turn: int, command: RacingCommand}}
      * @throws {NetError} INVALID_MESSAGE, or a RangeError read past the end
      */
-    static decode(buffer) {
+    decode(buffer) {
         const r = new NetByteReader(new Uint8Array(buffer));
         if (r.u8() !== RacingNetProtocol.MESSAGE_COMMAND) {
             throw new NetError(NetError.INVALID_MESSAGE, 'Not a command message');

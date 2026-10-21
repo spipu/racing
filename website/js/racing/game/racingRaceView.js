@@ -39,7 +39,9 @@ class RacingRaceView {
             this.lapTimes = race.lapTimes.slice();
         }
         this.lapMs        = race.lapMs;
-        this.record       = ((race.record === null) ? null : {lapMs: race.record.lapMs});
+        if ((race.record === null) || (this.record === null) || (this.record.lapMs !== race.record.lapMs)) {
+            this.record = ((race.record === null) ? null : {lapMs: race.record.lapMs});
+        }
         this.started      = race.started;
         this.finished     = race.finished;
         this.stopped      = race.stopped;
@@ -66,7 +68,7 @@ class RacingRaceView {
         const best = ((this.lapTimes.length > 0) ? Math.min(...this.lapTimes) : null);
 
         return {
-            raceMs:     RacingRaceOutcome.raceMs(this),
+            raceMs:     RacingRaceControl.raceMs(this),
             lapsMs:     this.lapTimes.slice(),
             bestLapMs:  best,
             record:     this.record,

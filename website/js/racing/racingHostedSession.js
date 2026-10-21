@@ -33,14 +33,15 @@ class RacingHostedSession {
     attach(game) {
         const session = this.open();
         this._game    = game;
-        this._notice.clear();
+        // Bound before it is cleared: the notice the previous race left must reach this one's display.
         this._notice.setOnNotice((text) => game.getPresentation().setNotice(text));
+        this._notice.clear();
         game.getPresentation().setPingSource(() => session.getLobby().getWorstPing());
         session.setOnPlayerRemoved((nickname) => this._notice.departed(nickname, performance.now()))
             .setOnPlayerAway((nickname, away) => this._notice.awayChanged(nickname, away, performance.now()));
         session.setCycle({
-            admitted: (peer) => game.getRole().addPlayer(session.playerIdOf(peer)),
-            gone:     (peer) => game.getRole().removePlayer(session.playerIdOf(peer)),
+            admitted: (peer) => game.getRole().addPlayer(session.playerIdOf(peer), session.nicknameOf(peer)),
+            gone:     (peer) => game.getRole().removePlayer(session.playerIdOf(peer))
         });
 
         return this;
@@ -72,13 +73,8 @@ class RacingHostedSession {
         this._display = new AppMenuDisplay('screen').init(true);
         this._lobby   = new AppMenuLobbyModal(this._display).openMain(this._session, {
             start: () => this._startFromLobby(),
-            back:  () => this._backFromStartLobby(onCancel),
+            back:  () => this._backFromStartLobby(onCancel)
         });
-    }
-
-    // The start lobby covers the race like a pause menu.
-    isStartLobbyOpen() {
-        return (this._display !== null);
     }
 
     // The subs build the race from now on: the start waits for them.
@@ -120,7 +116,7 @@ class RacingHostedSession {
     pauseContext() {
         return {
             getSession: () => this._session,
-            stop:       () => this._stopFromPause(),
+            stop:       () => this._stopFromPause()
         };
     }
 
@@ -149,13 +145,6 @@ class RacingHostedSession {
             });
         }
 
-        return this._session;
-    }
-
-    /**
-     * @returns {NetGameMainSession|null} null before the first lobby
-     */
-    getSession() {
         return this._session;
     }
 

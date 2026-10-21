@@ -40,6 +40,7 @@ class RacingRaceControl {
         this._onSound   = () => {};
         this._onFinish  = () => {};
         this._onRecord  = () => {};
+        this._splitAgainst = null;      // pass → the race time of the car ahead there; null: against the record
         this.record     = ((record === null) ? null : {lapMs: record.lapMs, checkpointsMs: record.checkpointsMs.slice()});
         this.newRecord  = false;
         this.laps       = physics.laps;
@@ -52,7 +53,6 @@ class RacingRaceControl {
         this.resultsDue = false;        // the results of this car's race are shown (its finish 51 ticks behind)
         this.place      = 0;            // in a race of several players, 1 = leading (RacingSimulation)
         this.passesMs   = [];           // race time at each checkpoint passed, by pass (lap × 2 + checkpoint − 1)
-        this._splitAgainst = null;      // pass → the race time of the car ahead there, null: the record's split
         // Display: start (3, 2, 1, 'go', 'ready'), lights of the READY gantry (LIGHTS_*), messages.
         this.startSign  = null;
         this.lights     = null;
@@ -227,7 +227,7 @@ class RacingRaceControl {
                 break;
             case RacingRaceControl.STEP_GO:
                 this._crew();
-                if (ticks >= RacingRaceControl.GO_TICKS) {
+                if (ticks >= this._sequence.goTicks) {
                     // $A04E: the crew goes.
                     if (this._pitStart) {
                         physics.pitCrewFrame = -1;
@@ -319,10 +319,6 @@ class RacingRaceControl {
 
     // $34E8 state 4 / $B2E4: the lap time less the time past the line, against the best lap of the race and the record.
     _lap(event, tick) {
-        // A race stopped before the last lap counts no more lap.
-        if (this.stopped) {
-            return;
-        }
         // Whole milliseconds: the time is summed by shares of ticks.
         const lapMs = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.lineCorrection)));
         this.lapTimes.push(lapMs);
@@ -384,7 +380,7 @@ class RacingRaceControl {
         const ms = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
         this._splitsMs[checkpoint - 1] = ms;
         if (this._splitAgainst !== null) {
-            this._splitAhead((this.lapTimes.length * RacingRaceControl.CHECKPOINTS) + (checkpoint - 1), (this.lapTimes.reduce((sum, lapMs) => (sum + lapMs), 0) + ms));
+            this._splitAhead(((this.lapTimes.length * RacingRaceControl.CHECKPOINTS) + (checkpoint - 1)), (RacingRaceControl.raceMs(this) + ms));
             return;
         }
         const recordMs = ((this.record === null) ? null : this.record.checkpointsMs[checkpoint - 1]);
@@ -483,16 +479,29 @@ class RacingRaceControl {
     }
 
     /**
+     * @param {object} race - RacingRaceControl or RacingRaceView
+     * @returns {number} the time of its laps done
+     */
+    static raceMs(race) {
+        let ms = 0;
+        for (const lapMs of race.lapTimes) {
+            ms += lapMs;
+        }
+
+        return ms;
+    }
+
+    /**
      * @returns {{raceMs: number, lapsMs: number[], bestLapMs: number, record: object, newRecord: boolean, classified: boolean}}
      */
     result() {
         return {
-            raceMs:    this.lapTimes.reduce((sum, ms) => (sum + ms), 0),
-            lapsMs:    this.lapTimes.slice(),
-            bestLapMs: this.bestLapMs,
-            record:    this.record,
-            newRecord: this.newRecord,
-            classified: !this.stopped,
+            raceMs:     RacingRaceControl.raceMs(this),
+            lapsMs:     this.lapTimes.slice(),
+            bestLapMs:  this.bestLapMs,
+            record:     this.record,
+            newRecord:  this.newRecord,
+            classified: !this.stopped
         };
     }
 }
@@ -516,7 +525,6 @@ RacingRaceControl.INTRO_TICKS            = 21;
 RacingRaceControl.PIT_START_TICKS        = 60;
 // Several players: the step $3E58 a tick, then "3" ($3E64).
 RacingRaceControl.TWO_PLAYERS_SETUP      = 2;
-RacingRaceControl.GO_TICKS               = 60;
 // The lights after the opening: red at tick 42, green at 63, gone at 104 ($3D9A, then > 20, > 20, > 40).
 RacingRaceControl.RED_TICKS              = 21;
 RacingRaceControl.GREEN_TICKS            = 21;
@@ -547,11 +555,11 @@ RacingRaceControl.START_PIT              = 'pit';
 RacingRaceControl.START_LIGHTS           = 'lights';
 RacingRaceControl.START_TWO_PLAYERS      = 'twoPlayers';
 // The start sequence of each kind: its first step after the opening, the ticks between "3", "2", "1" and "GO!"
-// ($9F4A tests BLT 20, $3E7E BLE 20), its jingle and the ticks after the start it plays ($9FBC, $3E08, $3EF6; the Time
-// Attack's chains the DAC $C6).
+// ($9F4A tests BLT 20, $3E7E BLE 20), the ticks "GO!" shows ($9FF4 BLT 60, $3F16 BLE 60), its jingle and the ticks after
+// the start it plays ($9FBC, $3E08, $3EF6; the Time Attack's chains the DAC $C6).
 RacingRaceControl.SEQUENCES = {
-    [RacingRaceControl.START_PIT]:         {firstStep: RacingRaceControl.STEP_PIT_START,   countTicks: 20, jingle: '93', jingleTicks: 5},
-    [RacingRaceControl.START_LIGHTS]:      {firstStep: RacingRaceControl.STEP_LIGHTS,      countTicks: 20, jingle: '93', jingleTicks: 10},
-    [RacingRaceControl.START_TWO_PLAYERS]: {firstStep: RacingRaceControl.STEP_TWO_PLAYERS, countTicks: 21, jingle: '98', jingleTicks: 5},
+    [RacingRaceControl.START_PIT]:         {firstStep: RacingRaceControl.STEP_PIT_START,   countTicks: 20, goTicks: 60, jingle: '93', jingleTicks: 5},
+    [RacingRaceControl.START_LIGHTS]:      {firstStep: RacingRaceControl.STEP_LIGHTS,      countTicks: 20, goTicks: 60, jingle: '93', jingleTicks: 10},
+    [RacingRaceControl.START_TWO_PLAYERS]: {firstStep: RacingRaceControl.STEP_TWO_PLAYERS, countTicks: 21, goTicks: 61, jingle: '98', jingleTicks: 5},
 };
 RacingRaceControl.JINGLE_RECORD          = '97';

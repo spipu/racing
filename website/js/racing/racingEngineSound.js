@@ -29,6 +29,7 @@ class RacingEngineSound {
         this._random  = RacingEngineSound.RANDOM_SEED;
         this._share   = 1;
         this._place   = ((positional) ? 0 : 1);   // share of the level by the car's distance
+        this._pan     = 0;
         this._tunnel  = false;
         this._output  = this._context.createGain();
         this._output.gain.value = (RacingEngineSound.LEVEL * this._place);
@@ -105,17 +106,23 @@ class RacingEngineSound {
      * @param {number} pan  - -1 left to 1 right
      */
     setPlacement(gain, pan) {
-        this._place = gain;
-        this._applyLevel();
-        if (this._panner !== null) {
-            this._panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this._context.currentTime, RacingEngineSound.GLIDE_S);
+        // Set only on a change: an automation event a frame would pile up.
+        if (Math.abs(gain - this._place) >= RacingEngineSound.PLACEMENT_STEP) {
+            this._place = gain;
+            this._applyLevel();
+        }
+        const side = Math.max(-1, Math.min(1, pan));
+        if ((this._panner !== null) && (Math.abs(side - this._pan) >= RacingEngineSound.PLACEMENT_STEP)) {
+            this._pan = side;
+            this._panner.pan.setTargetAtTime(side, this._context.currentTime, RacingEngineSound.GLIDE_S);
         }
 
         return this;
     }
 
     _applyLevel() {
-        this._output.gain.setTargetAtTime((this._running ? (RacingEngineSound.LEVEL * this._share * this._place) : 0), this._context.currentTime, RacingEngineSound.GLIDE_S);
+        const level = ((this._running) ? (RacingEngineSound.LEVEL * this._share * this._place) : 0);
+        this._output.gain.setTargetAtTime(level, this._context.currentTime, RacingEngineSound.GLIDE_S);
     }
 
     destroy() {
@@ -170,6 +177,8 @@ RacingEngineSound.RANDOM_STEP     = 0x3619;
 RacingEngineSound.LEVEL           = (0.09 * Math.pow(10, ((0.75 * 15) / 20)));
 RacingEngineSound.TUNNEL_VOLUME   = 14;
 RacingEngineSound.GLIDE_S         = 0.008;
+// The change of an other car's level or side that is applied: a frame's drift under it is not heard.
+RacingEngineSound.PLACEMENT_STEP  = 0.005;
 // Sound commands of the engine and of its tunnel copy by car ($4CB8, $232A).
 RacingEngineSound.COMMANDS = {
     formula:   {main: 'A2', tunnel: 'AF'},

@@ -35,7 +35,7 @@ class NetGameSubSession {
         this._onVisibility = () => this._visibilityChanged();
         this._guest        = new NetGuestSession(appBootstrap.getVersion(), links.linkFactory())
             .setOnControl((message) => this._receive(message))
-            .setOnBinary((buffer) => this._cycleCall('state', buffer))
+            .setOnBinary((buffer) => this._receiveBinary(buffer))
             .setOnLost(() => this._end(NetGameProtocol.END_LOST));
     }
 
@@ -193,6 +193,10 @@ class NetGameSubSession {
 
         return this._pairing.join(answer)
             .then((result) => {
+                // Disposed while the pairing resolved: nothing may stay attached.
+                if (this._ended) {
+                    return result;
+                }
                 this._guest.sendControl({type: NetGameProtocol.HELLO});
                 this._watchVisibility();
                 return result;
@@ -239,7 +243,11 @@ class NetGameSubSession {
         document.removeEventListener('visibilitychange', this._onVisibility);
     }
 
+    // Once left, the messages still in flight during the grace delay reach nobody.
     _receive(message) {
+        if (this._ended) {
+            return;
+        }
         if (message.type === NetGameProtocol.WELCOME) {
             this._playerId = message.playerId;
             this._setMode(message.mode, message.options);
@@ -279,6 +287,12 @@ class NetGameSubSession {
         }
         if (this._phases().includes(message.type)) {
             this._cycleCall('phase', message);
+        }
+    }
+
+    _receiveBinary(buffer) {
+        if (!this._ended) {
+            this._cycleCall('state', buffer);
         }
     }
 

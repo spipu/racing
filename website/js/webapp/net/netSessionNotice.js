@@ -103,7 +103,7 @@ class NetSessionNotice {
 
     _text() {
         if (this._waiting.length > 0) {
-            return appTranslator.get('multiplayer.waiting', {nickname: this._waiting.join(', ')});
+            return appTranslator.get('multiplayer.waiting', {nickname: NetSessionNotice.listOf(this._waiting)});
         }
         if (this._mainPaused) {
             return appTranslator.get('multiplayer.pausedByMain');
@@ -124,6 +124,14 @@ class NetSessionNotice {
      */
     _promptText() {
         return null;
+    }
+
+    /**
+     * @param {string[]} nicknames
+     * @returns {string} joined as the language lists them ("A, B et C")
+     */
+    static listOf(nicknames) {
+        return new Intl.ListFormat(appTranslator.getLocale(), {type: 'conjunction'}).format(nicknames);
     }
 
     /**

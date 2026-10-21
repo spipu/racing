@@ -1,47 +1,86 @@
 /**
- * The sounds of the other players' cars (user decision 2026-10-19, as doom_js hears the other players): their engines
- * and their noises — skids, crashes, walls, sparks, grass —, lowered with the distance and placed left or right by
- * where each car is from the camera; the viewed car's own stay centred (RacingPresentation). The engines are capped
- * to the ENGINES closest cars within reach, each keeping its voice while it stays among them.
+ * The sounds of the other players' cars (user decision 2026-10-19, as doom_js hears the other players): their noises —
+ * skids, crashes, walls, sparks, grass — and, when the engine voice can play, their engines, lowered with the distance
+ * and placed left or right by where each car is from the camera; the viewed car's own stay centred
+ * (RacingPresentation). The engines are capped to the ENGINES closest cars within reach, each keeping its voice while
+ * it stays among them. Nothing is allocated per frame.
  */
 class RacingCarSounds {
     /**
-     * @param {SoundEngine} engine
-     * @param {string}      car - car code: every car of the race is the same, so is its voice (user decision)
+     * @param {SoundEngine|null} engine - null: no engine voice (its AudioWorklet did not load), the noises only
+     * @param {string}           car    - car code: every car of the race is the same, so is its voice (user decision)
      */
     constructor(engine, car) {
-        this._voices   = Array.from({length: RacingCarSounds.ENGINES}, () => new RacingEngineSound(engine, car, true));
-        this._assigned = new Map();   // player id → index of its voice
+        const voices = ((engine !== null) ? RacingCarSounds.ENGINES : 0);
+        this._voices = Array.from({length: voices}, () => new RacingEngineSound(engine, car, true));
+        this._owners = new Array(voices).fill(null);   // by voice: the player id it sounds, null when free
     }
 
     /**
      * @param {number} ticks - time elapsed, in original ticks
-     * @param {{id: int, state: RacingCarState, camera: number[]}[]} cars - the other cars, each in camera space
+     * @param {{id: int, state: RacingCarState, camera: number[], distance: number, near: boolean}[]} cars - the other
+     *        cars in camera space; `near` is written here
      */
     update(ticks, cars) {
-        const near = cars.map((car) => ({car: car, distance: Math.hypot(...car.camera)}))
-            .filter((entry) => (entry.distance < RacingCarSounds.FAR))
-            .sort((a, b) => (a.distance - b.distance))
-            .slice(0, this._voices.length);
-        const kept = new Set(near.map((entry) => entry.car.id));
-        for (const id of Array.from(this._assigned.keys())) {
-            if (!kept.has(id)) {
-                this._assigned.delete(id);
+        if (this._voices.length === 0) {
+            return;
+        }
+        this._pickNearest(cars);
+        for (let index = 0; index < this._owners.length; index++) {
+            const owner = this._owners[index];
+            if ((owner !== null) && !RacingCarSounds._isNear(cars, owner)) {
+                this._owners[index] = null;
             }
         }
-        const free = this._voices.map((voice, index) => index).filter((index) => !Array.from(this._assigned.values()).includes(index));
-        for (const entry of near) {
-            if (!this._assigned.has(entry.car.id)) {
-                this._assigned.set(entry.car.id, free.shift());
+        for (const car of cars) {
+            if (car.near && !this._owners.includes(car.id)) {
+                this._owners[this._owners.indexOf(null)] = car.id;
             }
-            const state = entry.car.state;
-            this._voices[this._assigned.get(entry.car.id)]
-                .update(ticks, state.rpm, ((state.roadFlags & RacingPresentation.ROAD_TUNNEL) !== 0))
-                .setPlacement(RacingCarSounds.gainAt(entry.distance), RacingCarSounds.panOf(entry.car.camera));
         }
-        for (const index of free) {
-            this._voices[index].setPlacement(0, 0);
+        for (let index = 0; index < this._voices.length; index++) {
+            const car = RacingCarSounds._carOf(cars, this._owners[index]);
+            if (car === null) {
+                this._voices[index].setPlacement(0, 0);
+                continue;
+            }
+            this._voices[index].update(ticks, car.state.rpm, car.state.isInTunnel())
+                .setPlacement(RacingCarSounds.gainAt(car.distance), RacingCarSounds.panOf(car.camera));
         }
+    }
+
+    // The ENGINES closest cars within reach, marked near.
+    _pickNearest(cars) {
+        for (const car of cars) {
+            car.near = false;
+        }
+        for (let picked = 0; picked < this._voices.length; picked++) {
+            let closest = null;
+            for (const car of cars) {
+                if (!car.near && (car.distance < RacingCarSounds.FAR) && ((closest === null) || (car.distance < closest.distance))) {
+                    closest = car;
+                }
+            }
+            if (closest === null) {
+                return;
+            }
+            closest.near = true;
+        }
+    }
+
+    static _isNear(cars, id) {
+        const car = RacingCarSounds._carOf(cars, id);
+
+        return ((car !== null) && car.near);
+    }
+
+    static _carOf(cars, id) {
+        for (const car of cars) {
+            if (car.id === id) {
+                return car;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -70,6 +109,7 @@ class RacingCarSounds {
     destroy() {
         this._voices.forEach((voice) => voice.destroy());
         this._voices = [];
+        this._owners = [];
     }
 
     /**

@@ -6,18 +6,19 @@
  */
 class RacingPitBoxes {
     /**
-     * @param {object}                race      - race.json
-     * @param {string}                course    - course code
-     * @param {RacingCourseCollision} collision - of the course
-     * @param {boolean}               two       - the second box too
-     * @returns {{x: int, z: int, base: int[]}[]} entity units; base [x, height, z] of the crew; none on a course without pits
+     * @param {object}                race       - race.json
+     * @param {string}                course     - course code
+     * @param {RacingCourseCollision} collision  - of the course
+     * @param {boolean}               withSecond - the second box too (a race of several players)
+     * @returns {{x: int, z: int, base: int[]}[]} entity units; base [x, height, z] of the crew; the first box on every
+     *          course, even one without a pit lane (Bay Bridge, Sand Park), where no car reaches it
      */
-    static of(race, course, collision, two) {
+    static of(race, course, collision, withSecond) {
         const pit   = race.pit;
         const first = pit.pitBoxes[course][0];
         const boxes = [{x: first[0], z: first[1], base: pit.mechanicBases[course]}];
         const place = RacingPitBoxes._second(pit, course);
-        if (two && (place !== null)) {
+        if (withSecond && (place !== null)) {
             boxes.push({x: place[0], z: place[1], base: [place[0], collision.heightAt(place[0], place[1], 0), place[1]]});
         }
 

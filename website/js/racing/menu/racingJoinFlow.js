@@ -1,7 +1,7 @@
 /**
  * Joining a main's race from the Multiplayer screen, as doom_js's MenuJoinFlow: pairs with the main — its code read,
- * the answer shown —, then shows the lobby, which says once the main's race runs, until the main's race sends its
- * race to build (RacingMenuNavigator.joinSharedRace). The lobby closes when the session ends, with why.
+ * the answer shown —, then shows the lobby until the main sends the race to build (RacingMenuNavigator.joinSharedRace).
+ * The lobby closes when the session ends, with why.
  */
 class RacingJoinFlow {
     /**

@@ -65,15 +65,23 @@ class RacingHud extends AbstractHud {
     }
 
     /**
-     * The time left after the first finish, shown to a player still racing, and the place among the cars on the track
-     * (user decisions), in a race of several players.
+     * The time left after the first finish, shown to a player still racing (user decision).
      *
-     * @param {RacingRaceOutcome|null}  outcome
-     * @param {RacingPlayerRoster|null} roster  - null alone: no place shown
+     * @param {RacingRaceOutcome|null} outcome
      */
-    bindOutcome(outcome, roster) {
+    bindOutcome(outcome) {
         this._outcome = outcome;
-        this._roster  = roster;
+
+        return this;
+    }
+
+    /**
+     * The place among the cars on the track (user decision), in a race of several players.
+     *
+     * @param {RacingPlayerRoster|null} roster - null alone: no place shown
+     */
+    bindRoster(roster) {
+        this._roster = roster;
 
         return this;
     }
@@ -204,7 +212,11 @@ class RacingHud extends AbstractHud {
         const countdown = (((this._outcome !== null) && !race.finished) ? this._outcome.countdownMs : null);
         this._display('finishIn', (countdown !== null));
         if (countdown !== null) {
-            this._text('finishIn', appTranslator.get('hud.finishIn', {seconds: Math.ceil(countdown / RacingGame.MS_PER_SECOND)}));
+            const seconds = Math.ceil(countdown / RacingGame.MS_PER_SECOND);
+            if (seconds !== this._shown.finishInSeconds) {
+                this._shown.finishInSeconds = seconds;
+                this._text('finishIn', appTranslator.get('hud.finishIn', {seconds: seconds}));
+            }
         }
 
         const message = race.message;
@@ -231,7 +243,10 @@ class RacingHud extends AbstractHud {
         if (this._roster === null) {
             return;
         }
-        const count = this._roster.getAll().filter((player) => (player.getRace() !== null)).length;
+        let count = 0;
+        for (const player of this._roster.getAll()) {
+            count += ((player.getRace() !== null) ? 1 : 0);
+        }
         this._text('place', ((race.place > 0) ? String(race.place) : '-'));
         this._text('places', '/' + count);
     }

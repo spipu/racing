@@ -1,7 +1,8 @@
 /**
  * The flow of a race every device shares, as DoomGame: the exported data loaded, the race built and shown, its
  * frames, the pause menu over the frozen race (RacingPauseModal: Escape, or the pause button of the gamepad or of the
- * touch controls), the results (RacingResultsModal) over the race that goes on after the finish, the car driving
+ * touch controls), the results (RacingResultsModal alone, RacingStandingsModal in a session) over the race that goes on
+ * after the finish, the car driving
  * itself, and the best times of this device's own player — driven on the role of the device (RacingMainRole simulates
  * the race), never on which it is. The local player's commands are sampled from the controls (RacingControls,
  * RacingCommandSampler); the one-shot events of the race reach the presentation (RacingPresentation) as they come.
@@ -19,11 +20,14 @@ class RacingGame {
      */
     constructor(navigator, selection, hosted = null, followed = null) {
         const sub = ((followed !== null) ? followed.getSession() : null);
+
         this._navigator       = navigator;
         this._selection       = selection;
         this._hosted          = hosted;
         this._followed        = followed;
-        this._roster          = new RacingPlayerRoster().setLocal(new RacingPlayer((sub !== null) ? sub.getViewedPlayerId() : RacingGame.LOCAL_PLAYER_ID));
+        this._multiplayer     = ((hosted !== null) || (followed !== null));
+        this._roster          = new RacingPlayerRoster()
+            .setLocal(new RacingPlayer(((sub !== null) ? sub.getViewedPlayerId() : RacingGame.LOCAL_PLAYER_ID)));
         this._turnEvents      = new RacingTurnEvents();
         this._role            = ((sub !== null) ? new RacingSubRole(this._roster, sub) : new RacingMainRole(this._roster, this._turnEvents));
         this._presentation    = new RacingPresentation(selection);
@@ -45,7 +49,7 @@ class RacingGame {
     }
 
     /**
-     * @param {object|null} level - on a sub, the main's race: its levelLoad message ({laps, slots, ...})
+     * @param {object|null} level - on a sub, the main's race: its levelLoad message ({laps, players, ...})
      */
     async start(level = null) {
         const base      = RacingGame.ASSETS;
@@ -65,8 +69,12 @@ class RacingGame {
             stored,
             racingSound.loadAsync()
         ]);
+        // Left during the load (the main sent another race, the session ended): it is never built.
+        if (this._left) {
+            return;
+        }
 
-        const multiplayer = ((this._hosted !== null) || (this._followed !== null));
+        const multiplayer = this._multiplayer;
         const laps        = ((level !== null) ? level.laps : ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps()));
         const slots       = ((multiplayer) ? Array.from({length: RacingHostedSession.CAPACITY}, (unused, i) => (i + RacingPlayer.MAIN_ID)) : [RacingGame.LOCAL_PLAYER_ID]);
         // A sub holds every player of the main's race, posed by its states.
@@ -78,10 +86,12 @@ class RacingGame {
         this._level = {course: selection.course, mirror: selection.mirror, car: selection.car, gearbox: selection.gearbox, laps: laps};
         loader.reset();
         loader.beginBatch();
-        this._presentation.setOutcome(this._role.getOutcome()).setNicknames((id) => this._role.getNickname(id)).build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
+        this._presentation.setOutcome(this._role.getOutcome()).setNicknames((id) => this._role.getNickname(id))
+            .build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
         this._role.adoptRace({course, race, physics, multiplayerGrids, selection, multiplayer, laps, lapJingles: racingSound.laps},
             (result) => this._guard(this._finish, result), (lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs));
-        this._role.enterRace(((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
+        const noSplits = new Array(RacingRaceControl.CHECKPOINTS).fill(null);
+        this._role.enterRace((((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? noSplits)} : null));
 
         const skyId = loader.textures().load(sky);
         // Called from the image load: an error there would not reach the promise of start().
@@ -92,14 +102,15 @@ class RacingGame {
         loader.endBatch();
     }
 
-    // A sub leaves the session with its race.
+    // Leaving the race: the main menu, the session stopped on the main; the Multiplayer screen, the session left on a sub.
     quit() {
         if (!this._running) {
             return;
         }
         this._teardown();
+        this._role.leave();
         if (this._followed !== null) {
-            this._followed.leave();
+            this._followed.playerLeft();
             return;
         }
         this._navigator.endRace();
@@ -120,10 +131,6 @@ class RacingGame {
 
     getPresentation() {
         return this._presentation;
-    }
-
-    getRoster() {
-        return this._roster;
     }
 
     // Under the start lobby: nothing moves, the pause does not open.
@@ -170,7 +177,7 @@ class RacingGame {
         if (this._left) {
             return;
         }
-        if ((this._hosted !== null) || (this._followed !== null)) {
+        if (this._multiplayer) {
             this._presentation.setForcedRenderer(RacingGame.SESSION_RENDERER);
         }
         this._presentation.showRace(skyId, this._roster.getLocal());
@@ -215,7 +222,7 @@ class RacingGame {
         this._pauseDisplay = new AppMenuDisplay('screen').init(true);
         this._pauseModal   = new RacingPauseModal(this._pauseDisplay)
             .setOnResume(() => this._leavePause())
-            .setOnRestart((this._followed === null) ? () => this._restart() : null)
+            .setOnRestart(((this._role.restartsRace()) ? () => this._restart() : null))
             .setOnQuit(() => this.quit())
             .setSessionContext((this._hosted !== null) ? this._hosted.pauseContext() : null)
             .show(() => this._pauseTitle());
@@ -254,14 +261,13 @@ class RacingGame {
     _finish(result) {
         this._presentation.showResults();
         this._controls.setVirtualPadVisible(false);
-        const multiplayer = ((this._hosted !== null) || (this._followed !== null));
         const saved = ((result.classified !== false) ? this._saveRecord(null, result.raceMs, null) : Promise.resolve({newLap: false, newRace: false}));
         // The best lap was saved when it was done: the records shown are those of the race.
         saved.then((records) => {
             if (!this._running) {
                 return;
             }
-            if (multiplayer) {
+            if (this._multiplayer) {
                 this._showStandings();
                 return;
             }
@@ -281,7 +287,7 @@ class RacingGame {
     _showStandings() {
         this._resultsDisplay = new AppMenuDisplay('screen').init(true);
         this._results = new RacingStandingsModal(this._resultsDisplay);
-        if (this._followed === null) {
+        if (this._role.restartsRace()) {
             this._results.setActions(() => this._restart(), () => this._toCourses(), () => this.quit());
         }
         this._results.show(this._resultsTitle(), () => this._standings());
@@ -307,7 +313,7 @@ class RacingGame {
                 nickname:  this._role.getNickname(entry.id),
                 color:     RacingCarColors.cssOfSlot(entry.id),
                 status:    status,
-                raceMs:    ((race !== null) ? RacingRaceOutcome.raceMs(race) : null),
+                raceMs:    ((race !== null) ? RacingRaceControl.raceMs(race) : null),
                 bestLapMs: (((race !== null) && (race.lapTimes.length > 0)) ? Math.min(...race.lapTimes) : null),
                 laps:      ((race !== null) ? race.lapTimes.length : 0),
                 own:       (entry.id === this._roster.getLocal().getId())
@@ -319,9 +325,7 @@ class RacingGame {
 
     // The subs wait in the lobby while the main picks the next course.
     _toCourses() {
-        if (this._hosted !== null) {
-            this._role.announcePhase({type: RacingNetProtocol.LOBBY_RETURN});
-        }
+        this._role.announcePhase({type: RacingNetProtocol.LOBBY_RETURN});
         this._teardown();
         this._navigator.endRaceToCourses();
     }

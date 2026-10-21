@@ -405,7 +405,7 @@
     color: #CCC;
 }
 
-/* "/5" after the lap, as large as the lap number, which lines up with the other numbers. */
+/* "/5" after the lap (and "/4" after the place), as large as the number, which lines up with the other numbers. */
 .racing-hud-laps {
     font-size: 5cqh;
     font-weight: 800;
@@ -441,6 +441,13 @@
 }
 
 /* --- Message of the session over the race (RacingPresentation.setNotice) --- */
+.racing-game-notice-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    container-type: size;
+}
+
 .racing-game-notice {
     position: absolute;
     left: 50%;
@@ -449,18 +456,16 @@
     width: max-content;
     max-width: 90%;
     box-sizing: border-box;
-    padding: 0.4em 0.9em;
-    border-radius: 0.3em;
+    padding: 1.2cqh 2.6cqh;
+    border-radius: 1.2cqh;
     background-color: rgba(0, 0, 0, 0.6);
     color: #FFF;
     font-family: system-ui, sans-serif;
-    font-size: 1.05em;
+    font-size: 3.6cqh;
     font-weight: 700;
     font-style: italic;
     letter-spacing: 0.08em;
     text-align: center;
-    pointer-events: none;
-    z-index: 5;
 }
 
 /* --- Nicknames over the other players' cars (RacingCarTags), in their slots' colours --- */

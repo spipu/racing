@@ -35,6 +35,11 @@ class RacingCarState {
         this.smokeX       = null;
     }
 
+    // Road flag bit 4 under the car: a tunnel, where the engine echoes.
+    isInTunnel() {
+        return ((this.roadFlags & RacingCarState.ROAD_TUNNEL) !== 0);
+    }
+
     /**
      * @param {RacingCarPhysics} physics - after its step
      */
@@ -80,3 +85,5 @@ class RacingCarState {
         return this;
     }
 }
+
+RacingCarState.ROAD_TUNNEL = 0x10;

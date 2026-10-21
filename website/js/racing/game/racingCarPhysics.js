@@ -415,7 +415,8 @@ class RacingCarPhysics {
         }
         this.lap++;
         this.lapProgress = 0;
-        // A car that started behind the line crosses it into its first lap (user decision: the original counts a lap).
+        // A car that started behind the line crosses it into its first lap: the original would count a lap here, the
+        // crossing is neutral (user decision).
         if (this.lap === 0) {
             return;
         }
@@ -633,8 +634,8 @@ class RacingCarPhysics {
     }
 
     /**
-     * The pit of the player's place on a course (race.json pit): its box and the x offset of the approach; a race of
-     * several players adds the list of its boxes (boxes).
+     * The pit of the player's place on a course (race.json pit): its box and the x offset of the approach (the race adds
+     * the list of its boxes, RacingPitBoxes).
      *
      * @returns {{box: int[], approachX: int}}
      */

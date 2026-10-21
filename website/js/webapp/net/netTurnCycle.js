@@ -98,7 +98,8 @@ class NetTurnCycle {
         }
     }
 
-    // The time spent in a phase counts neither toward the timeouts nor the waiting notice.
+    // The time spent in a phase counts neither toward the command and build timeouts nor the waiting notice; an away
+    // sub's time does, the link outliving a suspended page only so long.
     turnsResumed(now) {
         this._phase     = null;
         this._waitSince = null;
@@ -155,7 +156,8 @@ class NetTurnCycle {
         if ((sub !== undefined) && (message.type === NetGameProtocol.LEVEL_READY) && (sub.phase === NetTurnCycle.SYNCING)
             && (message.seq === this._levelSeq)) {
             sub.phase = NetTurnCycle.JOINING;
-            peer.setLivenessSuspended(false);
+            // A page gone to the background while it built stays exempt until it comes back.
+            peer.setLivenessSuspended(NetTurnCycle._isAway(sub));
             if (this._phase !== null) {
                 peer.sendControl(this._phase);
             }

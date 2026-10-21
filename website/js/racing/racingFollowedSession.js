@@ -1,9 +1,9 @@
 /**
- * The session a sub follows, as DoomFollowedSession, but held by the menus (RacingMenuNavigator), as the main's
- * RacingHostedSession: a race is one RacingGame, so it outlives them. It builds each race the main sends — one build
- * at a time, the last race sent winning —, the race before it torn down, back to the lobby when the main picks the
- * next course, and takes the device back to the Multiplayer screen when the session ends — once the build is over, when the end comes during one, or at once
- * otherwise —, or when the race could not be built.
+ * The session a sub follows, as DoomFollowedSession; a race being one RacingGame, it outlives them. It builds each race
+ * the main sends — one build at a time, the last word of the main winning —, the race before it torn down, goes back
+ * to the lobby when the main picks the next course, and takes the device back to the Multiplayer screen when the
+ * session ends — once the build is over when the end comes during one, at once otherwise — or when a race could not
+ * be built.
  */
 class RacingFollowedSession {
     /**
@@ -16,13 +16,9 @@ class RacingFollowedSession {
         this._game         = null;   // the race shown
         this._joining      = false;  // a race the main sent is being built
         this._pendingLevel = null;   // the race the main sent meanwhile, built next
+        this._pendingLobby = false;  // the main went back to its lobby meanwhile
         this._endReason    = null;   // NetGameProtocol.END_* once the session ended
         this._left         = false;  // this device left the session itself
-    }
-
-    // The session ended: no race of it starts any more.
-    hasEnded() {
-        return (this._endReason !== null);
     }
 
     getSession() {
@@ -32,11 +28,12 @@ class RacingFollowedSession {
     /**
      * The device joins the main's race on the race the main sent.
      *
-     * @param {object} level - the levelLoad message: {seq, course, mirror, car, gearbox, laps, slots}
+     * @param {object} level - the levelLoad message: {seq, course, mirror, car, gearbox, laps, players}
      */
     async join(level) {
         if (this._joining) {
             this._pendingLevel = level;
+            this._pendingLobby = false;
             return;
         }
         this._joining = true;
@@ -61,6 +58,9 @@ class RacingFollowedSession {
         }
         // What the session told meanwhile, handled once the build is over.
         if (this._endReason !== null) {
+            if (failure !== null) {
+                game.leaveRace();
+            }
             this._leaveEnded();
             return;
         }
@@ -72,14 +72,15 @@ class RacingFollowedSession {
             const pending = this._pendingLevel;
             this._pendingLevel = null;
             await this.join(pending);
+        } else if (this._pendingLobby) {
+            this._toLobby();
         }
     }
 
-    // The player left the race from its pause: the session with it.
-    leave() {
+    // The player left the race from its pause, its role leaving the session: the Multiplayer screen.
+    playerLeft() {
         this._left = true;
         this._game = null;
-        this._session.setCycle(null).leave();
         this._navigator.leftFollowedSession(null);
     }
 
@@ -96,7 +97,13 @@ class RacingFollowedSession {
 
     // The race is over, the main picks the next course: the lobby again, until its next race.
     _toLobby() {
-        if (this._joining || (this._game === null)) {
+        if (this._joining) {
+            this._pendingLevel = null;
+            this._pendingLobby = true;
+            return;
+        }
+        this._pendingLobby = false;
+        if (this._game === null) {
             return;
         }
         this._game.leaveRace();

@@ -49,6 +49,22 @@ class AbstractRacingRole {
     }
 
     /**
+     * @returns {boolean} whether this device restarts the race and picks the next one (the pause, the results)
+     */
+    restartsRace() {
+        throw new Error('AbstractRacingRole: restartsRace not implemented');
+    }
+
+    /**
+     * A phase without turns opens on the subs (the return to the lobby).
+     *
+     * @param {object} message - its RacingNetProtocol control message
+     */
+    announcePhase(message) {
+        throw new Error('AbstractRacingRole: announcePhase not implemented');
+    }
+
+    /**
      * @param {boolean} paused - this device's pause menu is open over the race, which stops it for everyone
      */
     setLocalPaused(paused) {

@@ -115,6 +115,8 @@ class CarsComparator {
             second.tick(inputs[1]);
             if (this._ranked) {
                 const secondAhead = (this._Simulation.rankOrder(first, second) > 0);
+                // The second car is kept from a cycle to the next: a contact out of reach this time must not count.
+                second.contact = 0;
                 this._Simulation.collideCars([first, second]);
                 if (secondAhead && ((first.contact !== 0) || (second.contact !== 0))) {
                     led++;

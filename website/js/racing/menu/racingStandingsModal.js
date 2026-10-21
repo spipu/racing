@@ -20,7 +20,7 @@ class RacingStandingsModal extends AppMenuAbstractListModal {
         this._tableEl   = null;
         this._statusEl  = null;
         this._listEl    = null;
-        this._shape     = null;
+        this._shownRows = null;
         this._over      = null;
     }
 
@@ -37,7 +37,7 @@ class RacingStandingsModal extends AppMenuAbstractListModal {
 
     /**
      * @param {string}   title
-     * @param {function} source - () => {rows: {place, nickname, color, status, raceMs, bestLapMs, own}[], over: boolean}
+     * @param {function} source - () => {rows: {place, nickname, color, status, raceMs, bestLapMs, laps, own}[], over: boolean}
      */
     show(title, source) {
         this._source = source;
@@ -54,16 +54,20 @@ class RacingStandingsModal extends AppMenuAbstractListModal {
     // Called every frame: rebuilt only when the standings or the end of the race changed.
     refresh() {
         const {rows, over} = this._source();
-        const shape = JSON.stringify(rows);
-        if (shape !== this._shape) {
-            this._shape = shape;
+        const shown = JSON.stringify(rows);
+        if (shown !== this._shownRows) {
+            this._shownRows = shown;
             this._buildTable(rows);
         }
         if (over === this._over) {
             return;
         }
         this._over = over;
-        this._statusEl.textContent = appTranslator.get((over) ? ((this._onRestart !== null) ? '' : 'race.standings.waitingHost') : 'race.standings.inProgress');
+        if (!over) {
+            this._statusEl.textContent = appTranslator.get('race.standings.inProgress');
+        } else {
+            this._statusEl.textContent = ((this._onRestart !== null) ? '' : appTranslator.get('race.standings.waitingHost'));
+        }
         if (over && (this._onRestart !== null)) {
             this._nav.addItemIn(this._listEl, appTranslator.get('race.results.restart'), () => this._onRestart());
             this._nav.addItemIn(this._listEl, appTranslator.get('race.results.courses'), () => this._onCourses());

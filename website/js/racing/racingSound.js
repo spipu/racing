@@ -165,7 +165,7 @@ class RacingSound {
                 key:        command,
                 gain:       (gain * ((entry.fm) ? RacingSound.FM_GAIN : RacingSound.DAC_GAIN)),
                 pan:        pan,
-                replaceKey: ((entry.fm) ? null : (RacingSound.DAC_KEY + ':car' + source))
+                replaceKey: ((entry.fm) ? null : (RacingSound.CAR_DAC_KEY + source))
             };
             const play = () => this._player.play(this._samples.get(entry.id), options);
             if (entry.ms === 0) {
@@ -327,6 +327,8 @@ RacingSound.FRAME_MS        = (1000 / 60);
 // the gain of the samples, their peaks (-4.7 dB) still unclipped.
 RacingSound.DAC_GAIN        = 0.4;
 RacingSound.DAC_KEY         = 'dac';
+// The DAC of another player's car, by its player id.
+RacingSound.CAR_DAC_KEY     = 'dac:car';
 RacingSound.FM_GAIN         = 1.6;
 RacingSound.MUSIC_GAIN      = 1.6;
 

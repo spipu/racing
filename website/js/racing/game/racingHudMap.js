@@ -23,7 +23,8 @@ class RacingHudMap {
         this._side      = ((mirror) ? -1 : 1);
         this._svgEl     = null;
         this._size      = 0;
-        this._dots      = new Map();   // player id → {el, x, y}
+        this._dots      = new Map();   // player id → {el, x, y, frame}
+        this._frame     = 0;           // counts the updates: a dot not placed in the last one is gone
         this._roster    = null;
         this._colored   = false;
     }
@@ -77,32 +78,33 @@ class RacingHudMap {
 
     // Each car where its state stands; a car gone loses its dot, the viewed one is drawn last.
     update() {
-        const local   = this._roster.getLocal();
-        const players = this._roster.getAll().filter((player) => (player !== local));
-        players.push(local);
-        const seen = new Set();
-        for (const player of players) {
-            const dot = this._dot(player);
-            seen.add(player.getId());
-            const state = player.getCarState();
-            const cx    = Math.round(this._side * state.x * this._toScenery);
-            const cy    = Math.round(-state.z * this._toScenery);
-            if ((cx !== dot.x) || (cy !== dot.y)) {
-                dot.x = cx;
-                dot.y = cy;
-                dot.el.setAttribute('cx', String(cx));
-                dot.el.setAttribute('cy', String(cy));
-            }
+        this._frame++;
+        for (const player of this._roster.getAll()) {
+            this._placeDot(player);
         }
         for (const [id, dot] of this._dots) {
-            if (!seen.has(id)) {
+            if (dot.frame !== this._frame) {
                 dot.el.remove();
                 this._dots.delete(id);
             }
         }
-        const viewed = this._dots.get(local.getId()).el;
+        const viewed = this._dots.get(this._roster.getLocal().getId()).el;
         if (this._svgEl.lastChild !== viewed) {
             this._svgEl.appendChild(viewed);
+        }
+    }
+
+    _placeDot(player) {
+        const dot   = this._dot(player);
+        const state = player.getCarState();
+        const cx    = Math.round(this._side * state.x * this._toScenery);
+        const cy    = Math.round(-state.z * this._toScenery);
+        dot.frame = this._frame;
+        if ((cx !== dot.x) || (cy !== dot.y)) {
+            dot.x = cx;
+            dot.y = cy;
+            dot.el.setAttribute('cx', String(cx));
+            dot.el.setAttribute('cy', String(cy));
         }
     }
 
@@ -117,7 +119,7 @@ class RacingHudMap {
         if (this._colored) {
             el.style.fill = RacingCarColors.cssOfSlot(player.getId());
         }
-        dot = {el: el, x: null, y: null};
+        dot = {el: el, x: null, y: null, frame: 0};
         this._dots.set(player.getId(), dot);
 
         return dot;

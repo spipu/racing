@@ -15,6 +15,10 @@ class RacingSessionNotice extends NetSessionNotice {
      */
     setPausedBy(nicknames) {
         this._pausedBy = nicknames;
+        // A paused race waits for nobody (as the host's pause, NetSessionNotice.pausedByMain).
+        if (nicknames.length > 0) {
+            this._waiting = [];
+        }
         this._refresh();
     }
 
@@ -34,6 +38,10 @@ class RacingSessionNotice extends NetSessionNotice {
     }
 
     _promptText() {
-        return ((this._pausedBy.length > 0) ? appTranslator.get('multiplayer.pausedBy', {nickname: this._pausedBy.join(', ')}) : null);
+        if (this._pausedBy.length === 0) {
+            return null;
+        }
+
+        return appTranslator.get('multiplayer.pausedBy', {nickname: NetSessionNotice.listOf(this._pausedBy)});
     }
 }
