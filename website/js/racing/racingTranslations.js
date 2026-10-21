@@ -62,6 +62,12 @@ class RacingTranslations {
                 it: 'Interrompere il multigiocatore?\nTutti i giocatori saranno disconnessi.',
                 es: '¿Detener el multijugador?\nTodos los jugadores serán desconectados.'
             },
+            'multiplayer.pausedBy': {
+                fr: 'Course en pause par {nickname}',
+                en: 'Race paused by {nickname}',
+                it: 'Gara in pausa da {nickname}',
+                es: 'Carrera en pausa por {nickname}'
+            },
             'records.resetAll': {
                 fr: 'Tout réinitialiser',
                 en: 'Reset all',
@@ -363,6 +369,12 @@ class RacingTranslations {
                 en: '{value} fps',
                 it: '{value} fps',
                 es: '{value} fps'
+            },
+            'hud.fpsPing': {
+                fr: '{value} fps - ping {ping} ms',
+                en: '{value} fps - ping {ping} ms',
+                it: '{value} fps - ping {ping} ms',
+                es: '{value} fps - ping {ping} ms'
             },
             'settings.display.showFps': {
                 fr: 'Afficher le framerate',

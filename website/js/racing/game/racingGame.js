@@ -6,22 +6,28 @@
  * the race), never on which it is. The local player's commands are sampled from the controls (RacingControls,
  * RacingCommandSampler); the one-shot events of the race reach the presentation (RacingPresentation) as they come.
  * A race the device hosts a session for (RacingHostedSession) is built for every slot, renders with WebGL and shows
- * frozen under its start lobby until Start; its pause reaches the session.
+ * frozen under its start lobby until Start; its pause reaches the session. A race of a session this device follows
+ * (RacingFollowedSession) is the main's, built as the main sent it, followed by RacingSubRole. In a session, the pause
+ * of any player stops the race for everyone (user decision), and no turn runs before every player's command is in.
  */
 class RacingGame {
     /**
      * @param {RacingMenuNavigator} navigator
      * @param {{course: string, mirror: boolean, car: string, gearbox: string}} selection
-     * @param {RacingHostedSession|null} hosted - the session this device hosts, null for a race alone
+     * @param {RacingHostedSession|null}   hosted   - the session this device hosts, null for a race alone
+     * @param {RacingFollowedSession|null} followed - the session this device follows, null for a race of its own
      */
-    constructor(navigator, selection, hosted = null) {
+    constructor(navigator, selection, hosted = null, followed = null) {
+        const sub = ((followed !== null) ? followed.getSession() : null);
         this._navigator       = navigator;
         this._selection       = selection;
         this._hosted          = hosted;
-        this._roster          = new RacingPlayerRoster().setLocal(new RacingPlayer(RacingGame.LOCAL_PLAYER_ID));
+        this._followed        = followed;
+        this._roster          = new RacingPlayerRoster().setLocal(new RacingPlayer((sub !== null) ? sub.getViewedPlayerId() : RacingGame.LOCAL_PLAYER_ID));
         this._turnEvents      = new RacingTurnEvents();
-        this._role            = new RacingMainRole(this._roster, this._turnEvents);
+        this._role            = ((sub !== null) ? new RacingSubRole(this._roster, sub) : new RacingMainRole(this._roster, this._turnEvents));
         this._presentation    = new RacingPresentation(selection);
+        this._level           = null;    // {course, mirror, car, gearbox, laps} of the race, as the subs build it
         this._controls        = null;
         this._commandSampler  = null;
         this._results         = null;
@@ -29,6 +35,8 @@ class RacingGame {
         this._running         = false;
         this._paused          = false;
         this._frozen          = false;
+        this._held            = false;   // another player's pause holds the race
+        this._left            = false;   // left before it was shown
         this._pauseWasDown    = true;
         this._pauseDisplay    = null;
         this._pauseModal      = null;
@@ -36,7 +44,10 @@ class RacingGame {
         this._turnEvents.addListener((event) => this._presentation.playTurnEvent(event));
     }
 
-    async start() {
+    /**
+     * @param {object|null} level - on a sub, the main's race: its levelLoad message ({laps, slots, ...})
+     */
+    async start(level = null) {
         const base      = RacingGame.ASSETS;
         const selection = this._selection;
         const sky       = (base + 'skies/' + selection.course + '.png');
@@ -55,9 +66,16 @@ class RacingGame {
             racingSound.loadAsync()
         ]);
 
-        const multiplayer = (this._hosted !== null);
-        const laps        = ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps());
+        const multiplayer = ((this._hosted !== null) || (this._followed !== null));
+        const laps        = ((level !== null) ? level.laps : ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps()));
         const slots       = ((multiplayer) ? Array.from({length: RacingHostedSession.CAPACITY}, (unused, i) => (i + RacingPlayer.MAIN_ID)) : [RacingGame.LOCAL_PLAYER_ID]);
+        // A sub holds every player of the main's race, posed by its states.
+        for (const slot of ((level !== null) ? level.slots : [])) {
+            if (this._roster.getById(slot) === null) {
+                this._roster.add(new RacingPlayer(slot));
+            }
+        }
+        this._level = {course: selection.course, mirror: selection.mirror, car: selection.car, gearbox: selection.gearbox, laps: laps};
         loader.reset();
         loader.beginBatch();
         this._presentation.build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
@@ -74,16 +92,34 @@ class RacingGame {
         loader.endBatch();
     }
 
+    // A sub leaves the session with its race.
     quit() {
         if (!this._running) {
             return;
         }
         this._teardown();
+        if (this._followed !== null) {
+            this._followed.leave();
+            return;
+        }
         this._navigator.endRace();
+    }
+
+    // A sub's race goes: the main sent another, or the session ended. Before it is shown, it never will be.
+    leaveRace() {
+        if (!this._running) {
+            this._left = true;
+            return;
+        }
+        this._teardown();
     }
 
     getRole() {
         return this._role;
+    }
+
+    getPresentation() {
+        return this._presentation;
     }
 
     getRoster() {
@@ -106,7 +142,7 @@ class RacingGame {
     // The session stopped from the pause: the race goes on alone.
     sessionStopped() {
         this._hosted = null;
-        this._presentation.setForcedRenderer(null);
+        this._presentation.setForcedRenderer(null).setPingSource(null);
         this._navigator.sessionStopped();
     }
 
@@ -131,7 +167,10 @@ class RacingGame {
     }
 
     _begin(skyId) {
-        if (this._hosted !== null) {
+        if (this._left) {
+            return;
+        }
+        if ((this._hosted !== null) || (this._followed !== null)) {
             this._presentation.setForcedRenderer(RacingGame.SESSION_RENDERER);
         }
         this._presentation.showRace(skyId, this._roster.getLocal());
@@ -147,6 +186,7 @@ class RacingGame {
                 this._navigator.leaveSessionStart(this._selection);
             });
         }
+        this._role.levelStarted(this._level);
         requestAnimationFrame(this._animateCallback);
     }
 
@@ -169,12 +209,13 @@ class RacingGame {
     // The race stops under the menu: simulation, controls, touch controls, sounds.
     _enterPause() {
         this._paused = true;
+        this._role.setLocalPaused(true);
         this._controls.setVirtualPadVisible(false);
         this._presentation.setSoundPaused(true);
         this._pauseDisplay = new AppMenuDisplay('screen').init(true);
         this._pauseModal   = new RacingPauseModal(this._pauseDisplay)
             .setOnResume(() => this._leavePause())
-            .setOnRestart(() => this._restart())
+            .setOnRestart((this._followed === null) ? () => this._restart() : null)
             .setOnQuit(() => this.quit())
             .setSessionContext((this._hosted !== null) ? this._hosted.pauseContext() : null)
             .show(() => this._pauseTitle());
@@ -185,9 +226,25 @@ class RacingGame {
         this._closePause();
         this._paused       = false;
         this._pauseWasDown = true;
+        this._role.setLocalPaused(false);
         this._presentation.getEngine().resetDeltaClock();
         this._controls.applySettings().setVirtualPadVisible(true);
-        this._presentation.setSoundPaused(false);
+        this._presentation.setSoundPaused(this._held);
+    }
+
+    // Another player's pause holds the race here: its frames freeze, its sounds with them.
+    _trackHeld() {
+        const held = this._role.isHeld();
+        if (held === this._held) {
+            return;
+        }
+        this._held = held;
+        if (!this._paused) {
+            this._presentation.setSoundPaused(held);
+        }
+        if (!held) {
+            this._presentation.getEngine().resetDeltaClock();
+        }
     }
 
     // --- Finish ---
@@ -273,6 +330,10 @@ class RacingGame {
         } catch (error) {
             console.error(error);
             this._teardown();
+            if (this._followed !== null) {
+                this._followed.raceFailed(error);
+                return;
+            }
             this._navigator.raceFailed(this._selection, error);
         }
     }
@@ -289,8 +350,13 @@ class RacingGame {
             this._togglePause();
         }
         this._pauseWasDown = pauseDown;
-        // Frozen under the pause and the start lobby; the race goes on under the results.
-        if (this._paused || this._frozen) {
+        if (this._hosted !== null) {
+            this._hosted.update(timestamp);
+        }
+        this._trackHeld();
+        // Frozen under the pause, the start lobby, another player's pause and a turn waiting for a player; the race
+        // goes on under the results.
+        if (this._paused || this._frozen || this._held || !this._role.isTurnReady(timestamp)) {
             this._presentation.presentFrozen();
             requestAnimationFrame(this._animateCallback);
             return;
@@ -299,8 +365,7 @@ class RacingGame {
         // Collected every frame; the role samples the command when its turn needs it.
         this._commandSampler.collect();
         this._presentation.readViewToggles();
-        this._role.advance(ticks, this._commandSampler);
-        this._presentation.present(ticks, (this._results !== null));
+        this._presentation.present(this._role.advance(ticks, this._commandSampler, timestamp), (this._results !== null));
 
         requestAnimationFrame(this._animateCallback);
     }

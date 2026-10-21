@@ -415,6 +415,13 @@ class RacingRaceControl {
     }
 
     /**
+     * @returns {int} the counter the blinking reads (RacingRaceView replicates it)
+     */
+    getBlink() {
+        return this._blink;
+    }
+
+    /**
      * @returns {{raceMs: number, lapsMs: number[], bestLapMs: number, record: object, newRecord: boolean}}
      */
     result() {

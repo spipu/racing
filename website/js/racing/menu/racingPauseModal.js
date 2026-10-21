@@ -1,8 +1,9 @@
 /**
  * Pause modal, shown by the race over its own frozen frame (modelled on
  * doom_js's MenuPauseModal). Title "{course} — {car}", navigable entries
- * (back to the race / restart the race / multiplayer, in a session the device
- * hosts / options / leave the race) and no
+ * (back to the race / restart the race, but on a device that follows the
+ * main's race / multiplayer, in a session the device hosts / options / leave
+ * the race, and the session on a device that follows it) and no
  * bottom button: Backspace and the gamepad back button resume, the Escape and
  * pause toggle stays with the race, which only leaves the pause from its root:
  * the stacked options modal handles Escape itself as one step back.
@@ -60,7 +61,9 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         const {modal} = this._createShell(this._titleProvider(), 'app-menu-modal app-menu-modal-wide', 'app-menu-subtitle');
         const listEl  = AppMenuDom.addElement(modal, 'div', 'app-menu-list');
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.resume'), () => this._onResume());
-        this._nav.addItemIn(listEl, appTranslator.get('race.pause.restart'), () => this._confirmRestart());
+        if (this._onRestart !== null) {
+            this._nav.addItemIn(listEl, appTranslator.get('race.pause.restart'), () => this._confirmRestart());
+        }
         if (this._inSession()) {
             this._nav.addItemIn(listEl, appTranslator.get('multiplayer.pause.menu'), () => this._openMultiplayer());
         }

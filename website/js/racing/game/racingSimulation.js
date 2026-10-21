@@ -81,7 +81,7 @@ class RacingSimulation {
         // After a wall or a crash the player steers (user decision: the original drives the car back to its line 2 s).
         physics.drivenBackOnTrack = false;
         physics.pitWorkByCrew = true;
-        physics.place(...this._startPlace(player));
+        physics.place(...RacingSimulation.startPlace(this._data, player.getId()));
         if (multiplayer && (physics.progress > RacingCarPhysics.LINE_GAP)) {
             physics.startBehindLine();
         }
@@ -113,14 +113,21 @@ class RacingSimulation {
         return this;
     }
 
-    // [x, height, z, heading] in entity units: the Time Attack's place alone, else the slot's place of the grid of 8.
-    _startPlace(player) {
-        const {race, multiplayerGrids, selection, multiplayer} = this._data;
+    /**
+     * The Time Attack's place alone, else the slot's place of the grid of 8 — a sub poses its cars there too until the
+     * main's first state.
+     *
+     * @param {object} data - see adoptRace
+     * @param {int}    slot - the player's
+     * @returns {number[]} [x, height, z, heading] in entity units
+     */
+    static startPlace(data, slot) {
+        const {race, multiplayerGrids, selection, multiplayer} = data;
         if (!multiplayer) {
             return race.startGrids[selection.car].race[racingCatalog.getCourseIndex(selection.course)][RacingSimulation.TIME_ATTACK_PLACE];
         }
 
-        return multiplayerGrids.grids[selection.course][selection.car][player.getId() - RacingPlayer.MAIN_ID];
+        return multiplayerGrids.grids[selection.course][selection.car][slot - RacingPlayer.MAIN_ID];
     }
 
     // Big Forest starts alone in the pit box, with the mechanics ($6AB4); several players as the 2 players VS mode.

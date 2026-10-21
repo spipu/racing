@@ -29,6 +29,7 @@ class RacingHud extends AbstractHud {
         this._course  = '';
         this._manual  = false;
         this._map     = null;
+        this._ping    = null;   // () => round trip in ms or null, during a session
         this._els     = {};
         this._shown   = {};
         this._lapsShown = -1;
@@ -46,6 +47,17 @@ class RacingHud extends AbstractHud {
         this._course  = info.course;
         this._manual  = info.manual;
         this._map     = info.map;
+
+        return this;
+    }
+
+    /**
+     * The ping beside the fps, as doom_js: the worst sub's on the main, the main's on a sub.
+     *
+     * @param {function(): (number|null)|null} source - null outside a session
+     */
+    bindPingSource(source) {
+        this._ping = source;
 
         return this;
     }
@@ -155,7 +167,7 @@ class RacingHud extends AbstractHud {
         const mapShown = racingSettings.isMapShown();
         this._display('map', mapShown);
         if (mapShown) {
-            this._map.update(state.x, state.z);
+            this._map.update();
         }
 
         this._updateStart(race);
@@ -301,7 +313,11 @@ class RacingHud extends AbstractHud {
         const visible = racingSettings.isFpsShown();
         this._display('fps', visible);
         if (visible) {
-            this._text('fpsValue', appTranslator.get('hud.fps', {value: this._engine.getFps()}));
+            const fps  = this._engine.getFps();
+            const ping = ((this._ping !== null) ? this._ping() : null);
+            this._text('fpsValue', ((ping !== null)
+                ? appTranslator.get('hud.fpsPing', {value: fps, ping: Math.round(ping)})
+                : appTranslator.get('hud.fps', {value: fps})));
         }
     }
 

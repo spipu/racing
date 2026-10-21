@@ -38,6 +38,9 @@ class RacingPresentation {
         this._player         = null;
         this._controls       = null;
         this._viewWasDown    = true;       // a view button held as the race starts does not switch the view
+        this._pingSource     = null;       // () => round trip in ms or null, during a session
+        this._noticeText     = null;       // message of the session over the race, null = none
+        this._noticeEl       = null;
     }
 
     /**
@@ -99,7 +102,8 @@ class RacingPresentation {
             voice:    null,
         }));
         this._camera  = new RacingCamera(data.physics.cars[selection.car].viewTransitions, racingSettings.getStartView());
-        this._hudMap  = new RacingHudMap(data.course.map, data.race.courses[selection.course].racePath, data.course.collision.toScenery, mirror);
+        this._hudMap  = new RacingHudMap(data.course.map, data.race.courses[selection.course].racePath, data.course.collision.toScenery, mirror)
+            .bindPlayers(data.roster, data.multiplayer);
     }
 
     /**
@@ -169,6 +173,38 @@ class RacingPresentation {
         this._screen.destroyContainer();
         this._buildDisplay();
         this._controls.bindDisplay(this._screen.getDisplay());
+    }
+
+    /**
+     * @param {function(): (number|null)|null} source - the ping shown beside the fps, null outside a session
+     */
+    setPingSource(source) {
+        this._pingSource = source;
+        if (this._hud !== null) {
+            this._hud.bindPingSource(source);
+        }
+
+        return this;
+    }
+
+    /**
+     * A message of the session shown over the race until replaced (a turn waiting for a player, a pause), kept across
+     * a renderer swap.
+     *
+     * @param {string|null} text - null hides it
+     */
+    setNotice(text) {
+        this._noticeText = text;
+        if ((this._screen === null) || ((this._noticeEl === null) && (text === null))) {
+            return this;
+        }
+        if (this._noticeEl === null) {
+            this._noticeEl = AppMenuDom.addElement(this._screen.getDisplay(), 'div', 'racing-game-notice');
+        }
+        this._noticeEl.textContent   = (text ?? '');
+        this._noticeEl.style.display = ((text !== null) ? '' : 'none');
+
+        return this;
     }
 
     /**
@@ -257,6 +293,9 @@ class RacingPresentation {
     playTurnEvent(event) {
         if (event.type === RacingTurnEvents.CREW_STARTED) {
             const player = this._roster.getById(event.playerId);
+            if (player === null) {
+                return;
+            }
             const box    = this._crews[player.getCarState().pitBox];
             box.schedule = event.schedule;
             box.player   = player;
@@ -282,8 +321,10 @@ class RacingPresentation {
             course: ((selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
             manual: (selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL),
             map:    this._hudMap
-        });
+        }).bindPingSource(this._pingSource);
         this._screen.bindHud(this._hud);
+        this._noticeEl = null;
+        this.setNotice(this._noticeText);
     }
 
     _wantedRenderer() {

@@ -1,6 +1,8 @@
 /**
  * Map of the course on the HUD (race.md § HUD): the outline of the ROM ($15668),
- * fixed, scaled to fill its square, and the car as a dot.
+ * fixed, scaled to fill its square, and each car on the track as a dot: alone
+ * yellow, in a race of several players in the colour of its player's slot
+ * (user decision), the viewed car over the others.
  *
  * Every course starts heading 0 (+z, start grids of race.json): +z drawn upwards
  * puts the start upwards (user decision, the original turns the map with the car).
@@ -19,9 +21,22 @@ class RacingHudMap {
         this._racePath  = racePath;
         this._toScenery = toScenery;
         this._side      = ((mirror) ? -1 : 1);
-        this._car       = null;
-        this._carX      = null;
-        this._carY      = null;
+        this._svgEl     = null;
+        this._size      = 0;
+        this._dots      = new Map();   // player id → {el, x, y}
+        this._roster    = null;
+        this._colored   = false;
+    }
+
+    /**
+     * @param {RacingPlayerRoster} roster  - the cars on the track, the local player's viewed
+     * @param {boolean}            colored - a race of several players: each dot in its slot's colour
+     */
+    bindPlayers(roster, colored) {
+        this._roster  = roster;
+        this._colored = colored;
+
+        return this;
     }
 
     /**
@@ -55,30 +70,60 @@ class RacingHudMap {
         ['x1', 'y1', 'x2', 'y2'].forEach((name, i) => start.setAttribute(name, String(Math.round(ends[i]))));
         start.setAttribute('stroke-width', String(Math.round(size * RacingHudMap.START_WIDTH)));
 
-        this._car = this._svg(svg, 'circle', 'racing-hud-map-car');
-        this._car.setAttribute('r', String(Math.round(size * RacingHudMap.CAR_RADIUS)));
-        this._car.setAttribute('stroke-width', String(Math.round(size * RacingHudMap.CAR_OUTLINE)));
-        this._carX = null;
-        this._carY = null;
+        this._svgEl = svg;
+        this._size  = size;
+        this._dots  = new Map();
     }
 
-    /**
-     * @param {number} x - collision units, unmirrored course
-     * @param {number} z
-     */
-    update(x, z) {
-        const cx = Math.round(this._side * x * this._toScenery);
-        const cy = Math.round(-z * this._toScenery);
-        if ((cx === this._carX) && (cy === this._carY)) {
-            return;
+    // Each car where its state stands; a car gone loses its dot, the viewed one is drawn last.
+    update() {
+        const local   = this._roster.getLocal();
+        const players = this._roster.getAll().filter((player) => (player !== local));
+        players.push(local);
+        const seen = new Set();
+        for (const player of players) {
+            const dot = this._dot(player);
+            seen.add(player.getId());
+            const state = player.getCarState();
+            const cx    = Math.round(this._side * state.x * this._toScenery);
+            const cy    = Math.round(-state.z * this._toScenery);
+            if ((cx !== dot.x) || (cy !== dot.y)) {
+                dot.x = cx;
+                dot.y = cy;
+                dot.el.setAttribute('cx', String(cx));
+                dot.el.setAttribute('cy', String(cy));
+            }
         }
-        this._carX = cx;
-        this._carY = cy;
-        this._car.setAttribute('cx', String(cx));
-        this._car.setAttribute('cy', String(cy));
+        for (const [id, dot] of this._dots) {
+            if (!seen.has(id)) {
+                dot.el.remove();
+                this._dots.delete(id);
+            }
+        }
+        const viewed = this._dots.get(local.getId()).el;
+        if (this._svgEl.lastChild !== viewed) {
+            this._svgEl.appendChild(viewed);
+        }
     }
 
-    // The car in update() is placed the same way, without allocating.
+    _dot(player) {
+        let dot = this._dots.get(player.getId());
+        if (dot !== undefined) {
+            return dot;
+        }
+        const el = this._svg(this._svgEl, 'circle', 'racing-hud-map-car');
+        el.setAttribute('r', String(Math.round(this._size * RacingHudMap.CAR_RADIUS)));
+        el.setAttribute('stroke-width', String(Math.round(this._size * RacingHudMap.CAR_OUTLINE)));
+        if (this._colored) {
+            el.style.fill = RacingCarColors.cssOfSlot(player.getId());
+        }
+        dot = {el: el, x: null, y: null};
+        this._dots.set(player.getId(), dot);
+
+        return dot;
+    }
+
+    // The cars in update() are placed the same way, without allocating.
     _toScreen(x, z) {
         return [(this._side * x), -z];
     }

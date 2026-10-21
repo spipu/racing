@@ -4,7 +4,9 @@
  * is built) and handles the navigation between the screens. It holds the
  * session this device hosts (RacingHostedSession) from "Create a race" on,
  * across the races and back through the choice of the course (user decision:
- * the session outlives a race), until the main menu or the session's stop.
+ * the session outlives a race), until the main menu or the session's stop, and
+ * the session it follows (RacingFollowedSession) from the main's first race on,
+ * until it ends.
  */
 class RacingMenuNavigator {
     constructor() {
@@ -149,6 +151,38 @@ class RacingMenuNavigator {
             this._hosted.stop();
             this._hosted = null;
         }
+    }
+
+    /**
+     * A sub's lobby got the main's race to build: the menus go, the race the main sent is built.
+     *
+     * @param {NetGameSubSession} session
+     * @param {object}            level   - its levelLoad message
+     */
+    joinSharedRace(session, level) {
+        this._switchTo(null);
+        this._display.destroy();
+        new RacingFollowedSession(this, session).join(level);
+    }
+
+    /**
+     * The followed session is over: the Multiplayer screen again, with why when the main or the link ended it.
+     *
+     * @param {string|null} reason - NetGameProtocol.END_*, null when this device left it
+     */
+    leftFollowedSession(reason) {
+        this._display.init();
+        this.openMultiplayer();
+        if (reason !== null) {
+            AppMenuNetMessages.showEnd(this._display, reason);
+        }
+    }
+
+    // The main's race could not be built or stopped on an error: the session is left, with the error.
+    leftFollowedSessionOnError(error) {
+        this._display.init();
+        this.openMultiplayer();
+        new AppMenuModal(this._display).showError(appTranslator.get('race.failed'), error.message);
     }
 
     // Gearbox kept for the session, shown on the car screen.

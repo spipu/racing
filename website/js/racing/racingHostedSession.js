@@ -6,8 +6,10 @@
  * choice).
  *
  * Each race it is attached to (attach): the subs of its lobby get their cars on the grid as they join and lose them as
- * they leave, the race shows frozen under the start lobby until Start, and its pause reaches the session — the
- * lobby read only, the stop. It reaches the race through its public surface alone.
+ * they leave, the race shows frozen under the start lobby until Start, where the race's role hosts the session — the
+ * subs build the race, the start waits for them, their commands drive their cars —, the main's message over the race
+ * (who it waits for, whose pause holds the race, the players' news) is its own, and its pause reaches the session —
+ * the lobby read only, the stop. It reaches the race through its public surface alone.
  */
 class RacingHostedSession {
     /**
@@ -20,6 +22,7 @@ class RacingHostedSession {
         this._game     = null;   // the race it is attached to
         this._display  = null;   // the start lobby's, over the frozen race until Start
         this._lobby    = null;
+        this._notice   = new RacingSessionNotice();
     }
 
     /**
@@ -30,6 +33,11 @@ class RacingHostedSession {
     attach(game) {
         const session = this.open();
         this._game    = game;
+        this._notice.clear();
+        this._notice.setOnNotice((text) => game.getPresentation().setNotice(text));
+        game.getPresentation().setPingSource(() => session.getLobby().getWorstPing());
+        session.setOnPlayerRemoved((nickname) => this._notice.departed(nickname, performance.now()))
+            .setOnPlayerAway((nickname, away) => this._notice.awayChanged(nickname, away, performance.now()));
         session.setCycle({
             admitted: (peer) => game.getRole().addPlayer(session.playerIdOf(peer)),
             gone:     (peer) => game.getRole().removePlayer(session.playerIdOf(peer)),
@@ -42,9 +50,15 @@ class RacingHostedSession {
     detach() {
         this._closeStartLobby();
         if (this._session !== null) {
-            this._session.setCycle(null);
+            this._session.setCycle(null).setOnPlayerRemoved(null).setOnPlayerAway(null);
         }
+        this._notice.setOnNotice(null);
         this._game = null;
+    }
+
+    // Called every frame: a player's news runs out.
+    update(now) {
+        this._notice.update(now);
     }
 
     /**
@@ -67,11 +81,14 @@ class RacingHostedSession {
         return (this._display !== null);
     }
 
+    // The subs build the race from now on: the start waits for them.
     _startFromLobby() {
         this._closeStartLobby();
         if (!this._session.isStarted()) {
             this._session.start();
         }
+        this._game.getRole().startHosting(this._session, (nicknames) => this._notice.setWaiting(nicknames),
+            (nicknames) => this._notice.setPausedBy(nicknames));
         this._game.unfreeze();
     }
 
@@ -110,9 +127,8 @@ class RacingHostedSession {
     // The race goes on alone: the subs' cars leave the track.
     _stopFromPause() {
         const game = this._game;
-        for (const player of game.getRoster().getAll()) {
-            game.getRole().removePlayer(player.getId());
-        }
+        game.getRole().stopHosting();
+        this._notice.clear();
         this.detach();
         this.stop();
         game.sessionStopped();

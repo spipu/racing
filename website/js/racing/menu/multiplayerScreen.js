@@ -13,7 +13,7 @@ class MultiplayerScreen extends AbstractRacingMenuScreen {
 
         this._links        = new NetGameLinks();
         this._availability = new NetGameAvailability(this._links, () => new Object3dRendererWebGL().isAvailable());
-        this._join         = new RacingJoinFlow(display, this._links, this._availability);
+        this._join         = new RacingJoinFlow(navigator, display, this._links, this._availability);
     }
 
     _build() {
