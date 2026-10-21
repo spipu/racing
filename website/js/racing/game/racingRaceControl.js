@@ -51,6 +51,8 @@ class RacingRaceControl {
         this.stopped    = false;        // a race of several players ended before this car's last lap: unclassified
         this.resultsDue = false;        // the results of this car's race are shown (its finish 51 ticks behind)
         this.place      = 0;            // in a race of several players, 1 = leading (RacingSimulation)
+        this.passesMs   = [];           // race time at each checkpoint passed, by pass (lap × 2 + checkpoint − 1)
+        this._splitAgainst = null;      // pass → the race time of the car ahead there, null: the record's split
         // Display: start (3, 2, 1, 'go', 'ready'), lights of the READY gantry (LIGHTS_*), messages.
         this.startSign  = null;
         this.lights     = null;
@@ -104,6 +106,19 @@ class RacingRaceControl {
     // A new record of the lap, as soon as it is done: {lapMs, checkpointsMs}.
     setOnRecord(callback) {
         this._onRecord = callback;
+
+        return this;
+    }
+
+    /**
+     * A race of several players compares the split with the car just ahead at the same pass, as the 2 players VS mode
+     * with the other player ($8418, user decision); the record is left out of it.
+     *
+     * @param {function(int): (number|null)} source - pass → the race time of the car ahead there, null when it has not
+     *                                                 passed it or none leads this car
+     */
+    setSplitAgainst(source) {
+        this._splitAgainst = source;
 
         return this;
     }
@@ -291,6 +306,17 @@ class RacingRaceControl {
         }
     }
 
+    // The race time at the pass against the car ahead's, when it passed there already.
+    _splitAhead(pass, raceMs) {
+        this.passesMs[pass] = raceMs;
+        const aheadMs = this._splitAgainst(pass);
+        if ((this._message !== null) || (aheadMs === null)) {
+            return;
+        }
+        this._split = {ms: (raceMs - aheadMs), ticks: 0};
+        this._blinkRestart = true;
+    }
+
     // $34E8 state 4 / $B2E4: the lap time less the time past the line, against the best lap of the race and the record.
     _lap(event, tick) {
         // A race stopped before the last lap counts no more lap.
@@ -357,6 +383,10 @@ class RacingRaceControl {
         }
         const ms = Math.max(0, Math.round(this.lapMs - this._lineCorrection(this._course.checkpointCorrections[checkpoint - 1])));
         this._splitsMs[checkpoint - 1] = ms;
+        if (this._splitAgainst !== null) {
+            this._splitAhead((this.lapTimes.length * RacingRaceControl.CHECKPOINTS) + (checkpoint - 1), (this.lapTimes.reduce((sum, lapMs) => (sum + lapMs), 0) + ms));
+            return;
+        }
         const recordMs = ((this.record === null) ? null : this.record.checkpointsMs[checkpoint - 1]);
         if ((this._message !== null) || (recordMs === null)) {
             return;
@@ -468,6 +498,8 @@ class RacingRaceControl {
 }
 
 RacingRaceControl.TICK_MS                = 50;
+// Checkpoints of a lap ($C270 / $C274).
+RacingRaceControl.CHECKPOINTS            = 2;
 RacingRaceControl.EPSILON                = 1e-6;
 RacingRaceControl.STEP_INTRO             = 0;
 RacingRaceControl.STEP_PIT_START         = 8;

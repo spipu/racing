@@ -8,14 +8,16 @@
  * plays (V + the voice's detune) & $3FFF. The level is constant (lowered under
  * the results, which play over the race). In a tunnel (road flag bit 4) a
  * second channel plays the copy of the voice a little lower ($AF / $AD / $AE,
- * table $232A).
+ * table $232A). Another player's car (positional) sounds the same, lowered and placed left or right by where it is
+ * (setPlacement, user decision: one voice for every car, the echo in a tunnel too).
  */
 class RacingEngineSound {
     /**
      * @param {SoundEngine} engine
-     * @param {string}      car - car code
+     * @param {string}      car        - car code
+     * @param {boolean}     positional - another player's car, placed by setPlacement
      */
-    constructor(engine, car) {
+    constructor(engine, car, positional = false) {
         const commands = RacingEngineSound.COMMANDS[car];
         const main     = racingSound.fmVoice(commands.main);
         const tunnel   = racingSound.fmVoice(commands.tunnel);
@@ -26,10 +28,17 @@ class RacingEngineSound {
         this._frames  = 0;
         this._random  = RacingEngineSound.RANDOM_SEED;
         this._share   = 1;
+        this._place   = ((positional) ? 0 : 1);   // share of the level by the car's distance
         this._tunnel  = false;
         this._output  = this._context.createGain();
-        this._output.gain.value = RacingEngineSound.LEVEL;
-        this._output.connect(engine.getEffectsBus());
+        this._output.gain.value = (RacingEngineSound.LEVEL * this._place);
+        this._panner  = ((positional) ? this._context.createStereoPanner() : null);
+        if (this._panner !== null) {
+            this._output.connect(this._panner);
+            this._panner.connect(engine.getEffectsBus());
+        } else {
+            this._output.connect(engine.getEffectsBus());
+        }
         // The tunnel copy has the engine's voice (same bytes in the ROM), at its own track volume.
         this._voice = new AudioWorkletNode(this._context, RacingEngineSound.PROCESSOR, {
             numberOfInputs:     0,
@@ -89,14 +98,33 @@ class RacingEngineSound {
         return this;
     }
 
+    /**
+     * Where another player's car is heard from.
+     *
+     * @param {number} gain - share of the level, 0 silent to 1 close by
+     * @param {number} pan  - -1 left to 1 right
+     */
+    setPlacement(gain, pan) {
+        this._place = gain;
+        this._applyLevel();
+        if (this._panner !== null) {
+            this._panner.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this._context.currentTime, RacingEngineSound.GLIDE_S);
+        }
+
+        return this;
+    }
+
     _applyLevel() {
-        this._output.gain.setTargetAtTime((this._running ? (RacingEngineSound.LEVEL * this._share) : 0), this._context.currentTime, RacingEngineSound.GLIDE_S);
+        this._output.gain.setTargetAtTime((this._running ? (RacingEngineSound.LEVEL * this._share * this._place) : 0), this._context.currentTime, RacingEngineSound.GLIDE_S);
     }
 
     destroy() {
         this._voice.port.close();
         this._voice.disconnect();
         this._output.disconnect();
+        if (this._panner !== null) {
+            this._panner.disconnect();
+        }
     }
 
     // $232E, one frame.

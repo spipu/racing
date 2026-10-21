@@ -37,6 +37,7 @@ class RacingSimulation {
         this._clock     = 0;            // original ticks since the race was built: the end of a tick tests the contacts
         this._outcome   = new RacingRaceOutcome();
         this._endTick   = null;         // the clock the race of several players ends at, once a car finished
+        this._places    = new Map();    // player id → its place at the end of the previous step
         this._onFinish  = null;
         this._onRecord  = null;
     }
@@ -102,6 +103,9 @@ class RacingSimulation {
                 this._onRecord(player, lap);
             })
             .setOnFinish((result) => this._onFinish(player, result));
+        if (multiplayer) {
+            raceControl.setSplitAgainst((pass) => this._aheadAt(player, pass));
+        }
         player.enterRace(physics, raceControl);
         player.getCarState().capture(physics);
         this._pitWork.set(id, new RacingPitWork(player, this._events, this._random));
@@ -228,6 +232,42 @@ class RacingSimulation {
             player.getRace().place = (index + 1);
         });
         outcome.over = ((races.length > 0) && races.every((race) => race.finished));
+        this._overtakes(players);
+    }
+
+    // The race time at a pass of the car placed just ahead of the player, null when it leads or has not passed there.
+    _aheadAt(player, pass) {
+        const place = player.getRace().place;
+        const ahead = this._roster.getAll().find((other) => ((other.getRace() !== null) && (other.getRace().place === (place - 1))));
+
+        return ((ahead !== undefined) ? (ahead.getRace().passesMs[pass] ?? null) : null);
+    }
+
+    // $87E2: a player whose place changed hears the overtaking sound, if its car and the one it swapped places with run
+    // fast at clearly different speeds (and, at Sand Park, on the same layer of road); heard by that player alone.
+    _overtakes(players) {
+        for (const player of players) {
+            const id       = player.getId();
+            const place    = player.getRace().place;
+            const previous = (this._places.get(id) ?? place);
+            this._places.set(id, place);
+            const race = player.getRace();
+            if ((previous === place) || !race.started || race.finished) {
+                continue;
+            }
+            const other = players.find((candidate) => (candidate.getRace().place === previous));
+            if ((other === undefined) || !RacingSimulation._overtakeHeard(player.getPhysics(), other.getPhysics(), this._data.selection.course)) {
+                continue;
+            }
+            this._events.sound(id, RacingSimulation.OVERTAKE_SOUNDS[this._data.selection.car]);
+        }
+    }
+
+    static _overtakeHeard(a, b, course) {
+        const speeds = ((Math.abs(a.displaySpeed - b.displaySpeed) > RacingSimulation.OVERTAKE_GAP_KMH)
+            && ((a.displaySpeed + b.displaySpeed) > RacingSimulation.OVERTAKE_SUM_KMH));
+
+        return (speeds && ((course !== RacingSimulation.LAYERED_COURSE) || (((a.roadFlags ^ b.roadFlags) & RacingSimulation.ROAD_LAYER_BITS) === 0)));
     }
 
     // A command acts once: its presses on the first part of the step only. The race sends its sounds as it updates,
@@ -337,3 +377,10 @@ RacingSimulation.PAIR              = 2;
 RacingSimulation.EPSILON           = 1e-6;
 // A player without a command this step: off the pedals, wheels straight.
 RacingSimulation.NEUTRAL_COMMAND   = new RacingCommand();
+// The overtaking sound by car, and when it plays ($87E2): speeds +$04 apart by more than 20, more than 100 together; at
+// Sand Park, bits 1-2 of the road flags +$E5 equal (the same layer of road).
+RacingSimulation.OVERTAKE_SOUNDS   = {formula: 'B3', stock: 'CC', prototype: 'CF'};
+RacingSimulation.OVERTAKE_GAP_KMH  = 20;
+RacingSimulation.OVERTAKE_SUM_KMH  = 100;
+RacingSimulation.LAYERED_COURSE    = 'sand_park';
+RacingSimulation.ROAD_LAYER_BITS   = 0x06;

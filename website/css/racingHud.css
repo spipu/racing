@@ -462,3 +462,24 @@
     pointer-events: none;
     z-index: 5;
 }
+
+/* --- Nicknames over the other players' cars (RacingCarTags), in their slots' colours --- */
+.racing-car-tags {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    container-type: size;
+}
+
+.racing-car-tag {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    white-space: nowrap;
+    font-family: system-ui, sans-serif;
+    font-size: 2.4cqh;
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0.12cqh 0.3cqh rgba(0, 0, 0, 0.9), 0 0 0.2cqh rgba(0, 0, 0, 0.9);
+}

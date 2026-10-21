@@ -30,6 +30,7 @@ class RacingSound {
         this._heldTo   = 0;       // ms (performance clock) the priority holds to
         this._dacs     = new Map(); // DAC channel by key: the main one, a crew voice's
         this._timers   = [];
+        this._sources  = new Map(); // another player's car → {priority, heldTo, timers}: its own queue
     }
 
     // Idempotent: the engine is born once, the volume read again every time.
@@ -132,6 +133,51 @@ class RacingSound {
         return this;
     }
 
+    /**
+     * A sound of another player's car (user decision: heard, lowered and placed by where it is), through a queue of
+     * its own, as if each car had the driver of the original; its samples cut only its own. Its music is not heard.
+     *
+     * @param {int}    source  - the player id
+     * @param {string} command - sound command id of the original
+     * @param {number} gain    - share of the level, 0 to 1
+     * @param {number} pan     - -1 left to 1 right
+     */
+    sendFrom(source, command, gain, pan) {
+        const effect = this._effects[command];
+        if ((this._player === null) || (effect === undefined) || (this._jingles[command] !== undefined) || (gain <= 0)) {
+            return this;
+        }
+        const queue = (this._sources.get(source) ?? {priority: 0, heldTo: 0, timers: []});
+        this._sources.set(source, queue);
+        const now = performance.now();
+        if (now >= queue.heldTo) {
+            queue.priority = 0;
+        }
+        if (effect.priority < queue.priority) {
+            return this;
+        }
+        queue.priority = effect.priority;
+        queue.heldTo   = (now + effect.ms);
+        queue.timers.forEach((timer) => clearTimeout(timer));
+        queue.timers.length = 0;
+        for (const entry of effect.timeline) {
+            const options = {
+                key:        command,
+                gain:       (gain * ((entry.fm) ? RacingSound.FM_GAIN : RacingSound.DAC_GAIN)),
+                pan:        pan,
+                replaceKey: ((entry.fm) ? null : (RacingSound.DAC_KEY + ':car' + source))
+            };
+            const play = () => this._player.play(this._samples.get(entry.id), options);
+            if (entry.ms === 0) {
+                play();
+            } else {
+                queue.timers.push(setTimeout(play, entry.ms));
+            }
+        }
+
+        return this;
+    }
+
     setPaused(paused) {
         if (this._player !== null) {
             this._player.setPaused(paused);
@@ -144,6 +190,10 @@ class RacingSound {
     // $F3, leaving a race: every voice stops.
     stopAll() {
         this._cancelTimers();
+        for (const queue of this._sources.values()) {
+            queue.timers.forEach((timer) => clearTimeout(timer));
+        }
+        this._sources.clear();
         if (this._player !== null) {
             this._player.stopAll(false);
             this._musicPlayer.stopAll(false);

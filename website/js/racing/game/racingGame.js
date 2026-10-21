@@ -78,7 +78,7 @@ class RacingGame {
         this._level = {course: selection.course, mirror: selection.mirror, car: selection.car, gearbox: selection.gearbox, laps: laps};
         loader.reset();
         loader.beginBatch();
-        this._presentation.setOutcome(this._role.getOutcome()).build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
+        this._presentation.setOutcome(this._role.getOutcome()).setNicknames((id) => this._role.getNickname(id)).build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
         this._role.adoptRace({course, race, physics, multiplayerGrids, selection, multiplayer, laps, lapJingles: racingSound.laps},
             (result) => this._guard(this._finish, result), (lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs));
         this._role.enterRace(((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);

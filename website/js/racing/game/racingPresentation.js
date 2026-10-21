@@ -7,7 +7,8 @@
  * are emitted.
  *
  * In a race of several players, each car wears the colour of its player's slot (RacingCarColors); the other players'
- * cars are seen from outside. Each pit box has its crew (RacingPitBoxes: a second box in a race of several players),
+ * cars are seen from outside, their nicknames over them (RacingCarTags), their engines and noises heard from where they
+ * are (RacingCarSounds). Each pit box has its crew (RacingPitBoxes: a second box in a race of several players),
  * which works on the car whose stop at that box started last. A mirrored race flips the scene along x.
  */
 class RacingPresentation {
@@ -40,6 +41,11 @@ class RacingPresentation {
         this._viewWasDown    = true;       // a view button held as the race starts does not switch the view
         this._pingSource     = null;       // () => round trip in ms or null, during a session
         this._outcome        = null;       // RacingRaceOutcome: the time left after the first finish
+        this._multiplayer    = false;
+        this._nicknameOf     = () => '';
+        this._tags           = null;       // RacingCarTags, in a race of several players
+        this._carSounds      = null;       // RacingCarSounds, in a race of several players with the engine voice
+        this._positions      = new Map();  // player id → where its car is drawn, metres
         this._noticeText     = null;       // message of the session over the race, null = none
         this._noticeEl       = null;
     }
@@ -82,9 +88,11 @@ class RacingPresentation {
         if (car === undefined) {
             throw new Error('RacingPresentation - unknown car ' + selection.car);
         }
+        this._multiplayer = data.multiplayer;
         const wheels  = new RacingWheelModels(data.cars, car);
         const viewed  = data.roster.getLocal();
         this._roster  = data.roster;
+        this._tags    = ((data.multiplayer) ? new RacingCarTags((id) => this._nicknameOf(id)) : null);
         for (const slot of data.slots) {
             const palette = new RacingPalette(data.palettes, selection.course, selection.car);
             if (data.multiplayer) {
@@ -130,6 +138,9 @@ class RacingPresentation {
         }
         if ((racingSound.getEngine() !== null) && racingSound.hasEngineVoice()) {
             this._engineSound = new RacingEngineSound(racingSound.getEngine(), this._selection.car);
+            if (this._multiplayer) {
+                this._carSounds = new RacingCarSounds(racingSound.getEngine(), this._selection.car);
+            }
         }
         const cars      = Array.from(this._cars.values()).flatMap((view) => view.getAllInstances());
         const crews     = this._crews.flatMap((box) => box.crew.getAllInstances());
@@ -186,6 +197,15 @@ class RacingPresentation {
     }
 
     /**
+     * @param {function(int): string} nicknameOf - the label over another player's car
+     */
+    setNicknames(nicknameOf) {
+        this._nicknameOf = nicknameOf;
+
+        return this;
+    }
+
+    /**
      * @param {function(): (number|null)|null} source - the ping shown beside the fps, null outside a session
      */
     setPingSource(source) {
@@ -227,6 +247,9 @@ class RacingPresentation {
         if (this._engineSound !== null) {
             this._engineSound.setRunning(!paused);
         }
+        if (this._carSounds !== null) {
+            this._carSounds.setRunning(!paused);
+        }
     }
 
     /**
@@ -237,6 +260,9 @@ class RacingPresentation {
         if (this._engineSound !== null) {
             this._engineSound.setLevelShare(RacingPresentation.RESULTS_ENGINE_SHARE);
         }
+        if (this._carSounds !== null) {
+            this._carSounds.setLevelShare(RacingPresentation.RESULTS_ENGINE_SHARE);
+        }
         racingSound.stopAll().send(RacingPresentation.JINGLE_RESULTS);
         this._hud.setVisible(false);
     }
@@ -246,6 +272,10 @@ class RacingPresentation {
         if (this._engineSound !== null) {
             this._engineSound.destroy();
             this._engineSound = null;
+        }
+        if (this._carSounds !== null) {
+            this._carSounds.destroy();
+            this._carSounds = null;
         }
         racingSound.stopAll();
         if (this._screen !== null) {
@@ -287,6 +317,36 @@ class RacingPresentation {
         }
         this._objects.animate(ticks);
         this._draw();
+        this._presentOthers(ticks);
+    }
+
+    // After the scene is drawn, its camera set: the other players' cars labelled and heard from where they are.
+    _presentOthers(ticks) {
+        if (!this._multiplayer) {
+            return;
+        }
+        const others = this._roster.getAll().filter((player) => (player !== this._player)).map((player) => ({
+            id:     player.getId(),
+            state:  player.getCarState(),
+            camera: this._cameraOf(player.getId(), 0)
+        }));
+        if (this._carSounds !== null) {
+            this._carSounds.update(ticks, others);
+        }
+        this._tags.update(this._engine, others.map((car) => ({id: car.id, camera: this._cameraOf(car.id, RacingPresentation.TAG_HEIGHT)})));
+    }
+
+    // A point over a car where it was last placed, in camera space: [right, up, ahead], metres.
+    _cameraOf(id, height) {
+        const p = (this._positions.get(id) ?? [0, 0, 0]);
+        const m = this._engine.viewMatrix.v;
+        const y = (p[1] + height);
+
+        return [
+            ((m[0][0] * p[0]) + (m[1][0] * y) + (m[2][0] * p[2]) + m[3][0]),
+            ((m[0][1] * p[0]) + (m[1][1] * y) + (m[2][1] * p[2]) + m[3][1]),
+            ((m[0][2] * p[0]) + (m[1][2] * y) + (m[2][2] * p[2]) + m[3][2])
+        ];
     }
 
     // Frozen frame (pause): redrawn since a resize wipes the canvas, nothing moves.
@@ -311,6 +371,9 @@ class RacingPresentation {
             box.player   = player;
         } else if ((event.type === RacingTurnEvents.SOUND) && (event.playerId === this._player.getId())) {
             racingSound.send(event.command);
+        } else if ((event.type === RacingTurnEvents.SOUND) && (this._carSounds !== null) && RacingPresentation.CAR_SOUNDS.includes(event.command)
+            && (this._roster.getById(event.playerId) !== null)) {
+            this._carSounds.play(event.playerId, event.command, this._cameraOf(event.playerId, 0));
         }
     }
 
@@ -331,10 +394,13 @@ class RacingPresentation {
             course: ((selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
             manual: (selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL),
             map:    this._hudMap
-        }).bindPingSource(this._pingSource).bindOutcome(this._outcome);
+        }).bindPingSource(this._pingSource).bindOutcome(this._outcome, ((this._multiplayer) ? this._roster : null));
         this._screen.bindHud(this._hud);
         this._noticeEl = null;
         this.setNotice(this._noticeText);
+        if (this._tags !== null) {
+            this._tags.build(this._screen.getDisplay());
+        }
     }
 
     _wantedRenderer() {
@@ -428,7 +494,7 @@ class RacingPresentation {
 
     _placeCars(ticks) {
         for (const player of this._roster.getAll()) {
-            this._placeCar(ticks, player.getCarState(), this._cars.get(player.getId()), (player === this._player));
+            this._positions.set(player.getId(), this._placeCar(ticks, player.getCarState(), this._cars.get(player.getId()), (player === this._player)));
         }
     }
 
@@ -436,7 +502,7 @@ class RacingPresentation {
     // along (sin(-h), cos(-h)), the engine's yaw along (sin(yaw), cos(yaw)).
     // The height, smoothed by half a tick, lags up to a metre under a steep climb at full speed: the original paints the
     // car over the road, the depth buffer would hide it, so it is drawn on the road (user decision). The camera follows
-    // the viewed car.
+    // the viewed car. Returns where the car is drawn.
     _placeCar(ticks, state, view, viewed) {
         const side     = this._side;
         const position = [
@@ -458,6 +524,8 @@ class RacingPresentation {
         if (viewed) {
             this._camera.follow(ticks, position, yaw, pitch, roll, pose, this._cockpitLean(ticks, state, side));
         }
+
+        return position;
     }
 
     // Not in the original (user decision): the cockpit eye leans into the turn like on a motorbike, by the steering
@@ -514,3 +582,8 @@ RacingPresentation.RESULTS_ENGINE_SHARE        = 0.5;
 RacingPresentation.FINISH_VIEW                 = 1;
 // Road flag bit 4 under the car: a tunnel, the engine echoes.
 RacingPresentation.ROAD_TUNNEL                 = 0x10;
+// The noises of a car, heard from the other players' cars too (RacingCarPhysics): crash, skid, spin, wheelspin, wall,
+// sparks, contact, squeal and its cut, grass. The race's voices and music are each player's own.
+RacingPresentation.CAR_SOUNDS                  = ['B0', 'B1', 'B2', 'B4', 'B5', 'B7', 'B8', 'BD', 'C8', 'D2'];
+// Metres over a car's place where its nickname stands.
+RacingPresentation.TAG_HEIGHT                  = 1.6;

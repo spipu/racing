@@ -92,6 +92,12 @@ class RacingTranslations {
                 it: 'In attesa dell\'host',
                 es: 'Esperando al anfitrión'
             },
+            'hud.position': {
+                fr: 'Position',
+                en: 'Position',
+                it: 'Posizione',
+                es: 'Posición'
+            },
             'hud.finishIn': {
                 fr: 'Fin dans {seconds}',
                 en: 'Finish in {seconds}',

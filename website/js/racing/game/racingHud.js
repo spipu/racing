@@ -31,6 +31,7 @@ class RacingHud extends AbstractHud {
         this._map     = null;
         this._ping    = null;   // () => round trip in ms or null, during a session
         this._outcome = null;   // RacingRaceOutcome of a race of several players
+        this._roster  = null;   // the players of a race of several players, null alone
         this._els     = {};
         this._shown   = {};
         this._lapsShown = -1;
@@ -64,12 +65,15 @@ class RacingHud extends AbstractHud {
     }
 
     /**
-     * The time left after the first finish, shown to a player still racing (user decision).
+     * The time left after the first finish, shown to a player still racing, and the place among the cars on the track
+     * (user decisions), in a race of several players.
      *
-     * @param {RacingRaceOutcome|null} outcome
+     * @param {RacingRaceOutcome|null}  outcome
+     * @param {RacingPlayerRoster|null} roster  - null alone: no place shown
      */
-    bindOutcome(outcome) {
+    bindOutcome(outcome, roster) {
         this._outcome = outcome;
+        this._roster  = roster;
 
         return this;
     }
@@ -104,6 +108,10 @@ class RacingHud extends AbstractHud {
         }
 
         const status = this._add(left, 'racing-hud-block racing-hud-status');
+        els.placeRow = this._add(status, 'racing-hud-row');
+        this._add(els.placeRow, 'racing-hud-label', appTranslator.get('hud.position'));
+        els.place    = this._add(els.placeRow, 'racing-hud-value');
+        els.places   = this._add(els.placeRow, 'racing-hud-unit racing-hud-laps');
         const lapRow = this._add(status, 'racing-hud-row');
         this._add(lapRow, 'racing-hud-label', appTranslator.get('hud.laps'));
         els.lap      = this._add(lapRow, 'racing-hud-value');
@@ -169,6 +177,7 @@ class RacingHud extends AbstractHud {
         this._text('lapTime', RacingTime.format(race.lapMs));
         this._text('record', RacingTime.format((race.record === null) ? null : race.record.lapMs));
         this._updateLastLaps(race.lapTimes);
+        this._updatePlace(race);
         this._text('lap', String(Math.min((state.lap + 1), race.laps)));
         this._text('laps', '/' + race.laps);
         const mph = (racingSettings.getSpeedUnit() === RacingSettings.SPEED_UNIT_MPH);
@@ -215,6 +224,17 @@ class RacingHud extends AbstractHud {
     }
 
     // --- Parts ---
+
+    // "POSITION 2/4", known from the first step of the race.
+    _updatePlace(race) {
+        this._display('placeRow', (this._roster !== null));
+        if (this._roster === null) {
+            return;
+        }
+        const count = this._roster.getAll().filter((player) => (player.getRace() !== null)).length;
+        this._text('place', ((race.place > 0) ? String(race.place) : '-'));
+        this._text('places', '/' + count);
+    }
 
     _updateStart(race) {
         let sign = race.startSign;
