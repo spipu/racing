@@ -13,6 +13,14 @@ class RacingCarColors {
     }
 
     /**
+     * @param {int} slot
+     * @returns {string} the CSS colour of the slot (lobby)
+     */
+    static cssOfSlot(slot) {
+        return ('rgb(' + RacingCarColors.ofSlot(slot).join(', ') + ')');
+    }
+
+    /**
      * @param {string} car - car code
      * @returns {int[][]} [first, last] palette indexes of each ramp of the livery
      */

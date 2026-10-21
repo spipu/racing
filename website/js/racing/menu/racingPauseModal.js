@@ -1,7 +1,8 @@
 /**
  * Pause modal, shown by the race over its own frozen frame (modelled on
  * doom_js's MenuPauseModal). Title "{course} — {car}", navigable entries
- * (back to the race / restart the race / options / leave the race) and no
+ * (back to the race / restart the race / multiplayer, in a session the device
+ * hosts / options / leave the race) and no
  * bottom button: Backspace and the gamepad back button resume, the Escape and
  * pause toggle stays with the race, which only leaves the pause from its root:
  * the stacked options modal handles Escape itself as one step back.
@@ -19,6 +20,17 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         this._onQuit        = null;
         this._titleProvider = null;
         this._options       = null;
+        this._session       = null;     // see RacingHostedSession.pauseContext, null outside a session
+        this._multiplayer   = null;
+    }
+
+    /**
+     * @param {object|null} context - RacingHostedSession.pauseContext, null outside a session
+     */
+    setSessionContext(context) {
+        this._session = context;
+
+        return this;
     }
 
     setOnResume(callback) {
@@ -49,6 +61,9 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         const listEl  = AppMenuDom.addElement(modal, 'div', 'app-menu-list');
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.resume'), () => this._onResume());
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.restart'), () => this._confirmRestart());
+        if (this._inSession()) {
+            this._nav.addItemIn(listEl, appTranslator.get('multiplayer.pause.menu'), () => this._openMultiplayer());
+        }
         this._nav.addItemIn(listEl, appTranslator.get('menu.options'), () => this._openOptions());
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.quit'), () => this._onQuit());
 
@@ -72,6 +87,23 @@ class RacingPauseModal extends AppMenuAbstractListModal {
             this._options.setOnClose(null).close();
             this._options = null;
         }
+        if (this._multiplayer !== null) {
+            this._multiplayer.setOnClose(null).close();
+            this._multiplayer = null;
+        }
+    }
+
+    _inSession() {
+        return ((this._session !== null) && (this._session.getSession() !== null));
+    }
+
+    // Rebuilt when it closes: the session may have stopped.
+    _openMultiplayer() {
+        this._multiplayer = new RacingMultiplayerModal(this._display, this._session).setOnResume(() => this._onResume()).setOnClose(() => {
+            this._multiplayer = null;
+            this.show();
+        });
+        this._multiplayer.show();
     }
 
     _confirmRestart() {
@@ -80,7 +112,7 @@ class RacingPauseModal extends AppMenuAbstractListModal {
 
     // Rebuilt when the options close: a language change must reach the title and the entries.
     _openOptions() {
-        this._options = new RacingOptionsModal(this._display).setInGame(true).setOnClose(() => {
+        this._options = new RacingOptionsModal(this._display).setInGame(true).setRendererLocked(this._inSession()).setOnClose(() => {
             this._options = null;
             this.show();
         });

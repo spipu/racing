@@ -15,28 +15,29 @@ class RacingPresentation {
      * @param {{course: string, mirror: boolean, car: string, gearbox: string}} selection
      */
     constructor(selection) {
-        this._selection    = selection;
-        this._side         = ((selection.mirror) ? -1 : 1);
-        this._screen       = null;
-        this._engine       = null;
-        this._camera       = null;
-        this._car          = null;      // the viewed player's car
-        this._cars         = new Map(); // player id → RacingCarView, the viewed one included
-        this._players      = [];
-        this._objects      = null;
+        this._selection      = selection;
+        this._side           = ((selection.mirror) ? -1 : 1);
+        this._screen         = null;
+        this._engine         = null;
+        this._camera         = null;
+        this._car            = null;       // the viewed player's car
+        this._cars           = new Map();  // player id → RacingCarView, the viewed one included
+        this._roster         = null;
+        this._objects        = null;
         // By pit box: its index, its crew, the player whose car it works on, the schedule of a passage started this step
         // (until the car is placed), the voice of its gun's burst this frame.
-        this._crews        = [];
-        this._engineSound  = null;
-        this._hud          = null;
-        this._hudMap       = null;
-        this._instances    = [];
-        this._skyId        = null;
-        this._rendererCode = null;
-        this._eyeLean      = 0;
-        this._player       = null;
-        this._controls     = null;
-        this._viewWasDown  = true;      // a view button held as the race starts does not switch the view
+        this._crews          = [];
+        this._engineSound    = null;
+        this._hud            = null;
+        this._hudMap         = null;
+        this._instances      = [];
+        this._skyId          = null;
+        this._rendererCode   = null;
+        this._forcedRenderer = null;       // renderer imposed over the setting, null = the setting's
+        this._eyeLean        = 0;
+        this._player         = null;
+        this._controls       = null;
+        this._viewWasDown    = true;       // a view button held as the race starts does not switch the view
     }
 
     /**
@@ -51,15 +52,17 @@ class RacingPresentation {
     /**
      * Inside the loader batch: the scenery, the players' cars, the course's objects, the crew, the camera and the map.
      *
-     * @param {object}         data             - the exports of the course and of the game, and the race's players
-     * @param {object}         data.course
-     * @param {object}         data.cars
-     * @param {object}         data.palettes
-     * @param {object}         data.race
-     * @param {object}         data.physics
-     * @param {RacingPlayer[]} data.players     - in the race, the viewed one with its cockpit
-     * @param {RacingPlayer}   data.viewed
-     * @param {boolean}        data.multiplayer - the cars wear the colours of their slots
+     * @param {object}             data             - the exports of the course and of the game, and the race's players
+     * @param {object}             data.course
+     * @param {object}             data.cars
+     * @param {object}             data.palettes
+     * @param {object}             data.race
+     * @param {object}             data.physics
+     * @param {RacingPlayerRoster} data.roster      - the players of the race, the local one viewed with its cockpit
+     * @param {int[]}              data.slots       - the slots a car is built for: every slot of a session (a sub may
+     *                                                enter its lobby once the race is built, as doom builds the body of
+     *                                                every slot), the local player's alone
+     * @param {boolean}            data.multiplayer - the cars wear the colours of their slots
      */
     build(data) {
         const selection = this._selection;
@@ -76,22 +79,22 @@ class RacingPresentation {
             throw new Error('RacingPresentation - unknown car ' + selection.car);
         }
         const wheels  = new RacingWheelModels(data.cars, car);
-        this._players = data.players;
-        for (const player of data.players) {
+        const viewed  = data.roster.getLocal();
+        this._roster  = data.roster;
+        for (const slot of data.slots) {
             const palette = new RacingPalette(data.palettes, selection.course, selection.car);
             if (data.multiplayer) {
-                palette.paintLivery(RacingCarColors.liveryOf(selection.car), RacingCarColors.ofSlot(player.getId()));
+                palette.paintLivery(RacingCarColors.liveryOf(selection.car), RacingCarColors.ofSlot(slot));
             }
-            const viewed = (player === data.viewed);
-            this._cars.set(player.getId(), new RacingCarView(new RacingModelConverter(palette), data.cars, car, wheels, carScale, mirror, viewed));
+            this._cars.set(slot, new RacingCarView(new RacingModelConverter(palette), data.cars, car, wheels, carScale, mirror, (slot === viewed.getId())));
         }
-        this._car     = this._cars.get(data.viewed.getId());
+        this._car     = this._cars.get(viewed.getId());
         this._objects = new RacingCourseObjects(converter, data.course, carScale, mirror);
         const boxes   = RacingPitBoxes.of(data.race, selection.course, new RacingCourseCollision(data.course.collision), data.multiplayer);
         this._crews   = boxes.map((box, index) => ({
             index:    index,
             crew:     new RacingPitCrew(RacingGame.ASSETS, converter, wheels, data.race.pit, car, box.base, carScale, mirror),
-            player:   data.viewed,
+            player:   viewed,
             schedule: null,
             voice:    null,
         }));
@@ -142,13 +145,25 @@ class RacingPresentation {
     }
 
     /**
+     * A renderer imposed whatever the setting says (a multiplayer session renders with WebGL); the stored setting is
+     * left untouched and applies again once released. Applied on the next live frame.
+     *
+     * @param {string|null} code - null releases it
+     */
+    setForcedRenderer(code) {
+        this._forcedRenderer = code;
+
+        return this;
+    }
+
+    /**
      * The screen, the engine and the HUD built again when the renderer setting changed (in the pause options), since a
      * canvas keeps one context type for its whole life: applied on the first live frame no menu covers.
      *
      * @param {boolean} menuOpen - a menu still covers the screen
      */
     applyRendererSetting(menuOpen) {
-        if ((racingSettings.getRenderer() === this._rendererCode) || menuOpen) {
+        if ((this._wantedRenderer() === this._rendererCode) || menuOpen) {
             return;
         }
         this._screen.destroyContainer();
@@ -241,7 +256,7 @@ class RacingPresentation {
      */
     playTurnEvent(event) {
         if (event.type === RacingTurnEvents.CREW_STARTED) {
-            const player = this._players.find((candidate) => (candidate.getId() === event.playerId));
+            const player = this._roster.getById(event.playerId);
             const box    = this._crews[player.getCarState().pitBox];
             box.schedule = event.schedule;
             box.player   = player;
@@ -253,7 +268,7 @@ class RacingPresentation {
     // The screen, the engine and the HUD.
     _buildDisplay() {
         const selection    = this._selection;
-        this._rendererCode = racingSettings.getRenderer();
+        this._rendererCode = this._wantedRenderer();
         this._screen       = new ScreenManager('screen', {fullscreen: true, virtualWidth: RacingGame.VIRTUAL_WIDTH, virtualHeight: RacingGame.VIRTUAL_HEIGHT});
         this._engine       = new Engine3d(this._screen, new Object3dRendererList().getRenderer(this._rendererCode));
         this._engine.setFov(this._horizontalFov())
@@ -271,6 +286,10 @@ class RacingPresentation {
         this._screen.bindHud(this._hud);
     }
 
+    _wantedRenderer() {
+        return (this._forcedRenderer ?? racingSettings.getRenderer());
+    }
+
     _draw() {
         const engine = this._engine;
         engine.setCamera(this._camera);
@@ -281,9 +300,9 @@ class RacingPresentation {
         for (const box of this._crews) {
             this._drawInstances(box.crew.getInstances());
         }
-        for (const view of this._cars.values()) {
-            if (view !== this._car) {
-                this._drawInstances(view.getInstances());
+        for (const player of this._roster.getAll()) {
+            if (player !== this._player) {
+                this._drawInstances(this._cars.get(player.getId()).getInstances());
             }
         }
         // The original has no depth buffer and paints the cockpit last: it stays over the road it dips into. In its own
@@ -313,7 +332,7 @@ class RacingPresentation {
     // add up), heard on the viewed car only. Away, it is back to its first pose.
     _updateCrew(box, ticks) {
         const state = box.player.getCarState();
-        const shown = ((state.pitCrewFrame >= 0) && (state.pitBox === box.index));
+        const shown = ((this._roster.getById(box.player.getId()) !== null) && (state.pitCrewFrame >= 0) && (state.pitBox === box.index));
         if (!shown && box.crew.isStarted()) {
             box.crew.reset();
         }
@@ -357,7 +376,7 @@ class RacingPresentation {
     }
 
     _placeCars(ticks) {
-        for (const player of this._players) {
+        for (const player of this._roster.getAll()) {
             this._placeCar(ticks, player.getCarState(), this._cars.get(player.getId()), (player === this._player));
         }
     }

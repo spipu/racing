@@ -20,6 +20,48 @@ class RacingTranslations {
                 it: 'Giri migliori',
                 es: 'Mejores vueltas'
             },
+            'menu.multiplayer': {
+                fr: 'Multijoueur',
+                en: 'Multiplayer',
+                it: 'Multigiocatore',
+                es: 'Multijugador'
+            },
+            'multiplayer.create': {
+                fr: 'Créer une course',
+                en: 'Create a race',
+                it: 'Crea una gara',
+                es: 'Crear una carrera'
+            },
+            'multiplayer.options': {
+                fr: 'Options multijoueur',
+                en: 'Multiplayer options',
+                it: 'Opzioni multigiocatore',
+                es: 'Opciones multijugador'
+            },
+            'multiplayer.pause.menu': {
+                fr: 'Multijoueur',
+                en: 'Multiplayer',
+                it: 'Multigiocatore',
+                es: 'Multijugador'
+            },
+            'multiplayer.pause.lobby': {
+                fr: 'Salon',
+                en: 'Lobby',
+                it: 'Sala',
+                es: 'Sala'
+            },
+            'multiplayer.pause.stop': {
+                fr: 'Arrêter le multijoueur',
+                en: 'Stop multiplayer',
+                it: 'Interrompi il multigiocatore',
+                es: 'Detener el multijugador'
+            },
+            'multiplayer.pause.stopConfirm': {
+                fr: 'Arrêter le multijoueur ?\nTous les joueurs seront déconnectés.',
+                en: 'Stop multiplayer?\nEvery player will be disconnected.',
+                it: 'Interrompere il multigiocatore?\nTutti i giocatori saranno disconnessi.',
+                es: '¿Detener el multijugador?\nTodos los jugadores serán desconectados.'
+            },
             'records.resetAll': {
                 fr: 'Tout réinitialiser',
                 en: 'Reset all',

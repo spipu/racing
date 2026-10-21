@@ -11,6 +11,9 @@ class MainMenuScreen extends AbstractRacingMenuScreen {
         this._addListItem(listEl, appTranslator.get('menu.bestLaps'), () => {
             this._navigator.openBestLaps();
         });
+        this._addListItem(listEl, appTranslator.get('menu.multiplayer'), () => {
+            this._navigator.openMultiplayer();
+        });
         this._addListItem(listEl, appTranslator.get('menu.options'), () => {
             this._openModal(new RacingOptionsModal(this._display)).show();
         });

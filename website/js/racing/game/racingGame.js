@@ -5,15 +5,19 @@
  * itself, and the best times of this device's own player — driven on the role of the device (RacingMainRole simulates
  * the race), never on which it is. The local player's commands are sampled from the controls (RacingControls,
  * RacingCommandSampler); the one-shot events of the race reach the presentation (RacingPresentation) as they come.
+ * A race the device hosts a session for (RacingHostedSession) is built for every slot, renders with WebGL and shows
+ * frozen under its start lobby until Start; its pause reaches the session.
  */
 class RacingGame {
     /**
      * @param {RacingMenuNavigator} navigator
      * @param {{course: string, mirror: boolean, car: string, gearbox: string}} selection
+     * @param {RacingHostedSession|null} hosted - the session this device hosts, null for a race alone
      */
-    constructor(navigator, selection) {
+    constructor(navigator, selection, hosted = null) {
         this._navigator       = navigator;
         this._selection       = selection;
+        this._hosted          = hosted;
         this._roster          = new RacingPlayerRoster().setLocal(new RacingPlayer(RacingGame.LOCAL_PLAYER_ID));
         this._turnEvents      = new RacingTurnEvents();
         this._role            = new RacingMainRole(this._roster, this._turnEvents);
@@ -24,6 +28,7 @@ class RacingGame {
         this._resultsDisplay  = null;
         this._running         = false;
         this._paused          = false;
+        this._frozen          = false;
         this._pauseWasDown    = true;
         this._pauseDisplay    = null;
         this._pauseModal      = null;
@@ -50,12 +55,12 @@ class RacingGame {
             racingSound.loadAsync()
         ]);
 
-        const players     = this._roster.getAll();
-        const multiplayer = (players.length > 1);
+        const multiplayer = (this._hosted !== null);
         const laps        = ((multiplayer) ? racingSettings.getMultiplayerLaps() : racingSettings.getSoloLaps());
+        const slots       = ((multiplayer) ? Array.from({length: RacingHostedSession.CAPACITY}, (unused, i) => (i + RacingPlayer.MAIN_ID)) : [RacingGame.LOCAL_PLAYER_ID]);
         loader.reset();
         loader.beginBatch();
-        this._presentation.build({course, cars, palettes, race, physics, players, viewed: this._roster.getLocal(), multiplayer});
+        this._presentation.build({course, cars, palettes, race, physics, roster: this._roster, slots, multiplayer});
         this._role.adoptRace({course, race, physics, multiplayerGrids, selection, multiplayer, laps, lapJingles: racingSound.laps},
             (result) => this._guard(this._finish, result), (lap) => this._saveRecord(lap.lapMs, null, lap.checkpointsMs));
         this._role.enterRace(((best !== null) && (best.lapMs !== null)) ? {lapMs: best.lapMs, checkpointsMs: (best.checkpointsMs ?? [null, null])} : null);
@@ -77,9 +82,40 @@ class RacingGame {
         this._navigator.endRace();
     }
 
+    getRole() {
+        return this._role;
+    }
+
+    getRoster() {
+        return this._roster;
+    }
+
+    // Under the start lobby: nothing moves, the pause does not open.
+    freeze() {
+        this._frozen = true;
+        this._controls.setVirtualPadVisible(false);
+    }
+
+    unfreeze() {
+        this._frozen       = false;
+        this._pauseWasDown = true;
+        this._presentation.getEngine().resetDeltaClock();
+        this._controls.setVirtualPadVisible(true);
+    }
+
+    // The session stopped from the pause: the race goes on alone.
+    sessionStopped() {
+        this._hosted = null;
+        this._presentation.setForcedRenderer(null);
+        this._navigator.sessionStopped();
+    }
+
     // The race scene, its pause menu and its listener go: the menus come back.
     _teardown() {
         this._running = false;
+        if (this._hosted !== null) {
+            this._hosted.detach();
+        }
         if (this._pauseModal !== null) {
             this._closePause();
         }
@@ -95,6 +131,9 @@ class RacingGame {
     }
 
     _begin(skyId) {
+        if (this._hosted !== null) {
+            this._presentation.setForcedRenderer(RacingGame.SESSION_RENDERER);
+        }
         this._presentation.showRace(skyId, this._roster.getLocal());
         this._controls       = new RacingControls(this._presentation.getDisplay(), (this._selection.gearbox === RacingMenuNavigator.GEARBOX_MANUAL));
         this._commandSampler = new RacingCommandSampler(this._controls);
@@ -102,6 +141,12 @@ class RacingGame {
         this._running        = true;
         // Driven with a gamepad, the screen gets no touch to keep it awake.
         new ScreenWakeLock().init();
+        if (this._hosted !== null) {
+            this._hosted.attach(this).showStartLobby(() => {
+                this._teardown();
+                this._navigator.leaveSessionStart(this._selection);
+            });
+        }
         requestAnimationFrame(this._animateCallback);
     }
 
@@ -109,7 +154,7 @@ class RacingGame {
 
     // From the root of the pause only: the stacked options handle Escape as one step back.
     _togglePause() {
-        if (!this._running || (this._results !== null)) {
+        if (!this._running || (this._results !== null) || this._frozen) {
             return;
         }
         if (!this._paused) {
@@ -131,6 +176,7 @@ class RacingGame {
             .setOnResume(() => this._leavePause())
             .setOnRestart(() => this._restart())
             .setOnQuit(() => this.quit())
+            .setSessionContext((this._hosted !== null) ? this._hosted.pauseContext() : null)
             .show(() => this._pauseTitle());
     }
 
@@ -243,8 +289,8 @@ class RacingGame {
             this._togglePause();
         }
         this._pauseWasDown = pauseDown;
-        // Frozen under the pause; the race goes on under the results.
-        if (this._paused) {
+        // Frozen under the pause and the start lobby; the race goes on under the results.
+        if (this._paused || this._frozen) {
             this._presentation.presentFrozen();
             requestAnimationFrame(this._animateCallback);
             return;
@@ -273,3 +319,5 @@ RacingGame.VIRTUAL_HEIGHT                = 1080;
 RacingGame.METRES_PER_ENTITY_UNIT        = (RacingGame.SCENERY_UNITS_PER_ENTITY_UNIT / RacingGame.SCENERY_UNITS_PER_METRE);
 RacingGame.METRES_PER_HEIGHT_UNIT        = (1 / (RacingGame.HEIGHT_UNITS_PER_SCENERY_UNIT * RacingGame.SCENERY_UNITS_PER_METRE));
 RacingGame.LOCAL_PLAYER_ID               = RacingPlayer.MAIN_ID;
+// A multiplayer session renders with WebGL, as doom_js.
+RacingGame.SESSION_RENDERER              = 'webgl';

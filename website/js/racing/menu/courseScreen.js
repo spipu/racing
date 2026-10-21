@@ -19,6 +19,6 @@ class CourseScreen extends AbstractRacingMenuScreen {
     }
 
     _onBack() {
-        this._navigator.showMainMenu();
+        this._navigator.leaveCourses();
     }
 }

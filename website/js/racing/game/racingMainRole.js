@@ -1,8 +1,8 @@
 /**
  * The role of the device that simulates the race — the only one in a race alone, the main in a session. RacingGame
  * runs the flow every device shares and asks its role to move the race each frame; this role owns the simulation
- * (RacingSimulation) and everything only the simulating device does: the players entering the race, the commands
- * they drive with. A device that only follows the race will hold another role.
+ * (RacingSimulation) and everything only the simulating device does: the players entering the race — the subs of
+ * its session as they join its lobby, leaving it with their link —, the commands they drive with. A device that only follows the race will hold another role.
  */
 class RacingMainRole extends AbstractRacingRole {
     /**
@@ -33,6 +33,34 @@ class RacingMainRole extends AbstractRacingRole {
         for (const player of players) {
             this._simulation.addPlayer(player, ((player === this._roster.getLocal()) ? record : null));
         }
+    }
+
+    /**
+     * A sub of the session enters the race on its slot's place, before the start.
+     *
+     * @param {int} id - its slot
+     */
+    addPlayer(id) {
+        if (this._roster.getById(id) !== null) {
+            return;
+        }
+        const player = new RacingPlayer(id);
+        this._roster.add(player);
+        this._simulation.addPlayer(player, null);
+    }
+
+    /**
+     * A sub left the session: its car leaves the track.
+     *
+     * @param {int} id
+     */
+    removePlayer(id) {
+        const player = this._roster.getById(id);
+        if ((player === null) || (player === this._roster.getLocal())) {
+            return;
+        }
+        this._simulation.removePlayer(player);
+        this._roster.remove(id);
     }
 
     /**

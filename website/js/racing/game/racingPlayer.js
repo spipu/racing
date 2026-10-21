@@ -30,6 +30,14 @@ class RacingPlayer {
         return this;
     }
 
+    // Its car leaves the track.
+    leaveRace() {
+        this._physics = null;
+        this._race    = null;
+
+        return this;
+    }
+
     /**
      * @returns {RacingCarPhysics|null} null before the race, or where the race is not simulated
      */

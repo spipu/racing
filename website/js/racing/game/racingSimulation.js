@@ -100,6 +100,19 @@ class RacingSimulation {
         return this;
     }
 
+    /**
+     * Takes the player's car off the track (a sub gone).
+     *
+     * @param {RacingPlayer} player
+     */
+    removePlayer(player) {
+        this._pitWork.delete(player.getId());
+        this._previous.delete(player.getId());
+        player.leaveRace();
+
+        return this;
+    }
+
     // [x, height, z, heading] in entity units: the Time Attack's place alone, else the slot's place of the grid of 8.
     _startPlace(player) {
         const {race, multiplayerGrids, selection, multiplayer} = this._data;

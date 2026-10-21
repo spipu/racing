@@ -11,9 +11,10 @@ class RacingOptionsModal extends AppMenuSettingsModal {
     constructor(display) {
         super(display, racingSettings);
 
-        this._gamepad      = new AppInputGamepad();
-        this._shownDevices = null;
-        this._inGame       = false;
+        this._gamepad        = new AppInputGamepad();
+        this._shownDevices   = null;
+        this._inGame         = false;
+        this._rendererLocked = false;
     }
 
     // Opened from the race pause: the multiplayer settings are left out, as doom_js does in game.
@@ -23,8 +24,24 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         return this;
     }
 
+    /**
+     * In a multiplayer session the renderer is WebGL whatever the setting: it is not offered, as doom_js does.
+     *
+     * @param {boolean} locked
+     */
+    setRendererLocked(locked) {
+        this._rendererLocked = (locked === true);
+
+        return this;
+    }
+
     show() {
         return this._open(false, 'menu.options', () => this._buildRoot());
+    }
+
+    // The multiplayer settings alone, from the Multiplayer screen and the pause's Multiplayer menu.
+    showMultiplayer() {
+        return this._open(true, 'multiplayer.options', () => this._buildSettingsList(racingSettings.getDefinitions('multiplayer.')));
     }
 
     showHelp() {
@@ -47,7 +64,9 @@ class RacingOptionsModal extends AppMenuSettingsModal {
     }
 
     _addTopic(list, titleCode, prefix) {
-        this._nav.addItemIn(list, appTranslator.get(titleCode), () => this._pushPage(titleCode, () => this._buildSettingsList(racingSettings.getDefinitions(prefix))));
+        const definitions = () => racingSettings.getDefinitions(prefix)
+            .filter((definition) => (!this._rendererLocked || (definition.key !== RacingOptionsModal.RENDERER_KEY)));
+        this._nav.addItemIn(list, appTranslator.get(titleCode), () => this._pushPage(titleCode, () => this._buildSettingsList(definitions())));
     }
 
     // The device line, then the settings of the device in use; the page follows a gamepad plugged in or out.
@@ -142,6 +161,7 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 }
 
 RacingOptionsModal.DEVICE_REFRESH_MS = 500;
+RacingOptionsModal.RENDERER_KEY      = 'display.renderer';
 // The help page: each heading and its lines.
 RacingOptionsModal.HELP = [
     ['help.race', ['help.race.solo', 'help.race.laps']],
