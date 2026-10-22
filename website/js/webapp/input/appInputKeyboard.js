@@ -3,7 +3,8 @@ let AppInputKeyboard_private = null;
 /**
  * Physical keyboard state, read by `KeyboardEvent.code` (layout independent:
  * WASD = ZQSD on AZERTY), plus an optional action table (setActionDefaults /
- * setMapping) so a page reads actions the player can rebind.
+ * setMapping, more actions added by addActionDefaults) so a page reads
+ * actions the player can rebind.
  *
  * Soft singleton: `new AppInputKeyboard()` returns the page instance, its listeners
  * living as long as the page.
@@ -15,9 +16,10 @@ class AppInputKeyboard {
         }
         AppInputKeyboard_private = this;
 
-        this._keys     = new Set();
-        this._defaults = {};
-        this._mapping  = {};
+        this._keys      = new Set();
+        this._defaults  = {};
+        this._overrides = {};
+        this._mapping   = {};
 
         document.addEventListener('keydown', (e) => {
             this._keys.add(e.code);
@@ -51,8 +53,22 @@ class AppInputKeyboard {
      * @param {object} defaults - {action: code}
      */
     setActionDefaults(defaults) {
-        this._defaults = Object.assign({}, defaults);
-        this._mapping  = Object.assign({}, defaults);
+        this._defaults  = Object.assign({}, defaults);
+        this._overrides = {};
+        this._mapping   = Object.assign({}, defaults);
+
+        return this;
+    }
+
+    /**
+     * More actions beside the page's, with their default key ('' = unmapped).
+     * The player's choices already given are applied to them too.
+     *
+     * @param {object} defaults - {action: code}
+     */
+    addActionDefaults(defaults) {
+        Object.assign(this._defaults, defaults);
+        this._mapping = AppInputMapping.merge(this._defaults, this._overrides);
 
         return this;
     }
@@ -61,7 +77,8 @@ class AppInputKeyboard {
      * @param {object} mapping - {action: code}, '' unmapping the action
      */
     setMapping(mapping) {
-        this._mapping = AppInputMapping.merge(this._defaults, mapping);
+        this._overrides = Object.assign({}, mapping);
+        this._mapping   = AppInputMapping.merge(this._defaults, this._overrides);
 
         return this;
     }

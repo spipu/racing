@@ -193,6 +193,19 @@ class Inputs {
         return this;
     }
 
+    // A game's own keyboard actions beside the FPS ones ({action: code},
+    // '' = unmapped), rebound by setKeyMapping like them.
+    addKeyboardActions(defaults) {
+        this._keyboard.addActionDefaults(defaults);
+        return this;
+    }
+
+    // True while the key bound to a keyboard action is held, a game's own
+    // actions included ('' or unknown: never).
+    readKeyboardAction(action) {
+        return this._keyboard.readAction(action);
+    }
+
     // Optional gamepad button rebinding ({action: index|null}, see
     // InputGamepad.DEFAULT_MAPPING): actions left out keep their defaults.
     setGamepadButtonMapping(mapping) {
