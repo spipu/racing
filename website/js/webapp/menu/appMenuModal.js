@@ -84,6 +84,33 @@ class AppMenuModal {
     }
 
     /**
+     * Small notice modal: the final message of an operation (success or
+     * error) and a single "Close" button. The overlay click dismisses it too.
+     *
+     * @param {string}        message
+     * @param {boolean}       isError
+     * @param {function|null} onClose
+     */
+    notice(message, isError = false, onClose = null) {
+        const messageClass = 'app-menu-modal-message' + ((isError) ? ' app-menu-modal-error' : '');
+        const {modal}      = this._createShell(message, 'app-menu-modal', messageClass);
+
+        const actions = AppMenuDom.addElement(modal, 'div', 'app-menu-modal-actions');
+        const dismiss = () => {
+            this.close();
+            if (onClose !== null) {
+                onClose();
+            }
+        };
+
+        const button = AppMenuDom.addButton(actions, 'app-menu-button', appTranslator.get('menu.close'), dismiss);
+        this._attachButtonsNav([button], button, 0);
+        this._dismissOnOverlayClick(dismiss);
+
+        return this;
+    }
+
+    /**
      * Error modal: a prominent centred message plus an optional technical detail
      * (e.g. the top of a stack trace) and a single dismiss button.
      *
