@@ -17,7 +17,7 @@ class MultiplayerScreen extends AbstractRacingMenuScreen {
     }
 
     _build() {
-        const {panel, listEl} = this._buildPanel(appTranslator.get('menu.multiplayer'));
+        const {listEl} = this._buildSimpleMenu(appTranslator.get('menu.multiplayer'));
 
         const create = this._addListItem(listEl, appTranslator.get('multiplayer.create'), () => {
             AppMenuNetGate.enter(this._display, () => this._availability.unavailableReason(), racingSettings,
@@ -27,7 +27,7 @@ class MultiplayerScreen extends AbstractRacingMenuScreen {
         this._addListItem(listEl, appTranslator.get('multiplayer.options'), () => {
             this._openModal(new RacingOptionsModal(this._display)).showMultiplayer();
         });
-        this._addBackButton(panel);
+        this._nav.setBackTarget(this._nav.addItemIn(listEl, appTranslator.get('menu.back'), () => this._onBack()));
         this._nav.selectFirst();
         for (const item of [create, join]) {
             AppMenuNetGate.greyWhenUnavailable(item, () => this._availability.unavailableReason());

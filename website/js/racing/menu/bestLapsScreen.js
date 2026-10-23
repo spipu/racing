@@ -1,9 +1,10 @@
 /**
  * Best laps of this device: one row per course (every course, then every
  * mirrored one), one column per car. Only the cross of a row clears that
- * course, after a confirmation: the crosses are the entries of the
- * navigation (keyboard, gamepad), the rows are not; the bottom row resets them
- * all.
+ * course, after a confirmation (user decision): the crosses are the entries of
+ * the navigation (keyboard, gamepad), and a click, a tap or the mouse on a row
+ * only selects its cross — the row is highlighted, nothing is cleared. The
+ * bottom row holds Reset all, then Back.
  */
 class BestLapsScreen extends AbstractRacingMenuScreen {
     _build() {
@@ -21,24 +22,30 @@ class BestLapsScreen extends AbstractRacingMenuScreen {
         AppMenuDom.addText(header, 'racing-best-laps-reset', '');
 
         const cells = new Map();
+        let index   = 0;
         for (const mirror of [false, true]) {
             for (const course of racingCatalog.getCourses()) {
                 const label = ((mirror) ? appTranslator.get('course.mirror', {course: course.name}) : course.name);
-                const item  = AppMenuDom.addElement(listEl, 'div', 'app-menu-item racing-best-laps-row racing-best-laps-line');
-                AppMenuDom.addText(item, 'app-menu-item-label racing-best-laps-course', label);
+                const row   = AppMenuDom.addElement(listEl, 'div', 'app-menu-item racing-best-laps-row');
+                AppMenuDom.addText(row, 'app-menu-item-label racing-best-laps-course', label);
                 for (const car of cars) {
-                    cells.set(BestLapsScreen._key(course.code, mirror, car.code), AppMenuDom.addText(item, 'racing-best-laps-time', RacingTime.NONE));
+                    cells.set(BestLapsScreen._key(course.code, mirror, car.code), AppMenuDom.addText(row, 'racing-best-laps-time', RacingTime.NONE));
                 }
-                const reset = AppMenuDom.addDeleteButton(item, appTranslator.get('records.resetCourse'), () => this._confirmClear(course.code, mirror, label));
+                const reset = AppMenuDom.addDeleteButton(row, appTranslator.get('records.resetCourse'), () => this._confirmClear(course.code, mirror, label));
                 reset.classList.add('racing-best-laps-reset');
                 this._nav.addButtonItem(reset);
+                const crossIndex = index++;
+                // The cross stops its own click: a click on the row is the rest of it, which only selects.
+                row.addEventListener('click', () => this._nav.selectIndex(crossIndex));
+                row.addEventListener('mousemove', () => this._nav.selectIndex(crossIndex));
             }
         }
 
-        const actions = this._addElement('div', 'app-menu-actions', panel);
-        const back    = this._addButton(appTranslator.get('menu.back'), () => this._onBack(), actions);
-        const all     = this._addButton(appTranslator.get('records.resetAll'), () => this._confirmClearAll(), actions);
-        this._nav.setBottomButtons([back, all]);
+        const actions  = this._addElement('div', 'app-menu-actions app-menu-actions-split', panel);
+        const resetAll = this._addButton(appTranslator.get('records.resetAll'), () => this._confirmClearAll(), actions);
+        const back     = this._addButton(appTranslator.get('menu.back'), () => this._onBack(), actions);
+        resetAll.classList.add('app-menu-button-secondary');
+        this._nav.setBottomButtons([resetAll, back], back);
 
         this._nav.selectFirst();
         this._fill(cells);
@@ -66,13 +73,13 @@ class BestLapsScreen extends AbstractRacingMenuScreen {
     _confirmClear(course, mirror, label) {
         new AppMenuModal(this._display).confirm(appTranslator.get('records.resetCourseConfirm', {course: label}), () => {
             racingBestTimes.clearCourse(course, mirror).then(() => this.show(), (error) => this._failed(error));
-        }, null, appTranslator.get('menu.back'));
+        }, null, null, true, appTranslator.get('records.resetDetail'));
     }
 
     _confirmClearAll() {
         new AppMenuModal(this._display).confirm(appTranslator.get('records.resetAllConfirm'), () => {
             racingBestTimes.clearAll().then(() => this.show(), (error) => this._failed(error));
-        }, null, appTranslator.get('menu.back'));
+        }, null, null, true, appTranslator.get('records.resetDetail'));
     }
 
     _failed(error) {

@@ -18,13 +18,18 @@ class AppMenuModal {
      * @param {function}    onConfirm
      * @param {string|null} confirmLabel
      * @param {string|null} cancelLabel
+     * @param {boolean}     destructive - an action that destroys data opens on the cancel button
+     * @param {string|null} detail      - what the action does, on its own line under the question
      */
-    confirm(message, onConfirm, confirmLabel = null, cancelLabel = null) {
+    confirm(message, onConfirm, confirmLabel = null, cancelLabel = null, destructive = false, detail = null) {
         AppMenuSound.play(AppMenuSound.PROMPT);
         confirmLabel = (confirmLabel ?? appTranslator.get('menu.confirm'));
-        cancelLabel  = (cancelLabel ?? appTranslator.get('menu.cancel'));
+        cancelLabel  = (cancelLabel ?? appTranslator.get('menu.back'));
 
-        const {modal} = this._createShell(message, 'app-menu-modal', 'app-menu-modal-message');
+        const {modal} = this._createShell(message, 'app-menu-modal app-menu-modal-fit app-menu-modal-confirm', 'app-menu-modal-message app-menu-modal-question');
+        if (detail !== null) {
+            AppMenuDom.addText(modal, 'app-menu-modal-message', detail);
+        }
 
         const actions = AppMenuDom.addElement(modal, 'div', 'app-menu-modal-actions');
 
@@ -37,9 +42,41 @@ class AppMenuModal {
             onConfirm();
         });
 
-        // Confirm preselected (the user just asked for the action); every
-        // back input plays the cancel button.
-        this._attachButtonsNav([cancelButton, confirmButton], cancelButton, 1);
+        // Confirm preselected (the user just asked for the action), unless it
+        // destroys data; every back input plays the cancel button.
+        this._attachButtonsNav([cancelButton, confirmButton], cancelButton, ((destructive) ? 0 : 1));
+        this._dismissOnOverlayClick(() => this.close());
+
+        return this;
+    }
+
+    /**
+     * Choice between a few tiles (an icon of appMenu.css, a label, a line of explanation) above a Back button. The
+     * modal stays open on a choice: its action closes it or replaces its content.
+     *
+     * @param {string}                                                         title
+     * @param {{icon: string, label: string, hint: string, action: function}[]} choices
+     */
+    choose(title, choices) {
+        const {modal} = this._createShell(title, 'app-menu-modal app-menu-modal-choice', 'app-menu-modal-message app-menu-modal-title');
+        const row     = AppMenuDom.addElement(modal, 'div', 'app-menu-tiles');
+        const tiles   = choices.map((choice) => {
+            const tile = AppMenuDom.addIconButton(row, 'app-menu-button app-menu-button-secondary app-menu-tile', choice.icon, '', choice.action);
+            AppMenuDom.addText(tile, 'app-menu-tile-label', choice.label);
+            AppMenuDom.addText(tile, 'app-menu-tile-hint', choice.hint);
+
+            return tile;
+        });
+        const actions = AppMenuDom.addElement(modal, 'div', 'app-menu-modal-actions');
+        const back    = AppMenuDom.addButton(actions, 'app-menu-button app-menu-button-secondary', appTranslator.get('menu.back'), () => this.close());
+
+        this._nav = new AppMenuListNavigation(() => back.click(), () => !this._isTopOverlay())
+            .setEscapeAsBack(true)
+            .setGrid([...tiles.map((tile, index) => ({row: 0, column: index, span: 1})), {row: 1, column: 0, span: tiles.length}]);
+        for (const button of [...tiles, back]) {
+            this._nav.addButtonItem(button);
+        }
+        this._nav.attach().selectIndex(0);
         this._dismissOnOverlayClick(() => this.close());
 
         return this;
@@ -52,7 +89,7 @@ class AppMenuModal {
      * @param {string} message
      */
     showLoading(message) {
-        this._createShell(message, 'app-menu-modal',
+        this._createShell(message, 'app-menu-modal app-menu-modal-fit',
             'app-menu-modal-message app-menu-modal-loading');
 
         return this;
@@ -66,7 +103,7 @@ class AppMenuModal {
      * @param {function|null} onClose
      */
     info(message, onClose = null) {
-        const {modal} = this._createShell(message, 'app-menu-modal', 'app-menu-modal-message');
+        const {modal} = this._createShell(message, 'app-menu-modal app-menu-modal-fit', 'app-menu-modal-message');
 
         const actions = AppMenuDom.addElement(modal, 'div', 'app-menu-modal-actions');
         const dismiss = () => {
@@ -93,7 +130,7 @@ class AppMenuModal {
      */
     notice(message, isError = false, onClose = null) {
         const messageClass = 'app-menu-modal-message' + ((isError) ? ' app-menu-modal-error' : '');
-        const {modal}      = this._createShell(message, 'app-menu-modal', messageClass);
+        const {modal}      = this._createShell(message, 'app-menu-modal app-menu-modal-fit', messageClass);
 
         const actions = AppMenuDom.addElement(modal, 'div', 'app-menu-modal-actions');
         const dismiss = () => {

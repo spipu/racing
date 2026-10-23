@@ -41,10 +41,10 @@ class RacingStandingsModal extends AppMenuAbstractListModal {
      */
     show(title, source) {
         this._source = source;
-        const {modal} = this._createShell(title, 'app-menu-modal app-menu-modal-wide racing-results', 'app-menu-subtitle');
+        const {modal} = this._createShell(title, 'app-menu-modal app-menu-modal-wide racing-results', 'app-menu-modal-message app-menu-modal-title');
         this._tableEl  = AppMenuDom.addElement(modal, 'div', 'racing-standings-table');
         this._statusEl = AppMenuDom.addElement(modal, 'div', 'app-menu-status');
-        this._listEl   = AppMenuDom.addElement(modal, 'div', 'app-menu-list');
+        this._listEl   = AppMenuDom.addElement(modal, 'div', 'app-menu-list app-menu-list-simple');
         this._nav.attach();
         this.refresh();
 

@@ -66,6 +66,25 @@ class AppMenuAbstractListModal extends AppMenuModal {
         return {titleEl: messageEl, bodyEl: bodyEl, button: button};
     }
 
+    /**
+     * Simple menu shell, without a box (a pause menu over the game): a centred header (title and an optional
+     * subtitle line) above a centred column of entries.
+     *
+     * @param {string}      title
+     * @param {string|null} subtitle
+     */
+    _openSimpleShell(title, subtitle = null) {
+        const {modal, messageEl} = this._createShell(title, 'app-menu-modal-simple', 'app-menu-header-title');
+        this._overlay.classList.add('app-menu-overlay-simple');
+        const header = AppMenuDom.addElement(modal, 'div', 'app-menu-header');
+        header.appendChild(messageEl);
+        const subtitleEl = AppMenuDom.addText(header, 'app-menu-header-subtitle', (subtitle ?? ''));
+        const listEl     = AppMenuDom.addElement(modal, 'div', 'app-menu-list app-menu-list-simple');
+        this._nav.attach();
+
+        return {titleEl: messageEl, subtitleEl: subtitleEl, listEl: listEl};
+    }
+
     // Extra teardown of a subclass (timers, key capture, stacked children).
     _teardown() {
     }
@@ -80,7 +99,7 @@ class AppMenuAbstractListModal extends AppMenuModal {
 
     // Nested confirmation stacked above this modal (its overlay suspends our
     // navigation through the top-overlay rule).
-    _confirm(message, onConfirm, confirmLabel = null, cancelLabel = null) {
-        return new AppMenuModal(this._display).confirm(message, onConfirm, confirmLabel, cancelLabel);
+    _confirm(message, onConfirm, confirmLabel = null, cancelLabel = null, destructive = false, detail = null) {
+        return new AppMenuModal(this._display).confirm(message, onConfirm, confirmLabel, cancelLabel, destructive, detail);
     }
 }

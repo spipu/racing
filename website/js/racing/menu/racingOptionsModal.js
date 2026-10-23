@@ -1,8 +1,9 @@
 /**
- * Options modal of the menus: show() opens the options root (settings topics,
- * controls, reset), showHelp() opens the standalone help page. Adds to
- * AppMenuSettingsModal the Controls page (device choice, then the settings of
- * the device in use; their key, button and axis captures are the socle's).
+ * Options modal of the menus: show() opens the tabs (display, race, sound,
+ * multiplayer outside a race, controls) with the reset button, showHelp()
+ * opens the standalone help page. Adds to AppMenuSettingsModal the Controls
+ * tab (device choice, then the settings of the device in use; their key,
+ * button and axis captures are the socle's).
  */
 class RacingOptionsModal extends AppMenuSettingsModal {
     /**
@@ -36,7 +37,17 @@ class RacingOptionsModal extends AppMenuSettingsModal {
     }
 
     show() {
-        return this._open(false, 'menu.options', () => this._buildRoot());
+        const tabs = [
+            this._settingsTab('options.display', 'display.'),
+            this._settingsTab('options.race', 'race.'),
+            this._settingsTab('options.sound', 'sound.')
+        ];
+        if (!this._inGame) {
+            tabs.push(this._settingsTab('options.multiplayer', 'multiplayer.'));
+        }
+        tabs.push({titleCode: 'options.controls', builder: () => this._buildControls()});
+
+        return this._openTabs('menu.options', tabs, {labelCode: 'options.reset', action: () => this._confirmReset()});
     }
 
     // The multiplayer settings alone, from the Multiplayer screen and the pause's Multiplayer menu.
@@ -50,23 +61,9 @@ class RacingOptionsModal extends AppMenuSettingsModal {
 
     // --- Pages ---
 
-    _buildRoot() {
-        const list = this._addList();
-        this._addTopic(list, 'options.display', 'display.');
-        this._addTopic(list, 'options.race', 'race.');
-        this._addTopic(list, 'options.sound', 'sound.');
-        if (!this._inGame) {
-            this._addTopic(list, 'options.multiplayer', 'multiplayer.');
-        }
-        this._nav.addItemIn(list, appTranslator.get('options.controls'), () => this._pushPage('options.controls', () => this._buildControls()));
-        this._nav.addItemIn(list, appTranslator.get('options.reset'), () => this._confirmReset());
-        this._nav.selectFirst();
-    }
-
-    _addTopic(list, titleCode, prefix) {
-        const definitions = () => racingSettings.getDefinitions(prefix)
-            .filter((definition) => (!this._rendererLocked || (definition.key !== RacingOptionsModal.RENDERER_KEY)));
-        this._nav.addItemIn(list, appTranslator.get(titleCode), () => this._pushPage(titleCode, () => this._buildSettingsList(definitions())));
+    _settingsTab(titleCode, prefix) {
+        return {titleCode: titleCode, builder: () => this._buildSettingsList(racingSettings.getDefinitions(prefix)
+            .filter((definition) => (!this._rendererLocked || (definition.key !== RacingOptionsModal.RENDERER_KEY))))};
     }
 
     // The device line, then the settings of the device in use; the page follows a gamepad plugged in or out.
@@ -78,7 +75,7 @@ class RacingOptionsModal extends AppMenuSettingsModal {
         }, (dir) => {
             this._stepDevice(dir);
         });
-        AppMenuDom.addText(device, 'app-menu-item-value', this._deviceChoiceLabel(RacingControls.deviceChoice(padOn)));
+        AppMenuDom.addValue(device, this._deviceChoiceLabel(RacingControls.deviceChoice(padOn)), true);
 
         this._shownDevices = this._devicesState();
         for (const definition of racingSettings.getDefinitions(RacingOptionsModal.SETTING_PREFIXES[RacingControls.deviceInUse(padOn)])) {
@@ -134,7 +131,7 @@ class RacingOptionsModal extends AppMenuSettingsModal {
             racingSettings.resetAll();
             this._applySettings();
             this._renderPage();
-        }, null, appTranslator.get('menu.back'));
+        }, null, null, true, appTranslator.get('options.resetDetail'));
     }
 
     // How a race goes, then About; the controls themselves are in the options.
@@ -144,7 +141,7 @@ class RacingOptionsModal extends AppMenuSettingsModal {
             this._addLines(lines);
         }
         this._addHeading(appTranslator.get('help.about'));
-        this._addLines(['help.about.what', 'help.about.sega', 'help.about.commercial', 'help.about.author']);
+        this._addLines(['help.about.what', 'help.about.sega', 'help.about.commercial', 'help.about.author', 'help.about.font']);
         this._addLines(['help.about.copyright'], {year: new Date().getFullYear()});
     }
 

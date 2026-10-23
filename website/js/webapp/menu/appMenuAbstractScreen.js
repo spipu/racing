@@ -1,12 +1,15 @@
 /**
  * Base class of the menu screens, displayed inside the AppMenuDisplay virtual screen.
  *
- * Every screen shares the same skeleton (title, panel, subtitle, selectable
- * list, status, back button, footer) and the same selection model on its list
- * items, provided by AppMenuListNavigation (mouse hover, keyboard and gamepad
- * all drive one single highlighted entry). A project gives its title
- * (_titleText), may override the footer prefix (_footerPrefix) and builds its
- * screens on top (_build).
+ * Every screen shares the same skeleton (the brand in the top-left corner, a
+ * footer) and one of two layouts: a list screen (panel with its subtitle,
+ * selectable list, status and bottom buttons, plus an optional detail panel on
+ * its right), or a simple menu (a centred column of entries under a header,
+ * the exit entry last, small links in the bottom-left corner). Both share
+ * the same selection model on their entries, provided by AppMenuListNavigation
+ * (mouse hover, touch, keyboard and gamepad all drive one single highlighted
+ * entry). A project gives its brand (_titleText), may override the footer
+ * prefix (_footerPrefix) and builds its screens on top (_build).
  */
 class AppMenuAbstractScreen {
     /**
@@ -87,8 +90,7 @@ class AppMenuAbstractScreen {
 
     // --- Shared skeleton ---
 
-    // Standard skeleton of every screen: title, panel, subtitle and the empty
-    // selectable list.
+    // List screen: brand, panel, subtitle and the empty selectable list.
     _buildPanel(subtitleText) {
         this._addTitle(this._titleText());
 
@@ -96,6 +98,76 @@ class AppMenuAbstractScreen {
         const subtitleEl = AppMenuDom.addText(panel, 'app-menu-subtitle', subtitleText);
 
         return {panel: panel, subtitleEl: subtitleEl, listEl: this._addElement('div', 'app-menu-list', panel)};
+    }
+
+    // Detail panel on the right of a list screen's panel, which then becomes its left column.
+    _addDetailPanel() {
+        this._container.classList.add('app-menu-screen-detail');
+
+        return this._addElement('div', 'app-menu-detail');
+    }
+
+    /**
+     * Simple menu: brand, a centred header (title and an optional subtitle line), a centred column of entries.
+     *
+     * @param {string}      titleText
+     * @param {string|null} subtitleText
+     */
+    _buildSimpleMenu(titleText, subtitleText = null) {
+        this._container.classList.add('app-menu-screen-simple');
+        this._addTitle(this._titleText());
+
+        const header     = this._addElement('div', 'app-menu-header');
+        const titleEl    = AppMenuDom.addText(header, 'app-menu-header-title', titleText);
+        const subtitleEl = AppMenuDom.addText(header, 'app-menu-header-subtitle', (subtitleText ?? ''));
+
+        return {titleEl: titleEl, subtitleEl: subtitleEl, listEl: this._addElement('div', 'app-menu-list app-menu-list-simple')};
+    }
+
+    /**
+     * Small secondary buttons in the bottom-left corner (about, a bug report…): Down past the last entry reaches
+     * them, they never take a back input — a back target is set after them (they reset it).
+     *
+     * @param {{label: string, action: function}[]} links
+     */
+    _addLinks(links) {
+        const row     = this._addElement('div', 'app-menu-links');
+        const buttons = links.map((link) => this._addButton(link.label, link.action, row));
+        buttons.forEach((button) => button.classList.add('app-menu-button-secondary', 'app-menu-button-small'));
+        this._nav.setBottomButtons(buttons, null);
+
+        return buttons;
+    }
+
+    /**
+     * Buttons of the top-right corner (language, help…), each led by its icon: Up from the first entry reaches
+     * them, Left / Right walk them.
+     *
+     * @param {{icon: string, label: string, action: function}[]} buttons
+     */
+    _addCornerButtons(buttons) {
+        const row      = this._addElement('div', 'app-menu-corner');
+        const elements = buttons.map((button) => AppMenuDom.addIconButton(row, 'app-menu-button app-menu-button-secondary app-menu-button-small',
+            button.icon, button.label, button.action));
+        this._nav.setSideButtons(elements);
+
+        return elements;
+    }
+
+    // Full-screen picture behind the screen, dimmed by the theme; null removes it.
+    _setBackground(url) {
+        let background = this._container.querySelector(':scope > .app-menu-screen-background');
+        if (url === null) {
+            if (background !== null) {
+                background.remove();
+            }
+            return;
+        }
+        if (background === null) {
+            background = AppMenuDom.addElement(this._container, 'div', 'app-menu-screen-background');
+            this._container.insertBefore(background, this._container.firstChild);
+        }
+        background.style.backgroundImage = 'url("' + url + '")';
     }
 
     _addStatus(panel) {
@@ -150,8 +222,8 @@ class AppMenuAbstractScreen {
             return;
         }
         this._footerEl.textContent = this._footerPrefix() + ' ' + appBootstrap.getVersion()
-            + ' — ' + appBootstrap.getStatsText()
-            + ' — © ' + new Date().getFullYear() + ' Spipu';
+            + ' - ' + appBootstrap.getStatsText((bytes) => AppMenuDom.formatMegabytes(bytes))
+            + ' - © ' + new Date().getFullYear() + ' Spipu';
     }
 
     // --- DOM helpers (AppMenuDom wrappers defaulting to the screen container) ---

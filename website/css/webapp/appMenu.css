@@ -3,8 +3,20 @@
  * AppMenuDisplay virtual screen. The container font-size is scaled by the
  * display ratio (33px at ratio 1): every size below is in em, so the whole menu
  * stays proportional. Layout only: colours, fonts, borders and backgrounds
- * belong to the page's own theme, loaded after this sheet.
+ * belong to the page's own theme, loaded after this sheet. The drawn marks
+ * (selection arrows, chevrons, icons) paint in currentColor, so a theme only
+ * sets their colour; --app-menu-arrow-shift and --app-menu-cap-height (the
+ * cap height of the theme's font) set them on its capitals.
  */
+
+/* Typeface offered to the themes (lib/oswald, SIL OFL 1.1): only downloaded by a theme that uses it. */
+@font-face {
+    font-family: 'Oswald';
+    src: url('/lib/oswald/oswald.woff2') format('woff2');
+    font-weight: 200 700;
+    font-display: swap;
+}
+
 .app-menu-display {
     position: relative;
     overflow: hidden;
@@ -19,31 +31,101 @@
 }
 
 /* --- Screens (AppMenuAbstractScreen) --- */
+/* The brand, the corner buttons and the footer sit in the corners; the panel or
+   the simple menu fills the middle. */
 .app-menu-screen {
     position: absolute;
     inset: 0;
+    z-index: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    /* bigger bottom padding: raises the centered block slightly */
-    padding: 1.2em 1.5em 2em;
+    padding: 4.4em 2.2em 3.4em;
 }
 
-/* Fixed height: every screen shows the same panel size, the list inside grows
-   and scrolls. */
+.app-menu-screen-background {
+    position: absolute;
+    z-index: -1;
+    inset: -2%;
+    background-size: cover;
+    background-position: center;
+}
+
+.app-menu-screen-title {
+    position: absolute;
+    top: 1.2em;
+    left: 2.2em;
+}
+
+/* A home screen shows its brand as the header of its menu, not in the corner. */
+.app-menu-screen-home > .app-menu-screen-title {
+    display: none;
+}
+
+.app-menu-corner {
+    position: absolute;
+    top: 1.3em;
+    right: 2.2em;
+    display: flex;
+    gap: 0.6em;
+}
+
+.app-menu-footer {
+    position: absolute;
+    left: 2.2em;
+    right: 2.2em;
+    bottom: 0.9em;
+    text-align: center;
+}
+
+/* Fixed height: every list screen shows the same panel size, the list inside
+   grows and scrolls. */
 .app-menu-panel {
-    width: 78%;
-    height: 82%;
+    position: relative;
+    width: 88%;
+    height: 100%;
     display: flex;
     flex-direction: column;
+}
+
+/* With a detail panel: the list panel becomes the left column. */
+.app-menu-screen-detail {
+    align-items: flex-start;
+    padding-left: 3.5em;
+}
+
+.app-menu-screen-detail .app-menu-panel {
+    width: 46%;
+}
+
+.app-menu-detail {
+    position: absolute;
+    left: 58%;
+    right: 4%;
+    top: 7em;
 }
 
 .app-menu-actions {
     flex-shrink: 0;
     display: flex;
     justify-content: flex-end;
-    gap: 0.5em;
+    gap: 0.6em;
+}
+
+.app-menu-actions-start {
+    justify-content: flex-start;
+}
+
+/* An action of the screen on the left, Back on the right. */
+.app-menu-actions-split {
+    justify-content: space-between;
+}
+
+.app-menu-actions .app-menu-button {
+    padding-left: 1em;
+    padding-right: 1em;
+    white-space: nowrap;
 }
 
 .app-menu-status {
@@ -59,14 +141,73 @@
     padding: 1.2em 0;
 }
 
-.app-menu-footer {
-    margin-top: 0.8em;
-}
-
 .app-menu-subtitle {
     flex-shrink: 0;
     padding-bottom: 0.7em;
     margin-bottom: 0.7em;
+}
+
+/* --- Simple menu (a centred column under a header) --- */
+/* The column of entries is centred on the screen, the header above it at the top: three rows, the outer two equal
+   (the paddings are too), the first never shorter than the header — a long column is pushed down rather than
+   running under it. */
+.app-menu-screen-simple,
+.app-menu-modal-simple {
+    display: grid;
+    grid-template-rows: minmax(max-content, 1fr) auto 1fr;
+    justify-items: center;
+}
+
+.app-menu-screen-simple {
+    padding-top: 4.6em;
+    padding-bottom: 4.6em;
+}
+
+.app-menu-screen-simple > .app-menu-header,
+.app-menu-modal-simple > .app-menu-header {
+    align-self: start;
+}
+
+.app-menu-header {
+    flex-shrink: 0;
+    text-align: center;
+    margin-bottom: 1.4em;
+}
+
+.app-menu-header-subtitle:empty {
+    display: none;
+}
+
+.app-menu-list.app-menu-list-simple {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+/* A wide hit area around a short label: the whole band takes the click or the tap. */
+.app-menu-list-simple .app-menu-item {
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 38%;
+    margin-bottom: 0;
+}
+
+.app-menu-list-simple .app-menu-item-label {
+    flex: none;
+}
+
+.app-menu-list-simple .app-menu-item-infos {
+    display: none;
+}
+
+.app-menu-links {
+    position: absolute;
+    left: 2.2em;
+    bottom: 2.4em;
+    display: flex;
+    gap: 0.6em;
 }
 
 /* --- List --- */
@@ -111,31 +252,147 @@
     flex: 1;
 }
 
-/* Colour square before a label (AppMenuDom.addColorSwatch). */
+/* Selection arrows around the label: the leading one in a list, both in a simple menu. */
+.app-menu-item-arrow {
+    flex: none;
+    width: 0;
+    height: 0;
+    border-top: 0.3em solid transparent;
+    border-bottom: 0.3em solid transparent;
+    border-left: 0.42em solid currentColor;
+    visibility: hidden;
+    transform: translateY(var(--app-menu-arrow-shift, 0));
+}
+
+.app-menu-item-arrow-end {
+    display: none;
+    border-left: none;
+    border-right: 0.42em solid currentColor;
+}
+
+.app-menu-list-simple .app-menu-item-arrow-end {
+    display: block;
+}
+
+.app-menu-item-selected > .app-menu-item-arrow {
+    visibility: visible;
+    animation: appMenuArrowStart 0.9s ease-in-out infinite;
+}
+
+.app-menu-item-selected > .app-menu-item-arrow-end {
+    animation-name: appMenuArrowEnd;
+}
+
+@keyframes appMenuArrowStart {
+    50% {
+        transform: translate(0.15em, var(--app-menu-arrow-shift, 0));
+    }
+}
+
+@keyframes appMenuArrowEnd {
+    50% {
+        transform: translate(-0.15em, var(--app-menu-arrow-shift, 0));
+    }
+}
+
+/* Value of an entry, centred in a right column shared by every row; a cycled
+   value shows its two chevrons on the selected entry. */
+.app-menu-item-value {
+    flex: none;
+    width: 34%;
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+}
+
+.app-menu-item-value-text {
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.app-menu-item-chevron {
+    flex: none;
+    width: 0.38em;
+    height: 0.38em;
+    border: solid currentColor;
+    border-width: 0 0 0.12em 0.12em;
+    transform: translateY(var(--app-menu-arrow-shift, 0)) rotate(45deg);
+    visibility: hidden;
+}
+
+.app-menu-item-chevron-end {
+    transform: translateY(var(--app-menu-arrow-shift, 0)) rotate(-135deg);
+}
+
+.app-menu-item-selected .app-menu-item-value-cycle > .app-menu-item-chevron {
+    visibility: visible;
+}
+
+/* Colour mark before a label (AppMenuDom.addColorSwatch). */
 .app-menu-color-swatch {
     flex-shrink: 0;
     width: 0.8em;
     height: 0.8em;
-    margin-right: 0.6em;
 }
 
 /* Geometry only: the visual states come from app-menu-button (whose later
-   rules the doubled class outweighs). Sized as a comfortable touch target,
-   still under the row height so lists keep their rhythm. */
+   rules the doubled class outweighs). A small cross on a wide touch target:
+   the whole height of its row, over the row's padding, and 3em wide (~36 x
+   31 px on a phone held landscape). The same in every list, whatever the
+   theme's button size. */
 .app-menu-button.app-menu-item-delete {
     flex-shrink: 0;
+    align-self: stretch;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 2em;
-    height: 2em;
+    width: 3em;
+    height: auto;
+    margin: -0.45em -0.6em -0.45em 0;
     padding: 0;
+    font-size: inherit;
+}
+
+.app-menu-item-delete::before {
+    width: 0.55em;
+    height: 0.55em;
+    transform: none;
 }
 
 /* Shown but not selectable. */
 .app-menu-item-disabled {
     opacity: 0.35;
     cursor: default;
+}
+
+/* --- Detail panel (AppMenuDom.addFacts) --- */
+.app-menu-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 1.4em;
+    row-gap: 0.75em;
+    align-items: baseline;
+}
+
+.app-menu-fact-value {
+    white-space: nowrap;
+}
+
+.app-menu-detail-actions {
+    margin-top: 1.4em;
+}
+
+/* Title of a detail panel: two lines reserved, so the table under it stays put from one entry to the next. */
+.app-menu-detail-title {
+    height: 2.4em;
+    line-height: 1.2;
+    margin-bottom: 0.8em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
 }
 
 /* --- Buttons --- */
@@ -146,6 +403,63 @@
 
 .app-menu-button:disabled {
     cursor: default;
+}
+
+.app-menu-button-small {
+    padding: 0.45em 0.9em;
+}
+
+/* --- Icons (AppMenuDom.addIconButton): masked SVG in currentColor, never a font glyph --- */
+.app-menu-icon {
+    display: inline-flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.5em;
+}
+
+/* Centred on the capitals of the label, not on its line box (whose centre moves with the font's metrics): the icon
+   stands on the baseline, then sinks by half of what it outgrows the capitals. */
+.app-menu-icon::before {
+    content: '';
+    flex: none;
+    width: 0.9em;
+    height: 0.9em;
+    background-color: currentColor;
+    -webkit-mask: var(--app-menu-icon) center / contain no-repeat;
+    mask: var(--app-menu-icon) center / contain no-repeat;
+    transform: translateY(calc((0.9em - var(--app-menu-cap-height, 0.7em)) / 2));
+}
+
+.app-menu-icon-language {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8"><circle cx="12" cy="12" r="10.5"/><ellipse cx="12" cy="12" rx="5.2" ry="10.5"/><path d="M1.5 12h21"/></svg>');
+}
+
+.app-menu-icon-help {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.3 9a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.8V14"/><path d="M12 17.6v.1"/></svg>');
+}
+
+.app-menu-icon-add {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.6" stroke-linecap="round"><path d="M12 4v16M4 12h16"/></svg>');
+}
+
+.app-menu-icon-players {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round"><g transform="translate(0 -0.55)"><circle cx="9" cy="8" r="3.4"/><path d="M2.5 20.5c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17.5" cy="9" r="2.6"/><path d="M16.5 14.3c3 .3 5 2.8 5 6.2"/></g></svg>');
+}
+
+.app-menu-icon-link {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L11.6 6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.6-1.6"/></svg>');
+}
+
+.app-menu-icon-file {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linejoin="round"><path d="M5 2.5h9l5 5v14H5z"/><path d="M14 2.5v5h5"/></svg>');
+}
+
+.app-menu-icon-close {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>');
+}
+
+.app-menu-icon-zoom {
+    --app-menu-icon: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/></svg>');
 }
 
 /* --- Modal --- */
@@ -159,13 +473,37 @@
 
 .app-menu-modal {
     width: 48%;
-    padding: 1.2em 1.4em;
+    padding: 1.4em 1.8em;
+}
+
+/* A short modal (confirmation, loading, information) grows with its text rather than breaking a line of it. */
+.app-menu-modal-fit {
+    width: auto;
+    min-width: 48%;
+    max-width: 88%;
+}
+
+/* Both buttons as wide as the widest one. */
+.app-menu-modal-confirm .app-menu-modal-actions {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(6em, 1fr);
+    width: max-content;
+    margin: 0 auto;
+}
+
+.app-menu-modal-confirm .app-menu-button {
+    white-space: nowrap;
 }
 
 .app-menu-modal-message {
     text-align: center;
     margin-bottom: 1.4em;
     white-space: pre-line;
+}
+
+.app-menu-modal-question:has(+ .app-menu-modal-message) {
+    margin-bottom: 0.6em;
 }
 
 .app-menu-modal-loading {
@@ -206,6 +544,11 @@
     flex-direction: column;
 }
 
+/* Tabs: the modal takes the maximum height of a list modal at once, the same from a tab to the next. */
+.app-menu-modal-list.app-menu-modal-tabbed {
+    height: 85%;
+}
+
 .app-menu-modal-list .app-menu-modal-actions {
     margin-top: auto;
     justify-content: flex-end;
@@ -213,6 +556,26 @@
 
 .app-menu-modal-list .app-menu-modal-actions-pair {
     justify-content: center;
+}
+
+.app-menu-modal-list .app-menu-modal-actions-split {
+    justify-content: space-between;
+}
+
+/* Simple menu over the page (a pause over the game): no box, a centred column, hidden under a modal stacked on it
+   (its column would show through the veil). */
+.app-menu-overlay-simple {
+    align-items: flex-start;
+}
+
+.app-menu-overlay-simple:has(~ .app-menu-overlay) {
+    display: none;
+}
+
+.app-menu-modal-simple {
+    width: 100%;
+    height: 100%;
+    padding: 2.6em 2.2em;
 }
 
 /* Page body: fills the modal and scrolls. A page built as a list keeps its own
@@ -247,6 +610,154 @@
 .app-menu-modal-line {
     text-align: left;
     margin-bottom: 0.6em;
+}
+
+/* --- Choice modal (AppMenuModal.choose): tiles above the Back button --- */
+.app-menu-modal-choice {
+    width: 60%;
+}
+
+.app-menu-tiles {
+    display: flex;
+    gap: 1em;
+    margin-bottom: 1.2em;
+}
+
+.app-menu-button.app-menu-tile {
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 0.9em;
+    gap: 0.5em;
+    padding: 1.1em 1em;
+    text-transform: none;
+}
+
+.app-menu-tile::before,
+.app-menu-pairing-zoom::before {
+    transform: none;
+}
+
+.app-menu-tile::before {
+    width: 1.8em;
+    height: 1.8em;
+}
+
+.app-menu-tile-hint {
+    font-size: 0.9em;
+    letter-spacing: 0;
+}
+
+/* A text field of the browser, for what is pasted or typed with the device's own keyboard (an address). */
+.app-menu-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 1.2em;
+    padding: 0.55em 0.7em;
+    font: inherit;
+    outline: none;
+}
+
+.app-menu-file-input {
+    display: none;
+}
+
+/* --- Settings tabs (AppMenuSettingsModal._openTabs) --- */
+.app-menu-tabs {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    margin-bottom: 0.9em;
+}
+
+.app-menu-tab-list {
+    flex: 1;
+    display: flex;
+    gap: 0.3em;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.app-menu-button.app-menu-tab {
+    flex: none;
+    position: relative;
+    padding: 0.55em 1em;
+}
+
+.app-menu-button.app-menu-tab-step {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7em;
+    height: 1.7em;
+    padding: 0;
+}
+
+.app-menu-tab-step::before {
+    content: '';
+    border-top: 0.28em solid transparent;
+    border-bottom: 0.28em solid transparent;
+    border-right: 0.38em solid currentColor;
+}
+
+.app-menu-tab-next::before {
+    border-right: none;
+    border-left: 0.38em solid currentColor;
+}
+
+/* --- Lobby (AppMenuLobbyModal) --- */
+.app-menu-tag {
+    flex: none;
+}
+
+.app-menu-ping {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4em;
+    min-width: 5.5em;
+}
+
+/* Four signal bars, filled up to the level of the round trip. */
+.app-menu-ping-bars {
+    flex: none;
+    width: 1em;
+    height: 0.9em;
+    --app-menu-ping-fill: 0%;
+    background: linear-gradient(90deg, currentColor var(--app-menu-ping-fill), rgba(128, 128, 128, 0.35) var(--app-menu-ping-fill));
+    -webkit-mask: var(--app-menu-ping-mask) center / contain no-repeat;
+    mask: var(--app-menu-ping-mask) center / contain no-repeat;
+    --app-menu-ping-mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 14"><rect x="0" y="10" width="2.8" height="4" rx="0.6"/><rect x="4.4" y="7" width="2.8" height="7" rx="0.6"/><rect x="8.8" y="4" width="2.8" height="10" rx="0.6"/><rect x="13.2" y="0" width="2.8" height="14" rx="0.6"/></svg>');
+}
+
+.app-menu-ping[data-level="1"] .app-menu-ping-bars {
+    --app-menu-ping-fill: 17%;
+}
+
+.app-menu-ping[data-level="2"] .app-menu-ping-bars {
+    --app-menu-ping-fill: 45%;
+}
+
+.app-menu-ping[data-level="3"] .app-menu-ping-bars {
+    --app-menu-ping-fill: 72%;
+}
+
+.app-menu-ping[data-level="4"] .app-menu-ping-bars {
+    --app-menu-ping-fill: 100%;
+}
+
+.app-menu-item.app-menu-item-add {
+    justify-content: center;
+    margin-top: 0.6em;
+}
+
+.app-menu-item-add .app-menu-item-label {
+    flex: none;
 }
 
 /* --- Text entry modal (on-screen keyboard) --- */
@@ -330,22 +841,53 @@
 
 .app-menu-pairing-stage {
     display: flex;
-    gap: 1em;
+    gap: 1.6em;
     margin-bottom: 1em;
 }
 
 .app-menu-pairing-tile {
     flex: 1 1 0;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* The step number and its caption, above the frame; hidden with an empty caption. */
+.app-menu-pairing-step {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    min-height: 1.6em;
+    margin-bottom: 0.7em;
+}
+
+.app-menu-pairing-step:has(> .app-menu-pairing-caption:empty) {
+    visibility: hidden;
+}
+
+.app-menu-pairing-step-number {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.6em;
+    height: 1.6em;
+    border-radius: 50%;
 }
 
 /* Square, capped by the height of the 1080 screen (36em) less the modal chrome. */
+.app-menu-pairing-window {
+    position: relative;
+    width: 100%;
+    max-width: 18em;
+    aspect-ratio: 1;
+}
+
 .app-menu-pairing-frame {
     display: block;
     width: 100%;
-    max-width: 18em;
-    margin: 0 auto;
-    aspect-ratio: 1;
+    height: 100%;
     visibility: hidden;
     cursor: zoom-in;
 }
@@ -354,8 +896,13 @@
     visibility: visible;
 }
 
+/* The marks of a frame not shown stay hidden with it. */
+.app-menu-pairing-window:has(> .app-menu-pairing-frame:not(.shown)) > :not(.app-menu-pairing-frame) {
+    visibility: hidden;
+}
+
 /* A sub reads, then shows: the idle frame's tile steps aside, the other one is centred. */
-.app-menu-pairing-stage-sequential .app-menu-pairing-tile:not(:has(> .shown)) {
+.app-menu-pairing-stage-sequential .app-menu-pairing-tile:not(:has(.shown)) {
     display: none;
 }
 
@@ -363,9 +910,7 @@
     position: fixed;
     inset: 0;
     width: 100%;
-    max-width: none;
     height: 100%;
-    aspect-ratio: auto;
     z-index: 10;
     cursor: zoom-out;
 }
@@ -384,11 +929,77 @@
     object-fit: contain;
 }
 
+/* Beside the frame, never over the code: it would hamper the reading. */
+.app-menu-pairing-zoom {
+    position: absolute;
+    right: -2em;
+    bottom: 0;
+    width: 1.6em;
+    height: 1.6em;
+    align-items: center;
+    cursor: zoom-in;
+}
+
+.app-menu-pairing-viewfinder {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.app-menu-pairing-corner {
+    position: absolute;
+    width: 18%;
+    height: 18%;
+    border: 0 solid currentColor;
+}
+
+.app-menu-pairing-corner:nth-child(1) {
+    left: 9%;
+    top: 9%;
+    border-left-width: 0.18em;
+    border-top-width: 0.18em;
+}
+
+.app-menu-pairing-corner:nth-child(2) {
+    right: 9%;
+    top: 9%;
+    border-right-width: 0.18em;
+    border-top-width: 0.18em;
+}
+
+.app-menu-pairing-corner:nth-child(3) {
+    left: 9%;
+    bottom: 9%;
+    border-left-width: 0.18em;
+    border-bottom-width: 0.18em;
+}
+
+.app-menu-pairing-corner:nth-child(4) {
+    right: 9%;
+    bottom: 9%;
+    border-right-width: 0.18em;
+    border-bottom-width: 0.18em;
+}
+
+.app-menu-pairing-scan {
+    position: absolute;
+    left: 12%;
+    right: 12%;
+    height: 0.12em;
+    animation: appMenuPairingScan 2.2s ease-in-out infinite;
+}
+
+@keyframes appMenuPairingScan {
+    0%, 100% {
+        top: 14%;
+    }
+    50% {
+        top: 84%;
+    }
+}
+
 .app-menu-pairing-caption {
-    min-height: 1.4em;
-    margin-top: 0.4em;
     font-size: 0.8em;
-    text-align: center;
 }
 
 /* The codes are exchanged: the link being opened replaces both tiles. */
@@ -405,4 +1016,23 @@
 
 .app-menu-pairing-stage:has(> .app-menu-pairing-status:not(:empty)) .app-menu-pairing-tile {
     display: none;
+}
+
+/* --- Touch screens: a finger needs more than a mouse --- */
+/* On a phone held landscape the virtual screen shrinks to about a third: a small button would be ~22 px high.
+   Under a finger, every button takes the height of the regular ones (~29 px on such a phone) and the tab steps grow
+   to match; a mouse keeps the compact sizes. The keys of the on-screen keyboard keep theirs. */
+@media (pointer: coarse) {
+    .app-menu-display .app-menu-button.app-menu-button-small {
+        padding: 0.8em 1.1em;
+    }
+
+    .app-menu-display .app-menu-button.app-menu-tab {
+        padding: 0.8em 1.1em;
+    }
+
+    .app-menu-display .app-menu-button.app-menu-tab-step {
+        width: 2.6em;
+        height: 2.6em;
+    }
 }

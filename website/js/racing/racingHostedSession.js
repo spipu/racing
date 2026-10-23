@@ -98,7 +98,13 @@ class RacingHostedSession {
             cancel();
             return;
         }
-        new AppMenuModal(this._display).confirm(appTranslator.get('multiplayer.pause.stopConfirm'), cancel);
+        RacingHostedSession.confirmStop(this._display, cancel);
+    }
+
+    // The question the menus ask before a session stops: its players are disconnected.
+    static confirmStop(display, onStop) {
+        return new AppMenuModal(display).confirm(appTranslator.get('multiplayer.pause.stopConfirm'), onStop,
+            null, null, false, appTranslator.get('multiplayer.pause.stopDetail'));
     }
 
     _closeStartLobby() {

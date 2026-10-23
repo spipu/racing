@@ -33,32 +33,37 @@ class CarScreen extends AbstractRacingMenuScreen {
             gearboxEl.textContent = this._gearboxLabel();
         };
         const gearbox = this._nav.addItemIn(listEl, appTranslator.get('car.gearbox'), step, step);
-        gearboxEl = AppMenuDom.addText(gearbox, 'app-menu-item-value', this._gearboxLabel());
+        gearboxEl = AppMenuDom.addValue(gearbox, this._gearboxLabel(), true);
+        gearbox.classList.add('racing-car-row');
+
+        // The headings of the two time columns, between the gearbox and the cars: not an entry.
+        const header = AppMenuDom.addElement(listEl, 'div', 'racing-car-row racing-car-header');
+        AppMenuDom.addElement(header, 'span', 'racing-car-header-spacer');
+        AppMenuDom.addText(header, 'racing-car-time', appTranslator.get('car.bestLap'));
+        AppMenuDom.addText(header, 'racing-car-time', appTranslator.get('car.bestRace'));
 
         for (const car of racingCatalog.getCars()) {
             const item = this._addListItem(listEl, car.name, () => {
                 this._navigator.startRace({...this._choice, car: car.code, gearbox: this._navigator.getGearbox()});
             });
-            this._showBestTimes(item, car.code);
+            item.classList.add('racing-car-row');
+            const lapEl  = AppMenuDom.addText(item, 'racing-car-time', RacingTime.NONE);
+            const raceEl = AppMenuDom.addText(item, 'racing-car-time', RacingTime.NONE);
+            this._showBestTimes(lapEl, raceEl, car.code);
         }
         this._addBackButton(panel);
 
         this._nav.selectIndex(CarScreen.FIRST_CAR_ITEM);
     }
 
-    // The best lap and race of this device, once read; nothing without a record or a storage.
-    _showBestTimes(item, car) {
+    // The best lap and race of this device, once read; the empty time stays without a record or a storage.
+    _showBestTimes(lapEl, raceEl, car) {
         if (!racingBestTimes.isReady()) {
             return;
         }
         racingBestTimes.get(this._choice.course, this._choice.mirror, car).then((times) => {
-            if ((times.lapMs === null) && (times.raceMs === null)) {
-                return;
-            }
-            this._addListItemInfos(item, appTranslator.get('car.bestTimes', {
-                lap:  RacingTime.format(times.lapMs),
-                race: RacingTime.format(times.raceMs)
-            }));
+            lapEl.textContent  = RacingTime.format(times.lapMs);
+            raceEl.textContent = RacingTime.format(times.raceMs);
         }).catch((error) => {
             console.warn('CarScreen - best times unavailable: ' + error.message);
         });

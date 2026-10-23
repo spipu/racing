@@ -1,6 +1,7 @@
 /**
  * Pause modal, shown by the race over its own frozen frame (modelled on
- * doom_js's MenuPauseModal). Title "{course} — {car}", navigable entries:
+ * doom_js's MenuPauseModal): a simple menu headed by the course, the car
+ * under it, navigable entries:
  * back to the race, restart the race (not on a device that follows the main's
  * race), multiplayer (in a session the device hosts), options, leave the race
  * (stopping the session the device hosts, leaving the one it follows); no
@@ -19,7 +20,7 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         this._onResume       = null;
         this._onRestart      = null;
         this._onQuit         = null;
-        this._titleProvider  = null;
+        this._headerProvider = null;
         this._options        = null;
         this._sessionContext = null;    // see RacingHostedSession.pauseContext, null outside a session
         this._multiplayer    = null;
@@ -53,13 +54,13 @@ class RacingPauseModal extends AppMenuAbstractListModal {
     }
 
     /**
-     * @param {function} titleProvider returns the (translated) modal title, read again when the options close
+     * @param {function} headerProvider returns the (translated) header {title, subtitle}, read again when the options close
      */
-    show(titleProvider) {
-        this._titleProvider = titleProvider ?? this._titleProvider;
+    show(headerProvider) {
+        this._headerProvider = headerProvider ?? this._headerProvider;
 
-        const {modal} = this._createShell(this._titleProvider(), 'app-menu-modal app-menu-modal-wide', 'app-menu-subtitle');
-        const listEl  = AppMenuDom.addElement(modal, 'div', 'app-menu-list');
+        const header   = this._headerProvider();
+        const {listEl} = this._openSimpleShell(header.title, header.subtitle);
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.resume'), () => this._onResume());
         if (this._onRestart !== null) {
             this._nav.addItemIn(listEl, appTranslator.get('race.pause.restart'), () => this._confirmRestart());
@@ -70,7 +71,6 @@ class RacingPauseModal extends AppMenuAbstractListModal {
         this._nav.addItemIn(listEl, appTranslator.get('menu.options'), () => this._openOptions());
         this._nav.addItemIn(listEl, appTranslator.get('race.pause.quit'), () => this._onQuit());
 
-        this._nav.attach();
         this._nav.selectFirst();
 
         return this;
@@ -110,7 +110,7 @@ class RacingPauseModal extends AppMenuAbstractListModal {
     }
 
     _confirmRestart() {
-        this._confirm(appTranslator.get('race.pause.restartConfirm'), this._onRestart, appTranslator.get('race.pause.restartButton'));
+        this._confirm(appTranslator.get('race.pause.restartConfirm'), this._onRestart, null, null, false, appTranslator.get('race.pause.restartDetail'));
     }
 
     // Rebuilt when the options close: a language change must reach the title and the entries.

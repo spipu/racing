@@ -1,5 +1,5 @@
 {
-    "version": "v1.0227",
+    "version": "v1.0252",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -92,7 +92,8 @@
             "/assets/virtual_racing/jingles/98.mp3",
             "/assets/virtual_racing/jingles/A6.mp3",
             "/assets/virtual_racing/jingles/A7.mp3",
-            "/lib/zxing-wasm/zxing_full.wasm"
+            "/lib/zxing-wasm/zxing_full.wasm",
+            "/lib/oswald/oswald.woff2"
         ],
         "css": [
             "/css/webapp/appMenu.css",

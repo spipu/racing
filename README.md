@@ -13,7 +13,7 @@ A PWA racing game after Virtua Racing Deluxe (Sega 32X). Personal project, not d
 - **Sound**: the original's sound effects and jingles, the engine computed as the console's FM chip does, its pitch following the revs.
 - **Controls**: keyboard, gamepad or touch controls, chosen automatically or forced, remappable in the options.
 - **Records**: fastest lap and best race kept on the device, by course, version and car, shown and erased in "Best laps".
-- **Menus and help**: pause menu, options (display, race, sound, controls), a help explaining how a race goes; in English, French, Italian and Spanish.
+- **Menus and help**: pause menu, options in tabs (display, race, sound, multiplayer, controls), a help explaining how a race goes; in English, French, Italian and Spanish.
 - **Installable application**, usable offline.
 - To come: races with several players over the network.
 
@@ -31,6 +31,8 @@ tools/
 └── pitCrewViewer/ viewer of the pit crew models around the cars
 website/           the application, served as is
 ```
+
+`website/lib/oswald/` holds the Oswald font of the menus, under the SIL Open Font License 1.1, with its own LICENSE.md and attribution README.
 
 `website/js/engine/` (Spipu3D, the 3D engine) and `website/js/webapp/` (the PWA core) are copied unchanged from their reference repository, [spipu/3d-engine](https://github.com/spipu/3d-engine), which also holds their checks and examples.
 

@@ -41,7 +41,7 @@ class RacingResultsModal extends AppMenuAbstractListModal {
      * @param {{newLap: boolean, newRace: boolean}} records
      */
     show(title, result, records) {
-        const {modal} = this._createShell(title, 'app-menu-modal app-menu-modal-wide racing-results', 'app-menu-subtitle');
+        const {modal} = this._createShell(title, 'app-menu-modal app-menu-modal-wide racing-results', 'app-menu-modal-message app-menu-modal-title');
         const table   = AppMenuDom.addElement(modal, 'div', 'racing-results-table');
         const best    = Math.min(...result.lapsMs);
         result.lapsMs.forEach((lapMs, i) => {
@@ -50,7 +50,7 @@ class RacingResultsModal extends AppMenuAbstractListModal {
         });
         this._addRow(table, appTranslator.get('race.results.total'), result.raceMs, '', true, records.newRace);
 
-        const listEl = AppMenuDom.addElement(modal, 'div', 'app-menu-list');
+        const listEl = AppMenuDom.addElement(modal, 'div', 'app-menu-list app-menu-list-simple');
         this._nav.addItemIn(listEl, appTranslator.get('race.results.restart'), () => this._onRestart());
         this._nav.addItemIn(listEl, appTranslator.get('race.results.courses'), () => this._onCourses());
         this._nav.addItemIn(listEl, appTranslator.get('menu.main'), () => this._onQuit());

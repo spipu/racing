@@ -57,10 +57,16 @@ class RacingTranslations {
                 es: 'Detener el multijugador'
             },
             'multiplayer.pause.stopConfirm': {
-                fr: 'Arrêter le multijoueur ?\nTous les joueurs seront déconnectés.',
-                en: 'Stop multiplayer?\nEvery player will be disconnected.',
-                it: 'Interrompere il multigiocatore?\nTutti i giocatori saranno disconnessi.',
-                es: '¿Detener el multijugador?\nTodos los jugadores serán desconectados.'
+                fr: 'Arrêter le multijoueur ?',
+                en: 'Stop multiplayer?',
+                it: 'Interrompere il multigiocatore?',
+                es: '¿Detener el multijugador?'
+            },
+            'multiplayer.pause.stopDetail': {
+                fr: 'Tous les joueurs seront déconnectés.',
+                en: 'Every player will be disconnected.',
+                it: 'Tutti i giocatori saranno disconnessi.',
+                es: 'Todos los jugadores serán desconectados.'
             },
             'race.standings.racing': {
                 fr: 'En course',
@@ -129,10 +135,16 @@ class RacingTranslations {
                 es: 'Restablecer este circuito'
             },
             'records.resetCourseConfirm': {
-                fr: 'Effacer les meilleurs temps\nde {course} ?',
-                en: 'Clear the best times\nof {course}?',
-                it: 'Cancellare i migliori tempi\ndi {course}?',
-                es: '¿Borrar los mejores tiempos\nde {course}?'
+                fr: 'Effacer les meilleurs temps de {course} ?',
+                en: 'Clear the best times of {course}?',
+                it: 'Cancellare i migliori tempi di {course}?',
+                es: '¿Borrar los mejores tiempos de {course}?'
+            },
+            'records.resetDetail': {
+                fr: 'Les temps effacés ne peuvent pas être récupérés.',
+                en: 'Cleared times cannot be recovered.',
+                it: 'I tempi cancellati non possono essere recuperati.',
+                es: 'Los tiempos borrados no se pueden recuperar.'
             },
             'records.course': {
                 fr: 'Circuit',
@@ -201,7 +213,7 @@ class RacingTranslations {
                 es: 'Ayuda'
             },
             'menu.storageUnavailable': {
-                fr: 'Stockage navigateur indisponible — les paramétrages ne seront pas enregistrés.',
+                fr: 'Stockage navigateur indisponible — les paramètres ne seront pas enregistrés.',
                 en: 'Browser storage unavailable — the settings will not be saved.',
                 it: 'Archiviazione del browser non disponibile — le impostazioni non verranno salvate.',
                 es: 'Almacenamiento del navegador no disponible — los ajustes no se guardarán.'
@@ -286,16 +298,22 @@ class RacingTranslations {
                 es: 'Controles'
             },
             'options.reset': {
-                fr: 'Réinitialiser tous les paramétrages',
-                en: 'Reset every setting',
+                fr: 'Réinitialiser tous les paramètres',
+                en: 'Reset all settings',
                 it: 'Reimposta tutte le impostazioni',
                 es: 'Restablecer todos los ajustes'
             },
             'options.resetConfirm': {
-                fr: 'Supprimer tous les paramétrages enregistrés ?',
+                fr: 'Supprimer tous les paramètres enregistrés ?',
                 en: 'Delete every saved setting?',
                 it: 'Eliminare tutte le impostazioni salvate?',
                 es: '¿Eliminar todos los ajustes guardados?'
+            },
+            'options.resetDetail': {
+                fr: 'Tous les réglages reviennent à leur valeur par défaut, contrôles compris.',
+                en: 'Every setting goes back to its default, the controls included.',
+                it: 'Tutte le impostazioni tornano al valore predefinito, comandi compresi.',
+                es: 'Todos los ajustes vuelven a su valor predeterminado, controles incluidos.'
             },
             // --- Settings ---
             'settings.display.language': {
@@ -589,12 +607,6 @@ class RacingTranslations {
                 it: 'La gara si è interrotta per un errore.',
                 es: 'La carrera se detuvo por un error.'
             },
-            'race.pause.title': {
-                fr: '{course} — {car}',
-                en: '{course} — {car}',
-                it: '{course} — {car}',
-                es: '{course} — {car}'
-            },
             'race.pause.resume': {
                 fr: 'Revenir à la course',
                 en: 'Back to the race',
@@ -613,11 +625,11 @@ class RacingTranslations {
                 it: 'Ricominciare la gara?',
                 es: '¿Reiniciar la carrera?'
             },
-            'race.pause.restartButton': {
-                fr: 'Recommencer',
-                en: 'Restart',
-                it: 'Ricomincia',
-                es: 'Reiniciar'
+            'race.pause.restartDetail': {
+                fr: 'La course repart de la grille de départ.',
+                en: 'The race starts again from the starting grid.',
+                it: 'La gara riparte dalla griglia di partenza.',
+                es: 'La carrera vuelve a empezar desde la parrilla de salida.'
             },
             'race.pause.quit': {
                 fr: 'Quitter la course',
@@ -667,11 +679,17 @@ class RacingTranslations {
                 it: 'Cambia circuito',
                 es: 'Cambiar de circuito'
             },
-            'car.bestTimes': {
-                fr: 'Tour {lap} · Course {race}',
-                en: 'Lap {lap} · Race {race}',
-                it: 'Giro {lap} · Gara {race}',
-                es: 'Vuelta {lap} · Carrera {race}'
+            'car.bestLap': {
+                fr: 'Meilleur tour',
+                en: 'Best lap',
+                it: 'Giro migliore',
+                es: 'Mejor vuelta'
+            },
+            'car.bestRace': {
+                fr: 'Meilleure course',
+                en: 'Best race',
+                it: 'Gara migliore',
+                es: 'Mejor carrera'
             },
             // --- Help ---
             'help.race': {
@@ -841,6 +859,12 @@ class RacingTranslations {
                 en: 'Developed by Spipu (Laurent Minguet).',
                 it: 'Sviluppato da Spipu (Laurent Minguet).',
                 es: 'Desarrollado por Spipu (Laurent Minguet).'
+            },
+            'help.about.font': {
+                fr: 'Police des menus : Oswald, sous licence SIL OFL 1.1.',
+                en: 'Font of the menus: Oswald, under the SIL OFL 1.1 licence.',
+                it: 'Carattere dei menu: Oswald, con licenza SIL OFL 1.1.',
+                es: 'Tipografía de los menús: Oswald, bajo licencia SIL OFL 1.1.'
             },
             'help.about.copyright': {
                 fr: '© {year} Spipu.',

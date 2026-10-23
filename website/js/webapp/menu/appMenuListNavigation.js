@@ -3,12 +3,14 @@
  * screen, and each modal carrying a list).
  *
  * Owns the highlighted entry and drives it from every input source at once:
- * mouse hover (armed by a real mouse move), keyboard (arrows move, Enter
- * validates, Backspace goes back) and gamepad (d-pad or left stick with
- * auto-repeat, button 0 validates, button 1 goes back). The selection clamps
- * at both ends (no wrap-around); an optional row of side buttons above the list
- * and a bottom button below it join the vertical flow. The owner provides the
- * back action and the blocked state (its own modality).
+ * mouse hover (armed by a real mouse move), touch (a tap activates, or only
+ * selects first with setSelectFirstTap), keyboard (arrows move, Enter
+ * validates, Backspace goes back, PageUp / PageDown page) and gamepad (d-pad
+ * or left stick with auto-repeat, button 0 validates, button 1 goes back, the
+ * shoulders page). The selection clamps at both ends (no wrap-around); an
+ * optional row of side buttons above the list and a row of bottom buttons
+ * below it join the vertical flow. The owner provides the back action and the
+ * blocked state (its own modality).
  */
 class AppMenuListNavigation {
     static get PAD_POLL_MS() {
@@ -46,8 +48,14 @@ class AppMenuListNavigation {
         this._index             = -1;
         this._sideButtons       = [];
         this._sideIndex         = -1;
+        this._sideEntry         = -1;
         this._bottomButtons     = [];
         this._bottomIndex       = -1;
+        this._backButton        = null;
+        this._onPage            = null;
+        this._onSelect          = null;
+        this._selectFirstTap    = false;
+        this._tapStart          = null;
         this._horizontal        = false;
         this._grid              = null;
         this._onStart           = null;
@@ -57,7 +65,7 @@ class AppMenuListNavigation {
         this._pad               = new AppInputGamepad();
         this._padTimer          = null;
         this._padSeen           = false;
-        this._padState          = {validate: false, back: false, start: false};
+        this._padState          = {validate: false, back: false, start: false, pagePrev: false, pageNext: false};
         this._padHeldY          = {dir: 0, ms: 0};
         this._padHeldX          = {dir: 0, ms: 0};
     }
@@ -83,6 +91,28 @@ class AppMenuListNavigation {
     // validation is not its highlighted entry (a text entry).
     setOnStart(callback) {
         this._onStart = callback;
+
+        return this;
+    }
+
+    // Previous / next page of a paged list (settings tabs): PageUp / PageDown, the gamepad shoulders.
+    setOnPage(callback) {
+        this._onPage = callback;
+
+        return this;
+    }
+
+    // Called with the index of each newly highlighted entry (a detail panel following the selection).
+    setOnSelect(callback) {
+        this._onSelect = callback;
+
+        return this;
+    }
+
+    // A tap on an entry not highlighted yet only highlights it, the next one activates it: a finger, which has no
+    // hover, sees the detail of an entry before opening it. A mouse click still opens at once.
+    setSelectFirstTap(flag) {
+        this._selectFirstTap = (flag === true);
 
         return this;
     }
@@ -133,11 +163,19 @@ class AppMenuListNavigation {
     }
 
     // Row above the list, in left-to-right order, reached by Up on the first
-    // entry and walked with Left / Right. Validate clicks the focused button,
-    // so its press feedback plays.
-    setSideButtons(elements) {
+    // entry — on entryIndex, its rightmost button by default — and walked with
+    // Left / Right. Validate clicks the focused button, so its press feedback plays.
+    setSideButtons(elements, entryIndex = (elements.length - 1)) {
         this._sideButtons = elements;
         this._sideIndex   = -1;
+        this._sideEntry   = entryIndex;
+
+        return this;
+    }
+
+    // The button of the row that Up from the first entry lands on.
+    setSideEntry(index) {
+        this._sideEntry = index;
 
         return this;
     }
@@ -155,11 +193,20 @@ class AppMenuListNavigation {
     }
 
     // The bottom row: Down past the last entry lands on its rightmost button,
-    // Left/Right walk it, Up climbs back into the list. Its first button is
-    // the target of every back input (see _goBack).
-    setBottomButtons(buttons) {
+    // Left/Right walk it, Up climbs back into the list. backButton, its first
+    // button by default, is the target of every back input (see _goBack); a
+    // row of plain links passes null.
+    setBottomButtons(buttons, backButton = (buttons[0] ?? null)) {
         this._bottomButtons = buttons;
         this._bottomIndex   = -1;
+        this._backButton    = backButton;
+
+        return this;
+    }
+
+    // What every back input plays, through its click so the press feedback shows (the way out of a simple menu).
+    setBackTarget(el) {
+        this._backButton = el;
 
         return this;
     }
@@ -176,7 +223,19 @@ class AppMenuListNavigation {
     // onAdjust (Left/Right, pad X) cycles the entry's value.
     addItem(el, onActivate, onAdjust = null) {
         const entry = {el: el, action: onActivate, adjust: onAdjust};
+        // Read at pointerdown: the mouse events a browser emulates after a tap (mouseenter) may highlight the entry
+        // before its click.
+        el.addEventListener('pointerdown', (event) => {
+            this._tapStart = {entry: entry, touch: (event.pointerType !== 'mouse'), highlighted: this._isHighlighted(entry)};
+        });
         el.addEventListener('click', () => {
+            const tap        = (((this._tapStart !== null) && (this._tapStart.entry === entry)) ? this._tapStart : null);
+            const selectOnly = ((tap !== null) ? (tap.touch && !tap.highlighted) : !this._isHighlighted(entry));
+            this._tapStart   = null;
+            if (this._selectFirstTap && selectOnly) {
+                this._selectElement(el);
+                return;
+            }
             this._pressItem(entry);
         });
         el.addEventListener('mouseenter', () => {
@@ -244,6 +303,9 @@ class AppMenuListNavigation {
             entry.el.classList.add(AppMenuListNavigation._selectionClass(entry));
             this._scrollListTo(entry.el);
             this._mouseArmed = false;
+            if (this._onSelect !== null) {
+                this._onSelect(index);
+            }
         }
 
         return this;
@@ -399,11 +461,10 @@ class AppMenuListNavigation {
         this.activateSelection();
     }
 
-    // Every back input plays the first bottom button when there is one, so it
-    // gets the same press feedback and action as a click.
+    // Through its click, so the press feedback plays.
     _goBack() {
-        if (this._bottomButtons.length > 0) {
-            this._bottomButtons[0].click();
+        if (this._backButton !== null) {
+            this._backButton.click();
             return;
         }
         AppMenuSound.play(AppMenuSound.BACKUP);
@@ -455,9 +516,8 @@ class AppMenuListNavigation {
         return slot.column + slot.span / 2;
     }
 
-    // Entering the row from the list lands on its rightmost button.
     _focusSideFromList() {
-        this._focusSideAt(this._sideButtons.length - 1);
+        this._focusSideAt(Math.min(this._sideEntry, this._sideButtons.length - 1));
     }
 
     // -1 leaves the row. The list keeps its index, only the visible highlight
@@ -503,6 +563,10 @@ class AppMenuListNavigation {
         if (entry !== undefined) {
             entry.el.classList.toggle(AppMenuListNavigation._selectionClass(entry), (this._bottomIndex === -1));
         }
+    }
+
+    _isHighlighted(entry) {
+        return ((this._items[this._index] === entry) && (this._sideIndex === -1) && (this._bottomIndex === -1));
     }
 
     static _selectionClass(entry) {
@@ -561,6 +625,15 @@ class AppMenuListNavigation {
                 event.preventDefault();
                 this._stepSideways(1);
                 break;
+            case 'PageUp':
+            case 'PageDown':
+                if (this._onPage !== null) {
+                    event.preventDefault();
+                    if (!event.repeat) {
+                        this._onPage(((event.code === 'PageUp') ? -1 : 1));
+                    }
+                }
+                break;
             case 'Enter':
             case 'NumpadEnter':
                 event.preventDefault();
@@ -597,12 +670,16 @@ class AppMenuListNavigation {
             this._padState.validate = this._pad.readButtonValidate();
             this._padState.back     = this._pad.readButtonBack();
             this._padState.start    = this._pad.readMenuStart();
+            this._padState.pagePrev = this._pad.readMenuPagePrev();
+            this._padState.pageNext = this._pad.readMenuPageNext();
             return;
         }
 
         const validate   = this._pad.readButtonValidate();
         const back       = this._pad.readButtonBack();
         const start      = this._pad.readMenuStart();
+        const pagePrev   = this._pad.readMenuPagePrev();
+        const pageNext   = this._pad.readMenuPageNext();
         const directionY = this._readPadDirectionY();
         const directionX = this._readPadDirectionX();
 
@@ -611,7 +688,7 @@ class AppMenuListNavigation {
         // the edge detection, never an edge to act on.
         if (!this._padSeen) {
             this._padSeen      = true;
-            this._padState     = {validate: validate, back: back, start: start};
+            this._padState     = {validate: validate, back: back, start: start, pagePrev: pagePrev, pageNext: pageNext};
             this._padHeldY     = {dir: directionY, ms: 0};
             this._padHeldX     = {dir: directionX, ms: 0};
             return;
@@ -635,10 +712,18 @@ class AppMenuListNavigation {
         if (start && !this._padState.start && (this._onStart !== null)) {
             this._onStart();
         }
+        if (pagePrev && !this._padState.pagePrev && (this._onPage !== null)) {
+            this._onPage(-1);
+        }
+        if (pageNext && !this._padState.pageNext && (this._onPage !== null)) {
+            this._onPage(1);
+        }
 
         this._padState.validate = validate;
         this._padState.back     = back;
         this._padState.start    = start;
+        this._padState.pagePrev = pagePrev;
+        this._padState.pageNext = pageNext;
     }
 
     _readPadDirectionY() {

@@ -1,137 +1,297 @@
 /*
- * Spipu-Racing theme of the menus, after the screens of Virtua Racing Deluxe:
- * colours, fonts, borders and backgrounds of the app-menu-* structure
- * (css/webapp/appMenu.css, loaded first), plus the racing screens. Every size
- * is in em, like the structure.
+ * Spipu-Racing theme of the menus, a modern motorsport TV broadcast: colours,
+ * fonts, borders and backgrounds of the app-menu-* structure
+ * (css/webapp/appMenu.css, loaded first), plus the racing screens. Near-black
+ * navy, racing yellow, every text and button leaning forward (skewX: Oswald
+ * has no italic), the selection a yellow parallelogram band. Every size is in
+ * em, like the structure.
  */
 
 .app-menu-display {
+    --app-menu-arrow-shift: 0.045em;
+    --app-menu-cap-height: 0.84em;
+    --racing-accent: #FFC61A;
+    --racing-navy: #070C1E;
+    --racing-lean: skewX(-10deg);
     background:
-        repeating-conic-gradient(#86A1A3 0 25%, #97B2B4 0 50%) 0 0 / 3.2em 3.2em,
-        #8EA9AB;
+        radial-gradient(ellipse at 88% 100%, rgba(255, 198, 26, 0.16), rgba(255, 198, 26, 0) 45%),
+        repeating-linear-gradient(115deg, rgba(255, 255, 255, 0) 0 2.6em, rgba(255, 255, 255, 0.025) 2.6em 2.7em),
+        linear-gradient(160deg, #13204A 0%, #0B1330 45%, #070C1E 100%);
+    color: #FFF;
+    font-family: system-ui, "Segoe UI", "Helvetica", "Arial", sans-serif;
 }
 
 .app-menu-display-transparent {
     background: none;
 }
 
-.app-menu-screen {
-    /* Own stacking context: the title tab rises over the panel, never over a modal. */
-    z-index: 0;
+/* A menu over the paused race: the race layer itself is blurred and darkened — a backdrop-filter does not blur a
+   WebGL canvas everywhere. Not under the results of a race that goes on: the blur would be redone at every frame. */
+#screen:has(> .racing-menu-frozen .app-menu-overlay) > :not(.app-menu-display) {
+    filter: blur(6px) brightness(0.45);
 }
 
-/* --- Title: the white tab framed in yellow of the original screens --- */
+.app-menu-screen-title,
+.app-menu-header-title,
+.app-menu-subtitle,
+.app-menu-item,
+.app-menu-button,
+.app-menu-modal-title,
+.app-menu-modal-heading,
+.app-menu-fact-label,
+.app-menu-pairing-step-number,
+.racing-results-row,
+.racing-standings-row,
+.racing-best-laps-header {
+    font-family: "Oswald", "Arial Narrow", sans-serif;
+}
+
+/* --- Leaning texts and buttons --- */
+.app-menu-screen-title,
+.app-menu-header-title,
+.app-menu-header-subtitle,
+.app-menu-subtitle,
+.app-menu-item-label,
+.app-menu-item-value-text,
+.app-menu-button,
+.app-menu-modal-title,
+.app-menu-modal-heading,
+.racing-results-row,
+.racing-standings-row,
+.racing-best-laps-header {
+    transform: var(--racing-lean);
+}
+
+/* A transform needs a box: an inline label would not lean. */
+.app-menu-item-label,
+.app-menu-item-value-text {
+    display: inline-block;
+}
+
+/* --- Brand, header --- */
 .app-menu-screen-title {
-    background: #F7F7F2;
-    border: 0.1em solid #E8C400;
-    color: #1B2F9E;
-    font-family: "Georgia", "Times New Roman", serif;
-    font-size: 2em;
-    font-style: italic;
-    font-weight: bold;
-    letter-spacing: 0.12em;
+    color: var(--racing-accent);
+    font-size: 1.1em;
+    font-weight: 600;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
-    padding: 0.1em 1em;
-    margin-bottom: -0.55em;
-    position: relative;
-    z-index: 1;
 }
 
-/* --- Central panel: dashed white over black, like the original frames --- */
+.app-menu-header-title {
+    color: #FFF;
+    font-size: 2.6em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+}
+
+.app-menu-header-subtitle {
+    margin-top: 0.4em;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.85em;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+}
+
+/* The logo of the home: "SPIPU-" white, "RACING" yellow, over a small checker strip. */
+.app-menu-screen-home .app-menu-header-title {
+    position: relative;
+    font-size: 3.4em;
+    font-weight: 700;
+    padding-bottom: 0.25em;
+}
+
+.racing-logo-word,
+.racing-logo-accent {
+    display: inline;
+    white-space: nowrap;
+}
+
+.racing-logo-accent {
+    color: var(--racing-accent);
+    text-shadow: 0 0 0.4em rgba(255, 198, 26, 0.35);
+}
+
+.racing-logo-checker {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 3em;
+    height: 0.24em;
+    transform: translateX(-50%);
+    background: repeating-conic-gradient(#FFF 0 25%, #070C1E 0 50%) 0 0 / 0.24em 0.24em;
+}
+
+/* --- List screen --- */
 .app-menu-panel {
-    background: rgba(255, 255, 255, 0.12);
-    border: 0.12em dashed #F7F7F2;
-    outline: 0.12em solid #111;
-    border-radius: 0;
-    padding: 1.4em 1.2em 1em;
+    background: linear-gradient(180deg, rgba(19, 32, 74, 0.7), rgba(7, 12, 30, 0.7));
+    border-left: max(0.12em, 2px) solid var(--racing-accent);
+    padding: 1.1em 1.2em 1em;
 }
 
 .app-menu-subtitle {
-    color: #1B2F9E;
-    font-family: "Georgia", "Times New Roman", serif;
-    font-size: 1.05em;
-    font-style: italic;
-    font-weight: bold;
+    color: var(--racing-accent);
+    font-size: 1em;
+    font-weight: 600;
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    border-bottom: 0.06em solid rgba(27, 47, 158, 0.35);
+    border-bottom: max(0.04em, 1px) solid rgba(255, 198, 26, 0.3);
 }
 
 .app-menu-list,
 .app-menu-modal-list-body {
-    scrollbar-color: rgba(27, 47, 158, 0.5) transparent;
+    scrollbar-color: rgba(255, 198, 26, 0.45) transparent;
 }
 
 .app-menu-list::-webkit-scrollbar-thumb,
 .app-menu-modal-list-body::-webkit-scrollbar-thumb {
-    background: rgba(27, 47, 158, 0.5);
+    background: rgba(255, 198, 26, 0.45);
     border-radius: 0.1em;
 }
 
+/* --- Entries: the selection is a yellow parallelogram band, dark bold text on it --- */
 .app-menu-item {
-    background: rgba(236, 243, 243, 0.62);
-    border: max(0.08em, 1px) solid rgba(27, 47, 158, 0.25);
-    border-radius: 0;
-    color: #1B2F9E;
+    position: relative;
+    z-index: 0;
+    margin-bottom: 0.1em;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.app-menu-item::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    background: var(--racing-accent);
+    clip-path: polygon(1.2% 0, 100% 0, 98.8% 100%, 0 100%);
+    transform: scaleX(0.92);
+    opacity: 0;
+    transition: transform 0.15s ease-out, opacity 0.15s ease-out;
 }
 
 /* Hovering only moves the shared selection (mouse, keyboard and gamepad all
-   drive the same highlighted entry). Pre-brightened colors, no filter: a
-   filter here makes iOS re-run its text autosizing on the selected label. */
+   drive the same highlighted entry). No filter: a filter here makes iOS
+   re-run its text autosizing on the selected label. */
 .app-menu-item-selected {
-    background: #FFFFFF;
-    border-color: #E8C400;
+    color: var(--racing-navy);
 }
 
-/* Press feedback: a beat brighter than the selection, before the action. */
-.app-menu-item-pressed {
-    background: #FFF6C8;
-    border-color: #F5D000;
+.app-menu-item-selected::before {
+    transform: scaleX(1);
+    opacity: 1;
+}
+
+.app-menu-item-pressed::before {
+    background: #FFE07A;
 }
 
 .app-menu-item-label {
-    font-family: "Georgia", "Times New Roman", serif;
-    font-size: 1.05em;
-    font-style: italic;
-    font-weight: bold;
+    font-size: 1em;
+    font-weight: 500;
     letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.app-menu-item-selected .app-menu-item-label {
+    font-weight: 700;
+}
+
+.app-menu-item-arrow,
+.app-menu-item-chevron {
+    color: var(--racing-accent);
+}
+
+.app-menu-item-selected .app-menu-item-arrow,
+.app-menu-item-selected .app-menu-item-chevron {
+    color: var(--racing-navy);
 }
 
 .app-menu-item-infos {
-    color: rgba(27, 47, 158, 0.6);
-    font-size: 0.75em;
-    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85em;
+    letter-spacing: 0.04em;
+}
+
+.app-menu-item-selected .app-menu-item-infos {
+    color: rgba(7, 12, 30, 0.7);
+}
+
+.app-menu-item-value {
+    color: var(--racing-accent);
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+.app-menu-item-selected .app-menu-item-value {
+    color: var(--racing-navy);
 }
 
 .app-menu-color-swatch {
-    border-radius: 0;
+    border-radius: 50%;
 }
 
-/* Setting row value (right side of the item, the label pushes it there). */
-.app-menu-item-value {
-    color: #C41818;
-    font-size: 0.9em;
-    font-weight: bold;
-    letter-spacing: 0.08em;
+.app-menu-item-disabled {
+    opacity: 0.4;
 }
 
-.app-menu-button.app-menu-item-delete {
-    font-size: 0.85em;
-    /* Single glyph: the button letter-spacing would trail it off-centre. */
-    letter-spacing: 0;
-    line-height: 1;
+/* Simple menu: the band fits its label, wider than in a list. */
+.app-menu-list-simple .app-menu-item {
+    min-width: 34%;
+    padding: 0.35em 1.6em;
+    margin-bottom: 0.15em;
 }
 
-/* Buttons: white on the original navy at rest, navy on yellow once focused
-   (hover or keyboard / gamepad), a lighter yellow while pressed (the press
-   feedback of AppMenuDom.addButton). No dimming filter: it would eat the contrast. */
+.app-menu-list-simple .app-menu-item::before {
+    clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+}
+
+.app-menu-list-simple .app-menu-item-label {
+    font-size: 1.2em;
+    letter-spacing: 0.1em;
+}
+
+.app-menu-item.app-menu-item-add {
+    border: max(0.06em, 1px) dashed rgba(255, 198, 26, 0.5);
+}
+
+.app-menu-tag {
+    padding: 0.1em 0.5em;
+    border: max(0.04em, 1px) solid currentColor;
+    color: var(--racing-accent);
+    font-size: 0.8em;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+}
+
+.app-menu-item-selected .app-menu-tag {
+    color: var(--racing-navy);
+}
+
+.app-menu-ping {
+    color: #6FCF6F;
+    font-size: 0.8em;
+}
+
+.app-menu-ping[data-level="1"] {
+    color: #FF6A55;
+}
+
+.app-menu-ping[data-level="2"] {
+    color: var(--racing-accent);
+}
+
+.app-menu-item-selected .app-menu-ping {
+    color: var(--racing-navy);
+}
+
+/* --- Buttons: outlined secondary, filled yellow primary --- */
 .app-menu-button {
-    background: #1B2F9E;
-    border: 0.08em solid #E8C400;
+    background: var(--racing-accent);
+    border: max(0.06em, 1px) solid var(--racing-accent);
     border-radius: 0;
-    color: #FFFFFF;
-    font-family: "Helvetica", "Arial", sans-serif;
-    font-weight: bold;
+    color: var(--racing-navy);
+    font-weight: 700;
     font-size: 0.8em;
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -139,71 +299,155 @@
 
 .app-menu-button:hover,
 .app-menu-button-focus {
-    background: #F5D000;
-    color: #1B2F9E;
+    background: #FFD95C;
+    border-color: #FFF;
+    box-shadow: 0 0 0.9em rgba(255, 198, 26, 0.55);
+}
+
+.app-menu-button-secondary {
+    background: rgba(7, 12, 30, 0.4);
+    border-color: rgba(255, 198, 26, 0.55);
+    color: #FFF;
+}
+
+.app-menu-button-secondary:hover,
+.app-menu-button-secondary.app-menu-button-focus {
+    background: rgba(255, 198, 26, 0.14);
+    border-color: var(--racing-accent);
+    color: #FFF;
 }
 
 .app-menu-button:disabled {
-    background: #6F7896;
-    color: #D8DBE6;
-    border-color: #9AA0B4;
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.35);
+    box-shadow: none;
 }
 
 .app-menu-button-pressed,
 .app-menu-button-pressed:hover {
-    background: #FFF6C8;
-    color: #1B2F9E;
+    background: #FFF;
+    border-color: #FFF;
+    color: var(--racing-navy);
 }
 
-.app-menu-button-secondary {
-    background: rgba(255, 255, 255, 0.5);
-    color: #1B2F9E;
+
+.app-menu-button.app-menu-item-delete {
+    background: none;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.45);
+    transform: none;
+}
+
+.app-menu-item-selected .app-menu-button.app-menu-item-delete {
+    color: var(--racing-navy);
+}
+
+.app-menu-button.app-menu-item-delete:hover,
+.app-menu-button.app-menu-item-delete.app-menu-button-focus {
+    border-color: var(--racing-accent);
+    color: #FFF;
+}
+
+/* On the yellow band of its selected row, the cross stays navy. */
+.app-menu-item-selected .app-menu-button.app-menu-item-delete:hover,
+.app-menu-item-selected .app-menu-button.app-menu-item-delete.app-menu-button-focus {
+    border-color: var(--racing-navy);
+    color: var(--racing-navy);
 }
 
 /* --- Status, empty list --- */
 .app-menu-status {
-    color: #1B2F9E;
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.8em;
     letter-spacing: 0.12em;
+    text-align: center;
     text-transform: uppercase;
 }
 
 .app-menu-status-error {
-    color: #C41818;
+    color: #FF6A55;
 }
 
 .app-menu-empty {
-    color: rgba(27, 47, 158, 0.6);
+    color: rgba(255, 255, 255, 0.45);
     font-size: 0.85em;
     letter-spacing: 0.15em;
     text-transform: uppercase;
 }
 
-/* --- Footer (version + webapp stats) --- */
+/* --- Footer (version + webapp stats), a discreet checker ribbon above it --- */
 .app-menu-footer {
-    color: rgba(255, 255, 255, 0.85);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.65em;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    text-shadow: 0 0 0.3em rgba(0, 0, 0, 0.6);
 }
 
+.app-menu-screen > .app-menu-footer::before {
+    content: '';
+    display: block;
+    width: 14em;
+    height: 0.7em;
+    margin: 0 auto 0.6em;
+    opacity: 0.3;
+    background: repeating-conic-gradient(#FFF 0 25%, transparent 0 50%) 0 0 / 0.7em 0.7em;
+}
+
+/* --- Tabs --- */
+.app-menu-button.app-menu-tab {
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.app-menu-button.app-menu-tab:hover,
+.app-menu-button.app-menu-tab.app-menu-button-focus {
+    background: rgba(255, 198, 26, 0.12);
+    border-color: var(--racing-accent);
+    color: #FFF;
+}
+
+.app-menu-button.app-menu-tab-active {
+    background: var(--racing-accent);
+    color: var(--racing-navy);
+}
+
+/* --- Modals --- */
 .app-menu-overlay {
-    background: rgba(10, 20, 60, 0.55);
+    background: rgba(4, 7, 18, 0.72);
+}
+
+.app-menu-display-transparent .app-menu-overlay {
+    background: rgba(4, 7, 18, 0.5);
 }
 
 .app-menu-modal {
-    background: #EEF3F3;
-    border: 0.12em dashed #1B2F9E;
-    outline: 0.12em solid #F7F7F2;
+    background: linear-gradient(160deg, #15224D, #0A112A);
+    border: max(0.04em, 1px) solid rgba(255, 198, 26, 0.25);
+    border-top: max(0.12em, 2px) solid var(--racing-accent);
     border-radius: 0;
-    box-shadow: 0 0 2em rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0.8em 2.4em rgba(0, 0, 0, 0.6);
 }
 
 .app-menu-modal-message {
-    color: #1B2F9E;
-    font-size: 0.95em;
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 1em;
+    line-height: 1.45;
+}
+
+.app-menu-modal-question {
+    color: #FFF;
+    font-size: 1.15em;
+    font-weight: 600;
+}
+
+.app-menu-modal-title {
+    color: #FFF;
+    font-size: 1.15em;
+    font-weight: 600;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .app-menu-modal-loading {
@@ -211,16 +455,15 @@
 }
 
 .app-menu-modal-error {
-    color: #C41818;
+    color: #FF6A55;
 }
 
 .app-menu-modal-detail {
     font-family: monospace;
     font-size: 0.7em;
     line-height: 1.4;
-    color: #1B2F9E;
-    background: rgba(27, 47, 158, 0.08);
-    border-radius: 0;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(0, 0, 0, 0.35);
 }
 
 @keyframes racingMenuPulse {
@@ -233,55 +476,101 @@
 }
 
 .app-menu-modal-heading {
-    color: #1B2F9E;
-    font-family: "Georgia", "Times New Roman", serif;
-    font-size: 1.1em;
-    font-style: italic;
-    font-weight: bold;
+    color: var(--racing-accent);
+    font-size: 1.05em;
+    font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
 
 .app-menu-modal-link {
-    color: #C41818;
-    font-size: 1em;
-    letter-spacing: 0.08em;
+    color: var(--racing-accent);
+    font-size: 0.95em;
 }
 
 .app-menu-modal-link:hover {
-    color: #E02828;
+    color: #FFE07A;
 }
 
 .app-menu-modal-line {
-    color: #24306E;
-    font-size: 1em;
-    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.9em;
     line-height: 1.55;
 }
 
+/* --- On-screen keyboard: the key size of the structure, only the skin --- */
 .app-menu-text-field {
-    background: #FFFFFF;
-    border: 0.08em solid #1B2F9E;
-    border-radius: 0;
-    color: #1B2F9E;
+    background: rgba(0, 0, 0, 0.4);
+    border: none;
+    border-bottom: max(0.08em, 2px) solid var(--racing-accent);
+    color: #FFF;
     font-size: 1.4em;
     letter-spacing: 0.2em;
 }
 
 .app-menu-text-caret {
-    background: #C41818;
+    background: var(--racing-accent);
 }
 
 .app-menu-button.app-menu-key {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #FFF;
     font-size: 1.35em;
     /* Single glyph: the button letter-spacing would trail it off-centre. */
     letter-spacing: 0;
     line-height: 1;
 }
 
+.app-menu-button.app-menu-key:hover,
+.app-menu-button.app-menu-key.app-menu-button-focus {
+    background: rgba(255, 198, 26, 0.2);
+    border-color: var(--racing-accent);
+}
+
+.app-menu-button.app-menu-key.app-menu-key-validate {
+    background: var(--racing-accent);
+    border-color: var(--racing-accent);
+    color: var(--racing-navy);
+}
+
+.app-menu-button.app-menu-key.app-menu-button-pressed {
+    background: #FFF;
+    color: var(--racing-navy);
+}
+
+/* --- Pairing --- */
+.app-menu-pairing-qr,
+.app-menu-pairing-camera {
+    background: #000;
+}
+
+.app-menu-pairing-caption,
+.app-menu-pairing-status {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.app-menu-pairing-step-number {
+    background: var(--racing-accent);
+    color: var(--racing-navy);
+    font-weight: 700;
+    font-size: 0.8em;
+}
+
+.app-menu-pairing-viewfinder,
+.app-menu-pairing-zoom {
+    color: var(--racing-accent);
+}
+
+.app-menu-pairing-scan {
+    background: var(--racing-accent);
+    box-shadow: 0 0 0.6em var(--racing-accent);
+    opacity: 0.85;
+}
+
 /* --- Results of a race: one row per lap, then the total, over the race that goes on --- */
 .app-menu-modal.racing-results {
-    background: rgba(238, 243, 243, 0.82);
+    background: linear-gradient(160deg, rgba(21, 34, 77, 0.92), rgba(10, 17, 42, 0.92));
 }
 
 .racing-results-table {
@@ -293,14 +582,15 @@
     grid-template-columns: 1fr auto 1fr;
     gap: 1em;
     align-items: baseline;
-    color: #24306E;
+    color: rgba(255, 255, 255, 0.8);
     font-size: 1.1em;
     letter-spacing: 0.06em;
     line-height: 1.6;
 }
 
 .racing-results-strong {
-    font-weight: bold;
+    color: #FFF;
+    font-weight: 600;
 }
 
 .racing-results-label {
@@ -309,12 +599,11 @@
 
 .racing-results-time {
     font-variant-numeric: tabular-nums;
-    color: #1B2F9E;
+    color: #FFF;
 }
 
 .racing-results-mark {
-    color: #C41818;
-    font-style: italic;
+    color: var(--racing-accent);
 }
 
 /* --- Standings of a race of several players: place, player in its slot's colour, race time, best lap --- */
@@ -327,18 +616,20 @@
     grid-template-columns: 2em 1fr auto auto;
     gap: 1em;
     align-items: baseline;
-    color: #24306E;
+    color: rgba(255, 255, 255, 0.85);
     font-size: 1.1em;
 }
 
 .racing-standings-head {
-    font-size: 0.85em;
-    font-style: italic;
-    color: #5A6496;
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 .racing-standings-place {
     text-align: right;
+    color: var(--racing-accent);
 }
 
 .racing-standings-name::before {
@@ -349,21 +640,57 @@
     margin-right: 0.5em;
     border-radius: 50%;
     background-color: var(--racing-slot-color, transparent);
+    box-shadow: 0 0 0.4em var(--racing-slot-color, transparent);
+}
+
+/* --- Car choice: the best lap and the best race in two columns, together as wide as the gearbox value --- */
+.racing-car-row .app-menu-item-value {
+    width: 40%;
+}
+
+.racing-car-time {
+    flex: none;
+    width: calc(20% - 0.3em);
+    text-align: center;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Its labels are smaller than the rows: its gaps grow by the same ratio (1 / 0.8) to keep the columns in line. */
+.racing-car-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.6em 0.75em 0.25em;
+    color: var(--racing-accent);
+    font-family: "Oswald", "Arial Narrow", sans-serif;
+    font-size: 0.8em;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transform: var(--racing-lean);
+}
+
+.racing-car-header .racing-car-time {
+    width: calc(20% - 0.375em);
+}
+
+.racing-car-header-spacer {
+    flex: 1;
 }
 
 /* --- Best laps: a column per car, the reset cross at the end of the row --- */
 .racing-best-laps-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) repeat(3, 7em) 2.4em;
+    grid-template-columns: minmax(0, 1fr) repeat(3, 7em) 3em;
     align-items: center;
     column-gap: 0.6em;
 }
 
 .racing-best-laps-header {
     padding: 0 0.6em 0.4em;
-    color: #1B2F9E;
-    font-weight: bold;
-    font-style: italic;
+    color: var(--racing-accent);
+    font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -377,6 +704,27 @@
     justify-self: end;
 }
 
+/* A row is not an entry: its cross is. The row is highlighted while its cross is selected. */
+.racing-best-laps-row.app-menu-item {
+    cursor: default;
+}
+
+.racing-best-laps-row.app-menu-item:has(.app-menu-button-focus) {
+    color: var(--racing-navy);
+}
+
+.racing-best-laps-row.app-menu-item:has(.app-menu-button-focus)::before {
+    transform: scaleX(1);
+    opacity: 1;
+}
+
+.racing-best-laps-row .app-menu-button.app-menu-item-delete.app-menu-button-focus {
+    background: none;
+    border-color: var(--racing-navy);
+    box-shadow: none;
+    color: var(--racing-navy);
+}
+
 /* The course name stays on one line ("Acropolis — miroir"). */
 .racing-best-laps-course {
     white-space: nowrap;
@@ -384,12 +732,3 @@
     text-overflow: ellipsis;
 }
 
-/* A row is not an entry: no pointer, highlighted while its cross is. */
-.racing-best-laps-line {
-    cursor: default;
-}
-
-.racing-best-laps-line:has(.app-menu-button-focus) {
-    background: #FFFFFF;
-    border-color: #E8C400;
-}

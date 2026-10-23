@@ -1,7 +1,7 @@
 /**
  * Multiplayer sub-menu of the main's pause, as doom_js's MenuMultiplayerModal in a session: the lobby, without adding a
  * player during a race (user decision: one joins before a race only), the stop of the session and the multiplayer
- * options. Its back button, Backspace, Escape and the gamepad back button return to the pause.
+ * options. Its back entry, Backspace, Escape and the gamepad back button return to the pause.
  */
 class RacingMultiplayerModal extends AppMenuAbstractListModal {
     /**
@@ -25,11 +25,11 @@ class RacingMultiplayerModal extends AppMenuAbstractListModal {
     }
 
     show() {
-        const {bodyEl} = this._openShell(appTranslator.get('multiplayer.pause.menu'), appTranslator.get('menu.back'));
-        const listEl   = AppMenuDom.addElement(bodyEl, 'div', 'app-menu-list');
+        const {listEl} = this._openSimpleShell(appTranslator.get('multiplayer.pause.menu'));
         this._nav.addItemIn(listEl, appTranslator.get('multiplayer.pause.lobby'), () => this._openLobby());
         this._nav.addItemIn(listEl, appTranslator.get('multiplayer.pause.stop'), () => this._confirmStop());
         this._nav.addItemIn(listEl, appTranslator.get('multiplayer.options'), () => this._openOptions());
+        this._nav.setBackTarget(this._nav.addItemIn(listEl, appTranslator.get('menu.back'), () => this.close()));
         this._nav.selectFirst();
 
         return this;
@@ -56,7 +56,7 @@ class RacingMultiplayerModal extends AppMenuAbstractListModal {
     }
 
     _confirmStop() {
-        this._confirm(appTranslator.get('multiplayer.pause.stopConfirm'), () => {
+        RacingHostedSession.confirmStop(this._display, () => {
             this._sessionContext.stop();
             this._resume();
         });

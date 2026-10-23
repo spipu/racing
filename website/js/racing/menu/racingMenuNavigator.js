@@ -95,7 +95,7 @@ class RacingMenuNavigator {
             leave();
             return;
         }
-        new AppMenuModal(this._display).confirm(appTranslator.get('multiplayer.pause.stopConfirm'), leave);
+        RacingHostedSession.confirmStop(this._display, leave);
     }
 
     /**

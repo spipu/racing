@@ -41,11 +41,11 @@ class AppMenuDom {
         return element;
     }
 
-    // A colour square (a player's slot colour), first in its parent.
+    // A colour mark (a player's slot colour), right before the label of a list entry, else first in its parent.
     static addColorSwatch(parent, color) {
         const swatch = AppMenuDom.addElement(parent, 'span', 'app-menu-color-swatch');
         swatch.style.background = color;
-        parent.insertBefore(swatch, parent.firstChild);
+        parent.insertBefore(swatch, (parent.querySelector(':scope > .app-menu-item-label') ?? parent.firstChild));
 
         return swatch;
     }
@@ -69,18 +69,50 @@ class AppMenuDom {
         return element;
     }
 
-    // Selectable list entry shell (item + label) — the caller registers it on
-    // its AppMenuListNavigation and may append extra children (infos, buttons).
+    // Selectable list entry shell (selection arrows around the label) — the caller registers it on its
+    // AppMenuListNavigation and may append extra children (infos, value, buttons).
     static addListItem(listEl, labelText) {
         const item = AppMenuDom.addElement(listEl, 'div', 'app-menu-item');
+        AppMenuDom.addElement(item, 'span', 'app-menu-item-arrow');
         AppMenuDom.addText(item, 'app-menu-item-label', labelText);
+        AppMenuDom.addElement(item, 'span', 'app-menu-item-arrow app-menu-item-arrow-end');
 
         return item;
     }
 
+    /**
+     * Value of a list entry, on its right; a value cycled by Left / Right shows its two chevrons when selected.
+     *
+     * @returns {HTMLElement} the element holding the text
+     */
+    static addValue(item, text, cycles = false) {
+        const box = AppMenuDom.addElement(item, 'span', 'app-menu-item-value' + ((cycles) ? ' app-menu-item-value-cycle' : ''));
+        AppMenuDom.addElement(box, 'span', 'app-menu-item-chevron');
+        const valueEl = AppMenuDom.addText(box, 'app-menu-item-value-text', text);
+        AppMenuDom.addElement(box, 'span', 'app-menu-item-chevron app-menu-item-chevron-end');
+
+        return valueEl;
+    }
+
+    /**
+     * Label / value table of a detail panel.
+     *
+     * @param {HTMLElement}                       parent
+     * @param {{label: string, value: string}[]} facts
+     */
+    static addFacts(parent, facts) {
+        const table = AppMenuDom.addElement(parent, 'div', 'app-menu-facts');
+        for (const fact of facts) {
+            AppMenuDom.addText(table, 'app-menu-fact-label', fact.label);
+            AppMenuDom.addText(table, 'app-menu-fact-value', fact.value);
+        }
+
+        return table;
+    }
+
     // Delete cross of a list row (press feedback included, row not selected).
     static addDeleteButton(item, titleText, onDelete) {
-        const button = AppMenuDom.addButton(item, 'app-menu-button app-menu-item-delete', '\u2715', onDelete);
+        const button = AppMenuDom.addIconButton(item, 'app-menu-button app-menu-item-delete', 'close', '', onDelete);
         button.title = titleText;
 
         return button;
@@ -96,6 +128,11 @@ class AppMenuDom {
 
     static hasOverlay(container) {
         return (container.querySelector('.app-menu-overlay') !== null);
+    }
+
+    static formatMegabytes(bytes) {
+        return new Intl.NumberFormat(appTranslator.getLocale(), {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(bytes / 1048576)
+            + ' ' + appTranslator.get('unit.megabyte');
     }
 
     static formatSize(bytes) {
@@ -123,6 +160,11 @@ class AppMenuDom {
         return new Date(timestamp).toLocaleDateString(appTranslator.getLocale());
     }
 
+    // "19 July 2026", the month spelled out: a detail panel has the room for it.
+    static formatLongDay(timestamp) {
+        return new Date(timestamp).toLocaleDateString(appTranslator.getLocale(), {day: 'numeric', month: 'long', year: 'numeric'});
+    }
+
     // Seconds are for the save slots: two saves may land in the same minute.
     static formatDate(timestamp, withSeconds = false) {
         const date        = new Date(timestamp);
@@ -134,6 +176,11 @@ class AppMenuDom {
 
         return date.toLocaleDateString(locale)
             + ' ' + date.toLocaleTimeString(locale, timeOptions);
+    }
+
+    // A button led by an icon of appMenu.css (its class app-menu-icon-<name>).
+    static addIconButton(parent, className, icon, label, onClick, feedbackMs = AppMenuDom.PRESS_FEEDBACK_MS) {
+        return AppMenuDom.addButton(parent, className + ' app-menu-icon app-menu-icon-' + icon, label, onClick, feedbackMs);
     }
 
     // The blur avoids a focused button: a focused one would swallow the next

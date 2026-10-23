@@ -3,11 +3,14 @@
  * shows the breadcrumb of the stack ("Options > Display"), and the building of
  * a settings page from the definitions of an AppSettings ('bool' and 'list'
  * cycle on Left/Right, 'text' opens the on-screen keyboard, a control binding
- * 'char' / 'padButton' / 'padAxis' opens its capture page).
+ * 'char' / 'padButton' / 'padAxis' opens its capture page). Its root may be a
+ * row of tabs (_openTabs): one page per tab, switched by a click or a tap, the
+ * tab row reached by Up, PageUp / PageDown and the gamepad shoulders.
  *
- * A subclass builds its pages through _open / _pushPage and plugs in its own
- * setting types (_activateSetting, _customValueText), what a change applies
- * (_applySettings) and the settings that rewrite the whole page (_rebuildsPage).
+ * A subclass builds its pages through _open / _openTabs / _pushPage and plugs
+ * in its own setting types (_activateSetting, _customValueText), what a change
+ * applies (_applySettings) and the settings that rewrite the whole page
+ * (_rebuildsPage).
  */
 class AppMenuSettingsModal extends AppMenuAbstractListModal {
     /**
@@ -28,6 +31,14 @@ class AppMenuSettingsModal extends AppMenuAbstractListModal {
         this._captureHandler  = null;
         this._captureTimer    = null;
         this._layoutMap       = null;
+        this._titleCode       = null;
+        this._tabs            = null;
+        this._tabIndex        = 0;
+        this._tabBar          = null;
+        this._tabButtons      = [];
+        this._extraButton     = null;
+        this._extraLabelCode  = null;
+        this._tabRowShown     = true;
     }
 
     /**
@@ -43,6 +54,7 @@ class AppMenuSettingsModal extends AppMenuAbstractListModal {
     _open(standalone, titleCode, builder, confirmation = null) {
         this._loadLayoutMap();
         this._standalone = (standalone === true);
+        this._tabs       = null;
         const {titleEl, bodyEl, button} = this._openShell('', appTranslator.get('menu.close'), confirmation);
         this._titleEl      = titleEl;
         this._bodyEl       = bodyEl;
@@ -51,6 +63,76 @@ class AppMenuSettingsModal extends AppMenuAbstractListModal {
         this._pushPage(titleCode, builder);
 
         return this;
+    }
+
+    /**
+     * Opens the modal on a row of tabs, one page each, the first one shown. An extra button ({labelCode, action},
+     * a reset) takes the left of the bottom row, Back its right.
+     *
+     * @param {string}                                      titleCode
+     * @param {{titleCode: string, builder: function}[]}    tabs
+     * @param {{labelCode: string, action: function}|null} extra
+     */
+    _openTabs(titleCode, tabs, extra = null) {
+        this._loadLayoutMap();
+        this._standalone = false;
+        this._titleCode  = titleCode;
+        this._tabs       = tabs;
+        this._tabIndex   = 0;
+        const {titleEl, bodyEl, button} = this._openShell('', appTranslator.get('menu.back'));
+        this._titleEl      = titleEl;
+        this._bodyEl       = bodyEl;
+        this._actionButton = button;
+        bodyEl.parentElement.classList.add('app-menu-modal-tabbed');
+        this._buildTabBar();
+        this._extraButton    = null;
+        this._extraLabelCode = null;
+        if (extra !== null) {
+            this._extraLabelCode = extra.labelCode;
+            this._extraButton    = AppMenuDom.addButton(button.parentElement, 'app-menu-button app-menu-button-secondary', '', extra.action);
+            button.parentElement.insertBefore(this._extraButton, button);
+            button.parentElement.classList.add('app-menu-modal-actions-split');
+            this._nav.setBottomButtons([this._extraButton, button], button);
+        }
+        this._tabRowShown = true;
+        this._nav.setOnPage((dir) => this._stepTab(dir));
+        this._selectTab(0, false);
+
+        return this;
+    }
+
+    // Previous / next steps on both ends (a click or a tap), the tabs between them: the navigation walks the tabs
+    // only, entered on the active one.
+    _buildTabBar() {
+        this._tabBar = AppMenuDom.addElement(this._bodyEl.parentElement, 'div', 'app-menu-tabs');
+        this._bodyEl.parentElement.insertBefore(this._tabBar, this._bodyEl);
+        const step = (dir, className) => {
+            AppMenuDom.addButton(this._tabBar, 'app-menu-button app-menu-button-secondary app-menu-tab-step ' + className, '', () => this._stepTab(dir));
+        };
+        step(-1, 'app-menu-tab-previous');
+        const tabsEl     = AppMenuDom.addElement(this._tabBar, 'div', 'app-menu-tab-list');
+        this._tabButtons = this._tabs.map((tab, index) => AppMenuDom.addButton(tabsEl, 'app-menu-button app-menu-tab', '', () => this._selectTab(index, true)));
+        step(1, 'app-menu-tab-next');
+        this._nav.setSideButtons(this._tabButtons, 0);
+    }
+
+    _stepTab(dir) {
+        this._selectTab(((this._tabIndex + dir + this._tabs.length) % this._tabs.length), false);
+    }
+
+    // A tab picked in the tab row keeps the focus there; a page switch (shoulder, PageUp / PageDown, a step
+    // button) lands on the page's first entry.
+    _selectTab(index, focusTab) {
+        this._stopCapture();
+        this._tabIndex  = index;
+        this._pageStack = [{titleCode: this._tabs[index].titleCode, builder: this._tabs[index].builder, noBack: false}];
+        this._nav.setSideEntry(index).focusSideButton(null);
+        this._renderPage();
+        this._nav.selectFirst();
+        // Back on the tab once the page has its entry: Down from the tab row then reaches it.
+        if (focusTab) {
+            this._nav.focusSideButton(this._tabButtons[index]);
+        }
     }
 
     _teardown() {
@@ -90,15 +172,51 @@ class AppMenuSettingsModal extends AppMenuAbstractListModal {
         this._clearPageTimer();
         const current  = this._pageStack[this._pageStack.length - 1];
         const rootCode = ((this._standalone) ? 'menu.close' : 'menu.back');
-        this._titleEl.textContent        = this._pageStack.map((page) => appTranslator.get(page.titleCode)).join(' > ');
+        this._titleEl.textContent        = this._breadcrumb().map((code) => appTranslator.get(code)).join(' > ');
         this._actionButton.textContent   = appTranslator.get(((this._pageStack.length > 1) ? 'menu.back' : rootCode));
         this._actionButton.style.display = ((current.noBack === true) ? 'none' : '');
+        this._renderTabBar();
         this._bodyEl.innerHTML           = '';
         this._nav.clear();
         current.builder();
         if (this._pendingListView !== null) {
             this._applyListView(this._pendingListView);
             this._pendingListView = null;
+        }
+    }
+
+    // Under tabs, the root page is the modal's title; a page stacked on a tab names that tab first.
+    _breadcrumb() {
+        const codes = this._pageStack.map((page) => page.titleCode);
+        if (this._tabs === null) {
+            return codes;
+        }
+
+        return ((codes.length > 1) ? [this._titleCode, ...codes] : [this._titleCode]);
+    }
+
+    // The tab labels follow the language; the row and the extra button step aside under a stacked page.
+    _renderTabBar() {
+        if (this._tabs === null) {
+            return;
+        }
+        const atRoot = (this._pageStack.length === 1);
+        this._tabBar.style.visibility = ((atRoot) ? '' : 'hidden');
+        // A row stepped aside leaves the navigation too: Up must not reach a hidden tab, nor Left a hidden reset.
+        if (atRoot !== this._tabRowShown) {
+            this._tabRowShown = atRoot;
+            this._nav.setSideButtons(((atRoot) ? this._tabButtons : []), this._tabIndex);
+            if (this._extraButton !== null) {
+                this._nav.setBottomButtons(((atRoot) ? [this._extraButton, this._actionButton] : [this._actionButton]), this._actionButton);
+            }
+        }
+        this._tabButtons.forEach((button, index) => {
+            button.textContent = appTranslator.get(this._tabs[index].titleCode);
+            button.classList.toggle('app-menu-tab-active', (index === this._tabIndex));
+        });
+        if (this._extraButton !== null) {
+            this._extraButton.textContent   = appTranslator.get(this._extraLabelCode);
+            this._extraButton.style.display = ((atRoot) ? '' : 'none');
         }
     }
 
@@ -167,7 +285,7 @@ class AppMenuSettingsModal extends AppMenuAbstractListModal {
         }, (cycles ? (dir) => {
             this._stepSettingValue(definition, valueEl, dir);
         } : null));
-        valueEl = AppMenuDom.addText(item, 'app-menu-item-value', this._settingValueText(definition));
+        valueEl = AppMenuDom.addValue(item, this._settingValueText(definition), cycles);
 
         return item;
     }

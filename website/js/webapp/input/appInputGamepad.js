@@ -217,6 +217,15 @@ class AppInputGamepad {
         return ((action !== null) ? this.readAction(action) : this._button(AppInputGamepad.START_BUTTON));
     }
 
+    // Shoulder buttons L1 / R1: the same slots on the standard mapping and the DualSense raw layout.
+    readMenuPagePrev() {
+        return this._button(AppInputGamepad.SHOULDER_LEFT_BUTTON);
+    }
+
+    readMenuPageNext() {
+        return this._button(AppInputGamepad.SHOULDER_RIGHT_BUTTON);
+    }
+
     readMenuStickX() {
         const slot = this._menuBindings.stickX;
 
@@ -275,12 +284,14 @@ class AppInputGamepad {
     }
 }
 
-AppInputGamepad.DEAD_ZONE         = 0.15;
-AppInputGamepad.PRESS_THRESHOLD   = 0.5;
-AppInputGamepad.VALIDATE_BUTTON   = 0;
-AppInputGamepad.BACK_BUTTON       = 1;
-AppInputGamepad.START_BUTTON      = 9;
-AppInputGamepad.DPAD_FIRST_BUTTON = 12;
-AppInputGamepad.LEFT_STICK_X      = 0;
-AppInputGamepad.LEFT_STICK_Y      = 1;
-AppInputGamepad.NAME_MAX_LENGTH   = 24;
+AppInputGamepad.DEAD_ZONE             = 0.15;
+AppInputGamepad.PRESS_THRESHOLD       = 0.5;
+AppInputGamepad.VALIDATE_BUTTON       = 0;
+AppInputGamepad.BACK_BUTTON           = 1;
+AppInputGamepad.START_BUTTON          = 9;
+AppInputGamepad.SHOULDER_LEFT_BUTTON  = 4;
+AppInputGamepad.SHOULDER_RIGHT_BUTTON = 5;
+AppInputGamepad.DPAD_FIRST_BUTTON     = 12;
+AppInputGamepad.LEFT_STICK_X          = 0;
+AppInputGamepad.LEFT_STICK_Y          = 1;
+AppInputGamepad.NAME_MAX_LENGTH       = 24;

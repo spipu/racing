@@ -220,12 +220,14 @@ class RacingGame {
         this._controls.setVirtualPadVisible(false);
         this._presentation.setSoundPaused(true);
         this._pauseDisplay = new AppMenuDisplay('screen').init(true);
+        // The theme blurs the race under the pause only: it no longer moves.
+        this._pauseDisplay.getContainer().classList.add(RacingGame.FROZEN_DISPLAY_CLASS);
         this._pauseModal   = new RacingPauseModal(this._pauseDisplay)
             .setOnResume(() => this._leavePause())
             .setOnRestart(((this._role.restartsRace()) ? () => this._restart() : null))
             .setOnQuit(() => this.quit())
             .setSessionContext((this._hosted !== null) ? this._hosted.pauseContext() : null)
-            .show(() => this._pauseTitle());
+            .show(() => this._pauseHeader());
     }
 
     // The settings changed in the pause apply on resume, a renderer change on the next live frame.
@@ -373,14 +375,13 @@ class RacingGame {
         this._navigator.startRace(this._selection);
     }
 
-    _pauseTitle() {
+    _pauseHeader() {
         const course = racingCatalog.getCourse(this._selection.course).name;
-        const car    = racingCatalog.getCars().find((entry) => (entry.code === this._selection.car)).name;
 
-        return appTranslator.get('race.pause.title', {
-            course: ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
-            car:    car
-        });
+        return {
+            title:    ((this._selection.mirror) ? appTranslator.get('course.mirror', {course: course}) : course),
+            subtitle: racingCatalog.getCars().find((entry) => (entry.code === this._selection.car)).name
+        };
     }
 
     // Any error of the race stops it and brings the menus back with the error.
@@ -449,3 +450,4 @@ RacingGame.METRES_PER_HEIGHT_UNIT        = (1 / (RacingGame.HEIGHT_UNITS_PER_SCE
 RacingGame.LOCAL_PLAYER_ID               = RacingPlayer.MAIN_ID;
 // A multiplayer session renders with WebGL, as doom_js.
 RacingGame.SESSION_RENDERER              = 'webgl';
+RacingGame.FROZEN_DISPLAY_CLASS          = 'racing-menu-frozen';

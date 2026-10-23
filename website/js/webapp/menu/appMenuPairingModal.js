@@ -53,15 +53,17 @@ class AppMenuPairingModal extends AppMenuModal {
         const {modal}  = this._createShell(title, 'app-menu-modal app-menu-modal-wide app-menu-modal-pairing', 'app-menu-subtitle');
         const stage    = AppMenuDom.addElement(modal, 'div', 'app-menu-pairing-stage'
             + ((sequential) ? ' app-menu-pairing-stage-sequential' : ''));
+        // The step numbers follow the order of the flow: the main shows then reads, a sub reads then shows.
+        const qrTile     = AppMenuPairingModal._tile(stage, 'div', 'app-menu-pairing-qr', ((sequential) ? 2 : 1));
+        const cameraTile = AppMenuPairingModal._tile(stage, 'video', 'app-menu-pairing-camera', ((sequential) ? 1 : 2));
+        AppMenuPairingModal._addViewfinder(cameraTile.frame);
         const elements = {
-            qr:            AppMenuPairingModal._tile(stage, 'div', 'app-menu-pairing-qr'),
-            camera:        AppMenuPairingModal._tile(stage, 'video', 'app-menu-pairing-camera'),
-            qrCaption:     null,
-            cameraCaption: null,
+            qr:            qrTile.frame,
+            camera:        cameraTile.frame,
+            qrCaption:     qrTile.caption,
+            cameraCaption: cameraTile.caption,
             status:        AppMenuDom.addElement(stage, 'div', 'app-menu-pairing-status')
         };
-        elements.qrCaption     = AppMenuDom.addElement(elements.qr.parentElement, 'div', 'app-menu-pairing-caption');
-        elements.cameraCaption = AppMenuDom.addElement(elements.camera.parentElement, 'div', 'app-menu-pairing-caption');
         elements.camera.muted       = true;
         elements.camera.playsInline = true;
 
@@ -150,18 +152,36 @@ class AppMenuPairingModal extends AppMenuModal {
         return AppMenuPairingModal.ERROR_DEFAULT;
     }
 
-    // The element of a tile of the stage, its caption added under it by the caller.
-    static _tile(stage, tagName, className) {
-        const tile = AppMenuDom.addElement(stage, 'div', 'app-menu-pairing-tile');
+    // A tile of the stage: its step number and caption above the frame, the frame in a window that also holds
+    // the zoom mark (a click on either zooms the frame).
+    static _tile(stage, tagName, className, step) {
+        const tile    = AppMenuDom.addElement(stage, 'div', 'app-menu-pairing-tile');
+        const header  = AppMenuDom.addElement(tile, 'div', 'app-menu-pairing-step');
+        AppMenuDom.addText(header, 'app-menu-pairing-step-number', String(step));
+        const caption = AppMenuDom.addElement(header, 'div', 'app-menu-pairing-caption');
+        const pane    = AppMenuDom.addElement(tile, 'div', 'app-menu-pairing-window');
+        const frame   = AppMenuDom.addElement(pane, tagName, 'app-menu-pairing-frame ' + className);
+        const zoom    = AppMenuDom.addElement(pane, 'span', 'app-menu-pairing-zoom app-menu-icon app-menu-icon-zoom');
+        zoom.addEventListener('click', () => frame.click());
 
-        return AppMenuDom.addElement(tile, tagName, 'app-menu-pairing-frame ' + className);
+        return {frame: frame, caption: caption};
+    }
+
+    // Aiming corners and a sweeping line over the camera, drawn by the theme.
+    static _addViewfinder(frame) {
+        const viewfinder = AppMenuDom.addElement(frame.parentElement, 'span', 'app-menu-pairing-viewfinder');
+        for (let corner = 0; corner < AppMenuPairingModal.VIEWFINDER_CORNERS; corner++) {
+            AppMenuDom.addElement(viewfinder, 'span', 'app-menu-pairing-corner');
+        }
+        AppMenuDom.addElement(viewfinder, 'span', 'app-menu-pairing-scan');
     }
 }
 
-AppMenuPairingModal.WASM_URL       = '/lib/zxing-wasm/zxing_full.wasm';
-AppMenuPairingModal.NO_BREAK_SPACE = '\u00A0';
-AppMenuPairingModal.ERROR_DEFAULT  = 'multiplayer.error.pairing';
-AppMenuPairingModal.ERROR_CODES    = {
+AppMenuPairingModal.WASM_URL           = '/lib/zxing-wasm/zxing_full.wasm';
+AppMenuPairingModal.VIEWFINDER_CORNERS = 4;
+AppMenuPairingModal.NO_BREAK_SPACE     = '\u00A0';
+AppMenuPairingModal.ERROR_DEFAULT      = 'multiplayer.error.pairing';
+AppMenuPairingModal.ERROR_CODES        = {
     [NetError.VERSION_MISMATCH]: 'multiplayer.error.version',
     [NetError.INVITE_USED]:      'multiplayer.error.invite',
     [NetError.UNKNOWN_INVITE]:   'multiplayer.error.invite'

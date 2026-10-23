@@ -91,7 +91,7 @@ class AppMenuLobbyModal extends AppMenuAbstractListModal {
         for (const player of lobby.getPlayers()) {
             const pingEl = this._pingEls.get(player.id);
             if (pingEl !== undefined) {
-                pingEl.textContent = this._pingText(player);
+                this._showPing(pingEl, player);
             }
         }
     }
@@ -121,10 +121,32 @@ class AppMenuLobbyModal extends AppMenuAbstractListModal {
         }
     }
 
+    // The host is tagged; a sub shows its ping with signal bars, and on the main the cross that removes it.
     _addPlayer(player) {
         const item = this._addSeatItem(player, () => this._pickPlayer(player));
-        this._pingEls.set(player.id, AppMenuDom.addText(item, 'app-menu-item-infos', this._pingText(player)));
+        if (player.id === NetLobby.MAIN_ID) {
+            AppMenuDom.addText(item, 'app-menu-tag', appTranslator.get('multiplayer.lobby.main'));
+        } else {
+            const pingEl = AppMenuDom.addElement(item, 'span', 'app-menu-ping');
+            AppMenuDom.addElement(pingEl, 'span', 'app-menu-ping-bars');
+            AppMenuDom.addElement(pingEl, 'span', 'app-menu-ping-text');
+            this._showPing(pingEl, player);
+            this._pingEls.set(player.id, pingEl);
+            if (this._isMain) {
+                AppMenuDom.addDeleteButton(item, appTranslator.get('multiplayer.lobby.remove'), () => this._pickPlayer(player));
+            }
+        }
         this._itemKeys.push(player.id);
+    }
+
+    // The bars fill by thresholds of the round trip (AppMenuLobbyModal.PING_BAR_LIMITS_MS), none before a sample.
+    _showPing(pingEl, player) {
+        let level = 0;
+        if ((player.ping !== null) && (player.away !== true)) {
+            level = AppMenuLobbyModal.PING_BAR_LIMITS_MS.filter((limit) => (player.ping <= limit)).length + 1;
+        }
+        pingEl.dataset.level = String(level);
+        pingEl.querySelector('.app-menu-ping-text').textContent = this._pingText(player);
     }
 
     // A lost player's seat, kept for its return: nothing to do with it.
@@ -150,6 +172,7 @@ class AppMenuLobbyModal extends AppMenuAbstractListModal {
             return;
         }
         const add = this._nav.addItemIn(this._listEl, appTranslator.get('multiplayer.lobby.add'), () => this._addPlayerIfRoom());
+        add.classList.add('app-menu-item-add');
         if (lobby.isFull()) {
             add.classList.add('app-menu-item-disabled');
         }
@@ -170,13 +193,10 @@ class AppMenuLobbyModal extends AppMenuAbstractListModal {
             return;
         }
         this._confirm(appTranslator.get('multiplayer.lobby.removeConfirm', {nickname: player.nickname}),
-            () => this._session.remove(player.id), appTranslator.get('multiplayer.lobby.remove'));
+            () => this._session.remove(player.id), null, null, true);
     }
 
     _pingText(player) {
-        if (player.id === NetLobby.MAIN_ID) {
-            return appTranslator.get('multiplayer.lobby.main');
-        }
         if (player.away === true) {
             return appTranslator.get('multiplayer.lobby.away');
         }
@@ -189,5 +209,7 @@ class AppMenuLobbyModal extends AppMenuAbstractListModal {
     }
 }
 
-AppMenuLobbyModal.KEY_ADD      = 'add';
-AppMenuLobbyModal.KEY_RESERVED = 'reserved-';
+AppMenuLobbyModal.KEY_ADD            = 'add';
+AppMenuLobbyModal.KEY_RESERVED       = 'reserved-';
+// Round trips under which the signal shows 4, 3, then 2 bars; above the last one, a single bar.
+AppMenuLobbyModal.PING_BAR_LIMITS_MS = Object.freeze([40, 90, 180]);
