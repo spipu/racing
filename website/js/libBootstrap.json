@@ -1,5 +1,5 @@
 {
-    "version": "v1.0255",
+    "version": "v1.0256",
     "files": {
         "assets": [
             "/assets/virtual_racing/catalog.json",
@@ -177,6 +177,7 @@
             "/js/webapp/input/appInputVirtualGamepad.js",
             "/js/webapp/screenWakeLock.js",
             "/js/webapp/appViewportStabilizer.js",
+            "/js/webapp/appPlatform.js",
             "/js/webapp/appDatabaseSchema.js",
             "/js/webapp/appDatabaseUpgrade.js",
             "/js/webapp/appDatabase.js",
