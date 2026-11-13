@@ -1,5 +1,5 @@
 {
-    "version": "v1.8",
+    "version": "v1.9",
     "files": {
         "assets": [],
         "css": [],
@@ -56,11 +56,12 @@
             "/website/js/engine/animation/animationPlayer.js",
             "/website/js/engine/animation/animatedInstance.js",
             "/website/js/engine/zBuffer.js",
-            "/website/js/engine/renderer/faceDepthQueue.js",
+            "/website/js/engine/renderer/base/faceDepthQueue.js",
             "/website/js/engine/renderer/object3dRendererBase.js",
             "/website/js/engine/renderer/object3dRendererFast.js",
             "/website/js/engine/renderer/object3dRendererFull.js",
             "/website/js/engine/renderer/object3dRendererFlat.js",
+            "/website/js/engine/renderer/webgl/bloom.js",
             "/website/js/engine/renderer/object3dRendererWebGL.js",
             "/website/js/engine/renderer/object3dRendererList.js",
             "/website/js/engine/engine3d.js",
